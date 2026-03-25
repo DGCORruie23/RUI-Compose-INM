@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Cuadro Datos {{ fecha }}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        @page {
+            /* size: A4 landscape; Establecer formato horizontal */
+            size: A4 portrait; /* Establecer formato vertical */
+            margin: 10mm;
+        }
+
+        body {
+            font-family: 'Montserrat', sans-serif;
+            padding: 0;
+        }
+        h5 {
+            text-align: center;
+            align-items: center;
+            margin-top: -10px;
+            margin-bottom: -10px;
+        }
+        h6 {
+            text-align: center;
+            align-items: center;
+            margin-bottom: -4px;
+        }
+        
+        .fecha {
+            text-align: right;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        .letraT3 { 
+            color:rgb(244, 244, 244);
+            background-color:rgb(40, 92, 77);  /* Color de fondo */
+            writing-mode: vertical-lr; /* Texto en vertical (de abajo hacia arriba) */
+            font-size: 3pt;
+            border: 1px solid rgb(255, 255, 255); 
+            text-align: center;
+        }
+
+        .page-break {
+            page-break-before: always;
+        }
+
+        .tabla-oficina {
+            width: 80%;
+            border-collapse: collapse;
+            margin: auto;
+        }
+
+        .tabla-oficina th, .tabla-oficina td {
+            border: 1px solid black;
+            padding: 5px;
+            text-align: center;
+            font-size: 10pt;
+        }
+
+        .tabla-oficina th {
+            background-color:rgb(255, 255, 255); 
+            color: rgb(0, 0, 0);
+            font-weight: bold;
+        }
+
+        .tabla-oficina td {
+            color: rgb(139,107,65);
+        }
+
+        .tabla-oficina tr:last-child td {
+            background-color: rgb(139,107,65);
+            color: rgb(250, 250, 250); 
+            font-weight: bold; /* Opcional: negrita */
+        }
+
+
+        .tabla-oficina1 {
+            width: 80%;
+            border-collapse: collapse;
+            margin: auto;
+        }
+
+        .tabla-oficina1 th, .tabla-oficina1 td {
+            border: 1px solid black;
+            padding: 5px;
+            text-align: center;
+            font-size: 10pt;
+        }
+
+        .tabla-oficina1 th {
+            background-color:rgb(255, 255, 255); 
+            color: rgb(0, 0, 0);
+            font-weight: bold;
+        }
+
+        .tabla-oficina1 td {
+            color: rgb(112,48,160);
+        }
+
+        .tabla-oficina1 tr:last-child td {
+            background-color: rgb(112,48,160);
+            color: rgb(250, 250, 250); 
+            font-weight: bold; /* Opcional: negrita */
+        }
+
+        .tabla-resumen {
+            width: 45%; /* 🔹 3 columnas sin perder espacio */
+            border-collapse: collapse;
+            margin-bottom: 10px;
+            margin: auto;
+        }
+
+        .tabla-resumen th, .tabla-resumen td {
+            border: 1px solid black;
+            padding: 5px;
+            text-align: center;
+            font-size: 10pt;
+        }
+
+        .tabla-resumen th {
+            background-color:rgb(255, 255, 255); 
+            color:  rgb(98,17,50);
+            font-weight: bold;
+        }
+
+        .tabla-resumen td {
+            color: rgb(0, 0, 0);
+        }
+
+        .tabla-resumen tr:last-child td {
+            background-color: rgb(98,17,50);
+            color: rgb(250, 250, 250); 
+            font-weight: bold; /* Opcional: negrita */
+        }
+
+        .letras-DIF {
+            color: rgb(112,48,160);
+            text-align: center;
+        }
+
+        .letras-EM {
+            color: rgb(40, 92, 77); 
+            text-align: center;
+        }
+
+        .letras-Tit {
+            color: rgb(5, 11, 9); 
+            text-align: center;
+        }
+
+        .contenedor-2T {
+            margin-top: 40px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .contenedor-datos {
+            margin: 0;
+            display: grid;
+            grid-template-rows: auto 1fr auto; /* Encabezado, contenido, pie de página */
+            height: 100vh;
+        }
+
+        .color-temp td {
+            background-color: rgb(217, 217, 217);
+        }
+
+        .letras-temp td:last-child {
+            color: rgb(157,36,73
+            );
+        }
+
+        .texto-f {
+            font-size: 8pt;
+            text-indent: 30px;
+            text-align: justify;
+            line-height: 1.5;
+        }
+
+        .sangria {
+            text-indent: 20px; /* Sangría en la primera línea */
+        }
+        
+        .justificado {
+            text-align: justify;
+        }
+
+        .espaciado {
+            line-height: 1.5; /* Aumenta el espacio entre líneas */
+        }
+
+    </style>
+</head>
+<body>
+    <div class="contenedor-datos">
+        
+        <div>
+            <h4 class="letras-Tit">INSTITUTO NACIONAL DE MIGRACIÓN<br>DIRECCIÓN GENERAL DE OFICINAS DE REPRESENTACION</h4>
+
+            <div>
+                <h3 class="letras-Tit">Cuadro Datos<br>{{ fecha }}</h3>
+            </div>
+
+            <table class='tabla-resumen'>
+                <thead>
+                    <tr>
+                        <th>FECHA</th>
+                        <th>{{ fecha }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Rescatados:</td>
+                        <td>{{ rescatados }}</td>
+                    </tr>
+                    <tr class="letras-temp">
+                        <td>Reincidentes:</td>
+                        <td>-{{ reincidentes }}</td>
+                    </tr>
+                    <tr class="color-temp">
+                        <td>Subtotal:</td>
+                        <td>{{ subtotal1 }}</td>
+                    </tr>
+                    <tr class="letras-temp">
+                        <td>Inadmitidos:</td>
+                        <td>-{{ inadmitidos }}</td>
+                    </tr>
+                    <tr class="color-temp">
+                        <td>Subtotal:</td>
+                        <td>{{ subtotal2 }}</td>
+                    </tr>
+                    <tr class="letras-temp">
+                        <td>Retornados:</td>
+                        <td>-{{ retornados }}</td>
+                    </tr>
+                    <tr class="color-temp">
+                        <td>Subtotal:</td>
+                        <td><strong>{{ rescates_nuevos }}</strong></td>
+                    </tr>
+                    <tr>
+                        <td>De estos:</td>
+                        <td>{{ EM_total }} Alojados en EM y<BR>{{ DIF_total }} canalizados al DIF</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="contenedor-2T">
+            <div>
+                <h3 class="letras-EM">Alojados en EM</h3>
+                <table class='tabla-oficina'>
+                    <thead>
+                        <tr>
+                            <th>NACIONALIDAD</th>
+                            <th>TOTAL</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for oficina, datos in rescates_EM.items %}
+                        <tr>
+                            <td>{{ oficina }}</td>
+                            <td>{{ datos.total_EM }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="2"> <strong>Sin rescates.</strong></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div>
+                <h3 class="letras-DIF">Alojados en DIF/ALBERGUE</h3>
+                <table class='tabla-oficina1'>
+                    <thead>
+                        <tr>
+                            <th>NACIONALIDAD</th>
+                            <th>TOTAL</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for oficina, datos in rescates_DIF.items %}
+                        <tr>
+                            <td>{{ oficina }}</td>
+                            <td>{{ datos.total_DIF }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="2"> <strong>Sin rescates.</strong></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <br>
+        <br>
+
+        <p class="texto-f">
+            Por lo que hace al número de rescates reportados, se precisa, que:<br><br>
+            1.El mayor porcentaje de rescates, son extranjeros que se quedaron en Territorio Nacional, esperando cita de CBP-ONE y ahora son detectados en trayecto hacia el sur, solicitando el retorno voluntario su país de origen.<br><br>
+            2.En el caso de Guatemala y Honduras se continúa con retornos inmediatos y los programados vía aérea y terrestre al interior de sus países.<br><br>
+            3.En el caso de los venezolanos (que representan el mayor porcentaje de extranjeros en situación irregular en nuestro país) cada día se incrementa el número de solicitantes, para el Retorno Voluntario a su país.
+        </p>
+
+    </div>
+
+</body>
+</html>

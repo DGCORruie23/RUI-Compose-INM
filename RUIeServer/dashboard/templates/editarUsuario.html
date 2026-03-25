@@ -1,0 +1,236 @@
+{% extends "base/base.html" %}
+
+{% load static %}
+
+{% block styles %}
+    <style>
+
+
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 8px;
+        }
+
+        tr:nth-child(even) {
+            background-color: #e1e1e1
+        }
+
+        th {
+
+            color: rgb(165, 27, 27);
+        }
+
+        .bdtable {
+            border: 2px solid #b4b4b4;
+            border-radius: 15px;
+            box-shadow: 0px 1px;
+            margin-left: 100px;
+            margin-right: 100px;
+  
+        }
+        .edit{
+            border: 2px solid #f2eddf;
+            background-color: #f2eddf;
+            border-radius: 15px;
+            box-shadow: 0px 1px;
+            margin-left: 100px;
+            margin-right: 100px;
+            margin-top: 100px;
+            opacity: 0.75;
+        }
+        .elegant-input-label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+    
+        .elegant-input {
+            width: 100%;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-sizing: border-box;
+            margin-bottom: 15px;
+            padding: 8px; 
+        }
+
+        .overlay { 
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0, 0, 0, 0.7);
+            transition: opacity 500ms;
+            visibility: hidden;
+            opacity: 0;
+        }
+
+        .overlay:target{
+            visibility: visible;
+            opacity: 1;
+        }
+
+        #popupBody{
+            width: 46%;
+            padding: 2%;
+            border-radius: 15px;
+            box-shadow: 0 0 5px #CCC;
+            background: #FFF;
+            position: relative;
+            margin: 20% auto;
+            transition: all 5s ease-in-out;
+
+        }
+
+
+        #cerrar{
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            font-size: 30px;
+            font-weight: bold;
+            text-decoration: none;
+            color: #F00;
+            transition: all 200ms;
+        }
+
+
+    </style>
+        {% endblock styles %}
+
+        {% block content %}
+        {% if user.is_authenticated %}
+    <!-- tablas de prueba
+    <div class="bdtable bg-inm-marron-100">
+        <table>
+            <tr>
+                <th>Oficina de Representación</th>
+                <th>Nombre del Punto</th>
+                <th>Tipo del Punto</th>
+            </tr>
+      
+                <tr>
+                    <td>{{ data.oficinaR }}</td>
+                    <td>{{ data.nomPuntoRevision }}</td>
+                    <td>{{ data.tipoP }}</td>
+                </tr>
+    
+        </table>
+
+    </div>-->
+    
+    <div class="edit">
+        <br><br>
+        <form method="POST" action="#" style="text-align: center; max-width: 300px; margin: auto;"> {% csrf_token %}
+
+            
+            <input type="hidden" name="idUser" value="{{ form.idUser }}" class="elegant-input" id="id_usuario"><br>
+            <input type="hidden" name="password" value="{{ form.password }}" class="elegant-input" id="password"><br>
+
+            <label for="lname" class="elegant-input-label">Nickname:</label><br>
+            <input type="text" id="id_nickname" name="nickname" value="{{ form.nickname }}" class="elegant-input"><br>
+        
+            <label for="lname" class="elegant-input-label">Nombre:</label><br>
+            <input type="text" id="id_nombre" name="nombre" value="{{ form.nombre }}" class="elegant-input"><br>
+
+            <label for="lname" class="elegant-input-label">Apellidos:</label><br>
+            <input type="text" id="id_apellido" name="apellido" value="{{ form.apellido }}" class="elegant-input"><br>
+
+            <label for="fname" class="elegant-input-label">Estado:</label><br>
+
+                <select type="text" name="estado" value="{{ form.estado }}" class="elegant-input" id="id_estado">
+                    <option value='1' {% if form.estado == '1' %}selected{% endif %}>AGUASCALIENTES</option>
+                    <option value='2' {% if form.estado == '2' %}selected{% endif %}>BAJA CALIFORNIA</option>
+                    <option value='3' {% if form.estado == '3' %}selected{% endif %}>BAJA CALIFORNIA SUR</option>
+                    <option value='4' {% if form.estado == '4' %}selected{% endif %}>CAMPECHE</option>
+                    <option value='9' {% if form.estado == '9' %}selected{% endif %}>CDMX</option>
+                    <option value='7' {% if form.estado == '7' %}selected{% endif %}>CHIAPAS</option>
+                    <option value='8' {% if form.estado == '8' %}selected{% endif %}>CHIHUAHUA</option>
+                    <option value='5' {% if form.estado == '5' %}selected{% endif %}>COAHUILA</option>
+                    <option value='6' {% if form.estado == '6' %}selected{% endif %}>COLIMA</option>
+                    <option value='10' {% if form.estado == '10' %}selected{% endif %}>DURANGO</option>
+                    <option value='15' {% if form.estado == '15' %}selected{% endif %}>EDOMEX</option>
+                    <option value='12' {% if form.estado == '12' %}selected{% endif %}>GUERRERO</option>
+                    <option value='11' {% if form.estado == '11' %}selected{% endif %}>GUANAJUATO</option>
+                    <option value='13' {% if form.estado == '13' %}selected{% endif %}>HIDALGO</option>
+                    <option value='14' {% if form.estado == '14' %}selected{% endif %}>JALISCO</option>
+                    <option value='16' {% if form.estado == '16' %}selected{% endif %}>MICHOACÁN</option>
+                    <option value='17' {% if form.estado == '17' %}selected{% endif %}>MORELOS</option>
+                    <option value='18' {% if form.estado == '18' %}selected{% endif %}>NAYARIT</option>
+                    <option value='19' {% if form.estado == '19' %}selected{% endif %}>NUEVO LEÓN</option>
+                    <option value='20' {% if form.estado == '20' %}selected{% endif %}>OAXACA</option>
+                    <option value='21' {% if form.estado == '21' %}selected{% endif %}>PUEBLA</option>
+                    <option value='22' {% if form.estado == '22' %}selected{% endif %}>QUERÉTARO</option>
+                    <option value='23' {% if form.estado == '23' %}selected{% endif %}>QUINTANA ROO</option>
+                    <option value='24' {% if form.estado == '24' %}selected{% endif %}>SAN LUIS POTOSÍ</option>
+                    <option value='25' {% if form.estado == '25' %}selected{% endif %}>SINALOA</option>
+                    <option value='26' {% if form.estado == '26' %}selected{% endif %}>SONORA</option>
+                    <option value='27' {% if form.estado == '27' %}selected{% endif %}>TABASCO</option>
+                    <option value='28' {% if form.estado == '28' %}selected{% endif %}>TAMAULIPAS</option>
+                    <option value='29' {% if form.estado == '29' %}selected{% endif %}>TLAXCALA</option>
+                    <option value='30' {% if form.estado == '30' %}selected{% endif %}>VERACRUZ</option>
+                    <option value='31' {% if form.estado == '31' %}selected{% endif %}>YUCATÁN</option>
+                    <option value='32' {% if form.estado == '32' %}selected{% endif %}>ZACATECAS</option>
+
+                </select><br>
+
+                <label for="fname" class="elegant-input-label">Tipo de Usuario:</label><br>
+
+                <select type="text" name="tipo" value="{{ form.tipo }}" class="elegant-input" id="id_tipo">
+                    <option value='1' {% if form.tipo == '1' %}selected{% endif %}>Administrador</option>
+                    <option value='2' {% if form.tipo == '2' %}selected{% endif %}>Validador</option>
+                    <option value='3' {% if form.tipo == '3' %}selected{% endif %}>Capturador</option>
+                </select><br>
+
+                <label for="lname" class="elegant-input-label">Contraseña texto:</label><br>
+                <input type="text" id="id_str_pass" name="str_pass" value="{{ form.str_pass }}" class="elegant-input"><br>
+
+                <label for="fname" class="elegant-input-label">Tipo de Dispositivo:</label><br>
+                <select type="text" name="tipo_disp" value="{{ form.tipo_disp }}" class="elegant-input" id="id_tipo_disp">
+                    <option value='1' {% if form.tipo_disp == '1' %}selected{% endif %}>Android</option>
+                    <option value='2' {% if form.tipo_disp == '2' %}selected{% endif %}>IPhone</option>
+                    <option value='3' {% if form.tipo_disp == '3' %}selected{% endif %}>Otro</option>
+                </select><br>
+            
+            <br>
+            <input type="submit" value="Guardar" class="py-2 px-6 bg-inm-verde-200 rounded-xl text-white hover:bg-inm-marron-100">
+            <br><br>
+            <a href="#popup" class="py-2 px-6 bg-inm-verde-200 rounded-xl text-white hover:bg-inm-marron-100">Cambiar Contraseña</a>
+        </form>
+        <br>
+        
+    </div>
+    
+ 
+
+    <div id="popup" class="overlay">
+        <div id="popupBody">
+            <a href="#" id="cerrar">&times;</a>
+            <div class="popupContent">
+                {% if user.is_authenticated %}
+                <center>
+                    <h3>
+                        Ingresa la nueva contraseña:
+                    </h3>
+                    <br>
+                    <br>
+                </center>
+                <form method="POST" action="#" style="text-align: center; max-width: 300px; margin: auto;"> {% csrf_token %}
+                    <input type="hidden" name="idUser" value="{{ form.idUser }}" class="elegant-input" id="id_usuario"><br>
+                    <input name="password" value="" class="elegant-input" id="id_password"><br>
+                    <input type="submit" value="Guardar" class="ml-64 py-2 px-6 bg-inm-verde-200 rounded-xl text-white hover:bg-inm-marron-100">
+                </form>
+
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% endblock content %}

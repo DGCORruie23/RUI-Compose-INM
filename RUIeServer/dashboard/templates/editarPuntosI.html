@@ -1,0 +1,171 @@
+{% extends "base/base.html" %}
+
+{% load static %}
+
+{% block styles %}
+
+    <style>
+
+
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 8px;
+        }
+
+        tr:nth-child(even) {
+            background-color: #e1e1e1
+        }
+
+        th {
+
+            color: rgb(165, 27, 27);
+        }
+
+        .bdtable {
+            border: 2px solid #b4b4b4;
+            border-radius: 15px;
+            box-shadow: 0px 1px;
+            margin-left: 100px;
+            margin-right: 100px;
+  
+        }
+        .edit{
+            border: 2px solid #f2eddf;
+            background-color: #f2eddf;
+            border-radius: 15px;
+            box-shadow: 0px 1px;
+            margin-left: 100px;
+            margin-right: 100px;
+            margin-top: 100px;
+            opacity: 0.75;
+        }
+        .elegant-input-label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+    
+        .elegant-input {
+            width: 100%;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-sizing: border-box;
+            margin-bottom: 15px;
+            padding: 8px; 
+        }
+
+
+    </style>
+        {% endblock styles %}
+
+        {% block content %}
+        {% if user.is_authenticated %}
+
+    <!-- tablas de prueba
+    <div class="bdtable bg-inm-marron-100">
+        <table>
+            <tr>
+                <th>Oficina de Representación</th>
+                <th>Nombre del Punto</th>
+                <th>Tipo del Punto</th>
+            </tr>
+      
+                <tr>
+                    <td>{{ data.oficinaR }}</td>
+                    <td>{{ data.nomPuntoRevision }}</td>
+                    <td>{{ data.tipoP }}</td>
+                </tr>
+    
+        </table>
+
+    </div>-->
+    
+    <div class="edit">
+        <br><br>
+        <form method="POST" action="#" style="text-align: center; max-width: 300px; margin: auto;"> {% csrf_token %}
+
+        
+            <input type="hidden" name="idPuntoInter" value="{{ form.idPuntoInter }}" class="elegant-input" id="id_idPuntoInter"><br>
+                
+
+            <label for="fname" class="elegant-input-label">Oficina de Representacion:</label><br>
+                <select type="text" name="estadoPunto" value="{{ form.estadoPunto }}" class="elegant-input" id="id_estadoPunto">
+                    <option value="AGUASCALIENTES" {% if form.estadoPunto == 'AGUASCALIENTES' %}selected{% endif %}>AGUASCALIENTES</option>
+                    <option value="BAJA CALIFORNIA" {% if form.estadoPunto == 'BAJA CALIFORNIA' %}selected{% endif %}>BAJA CALIFORNIA</option>
+                    <option value="BAJA CALIFORNIA SUR" {% if form.estadoPunto == 'BAJA CALIFORNIA SUR' %}selected{% endif %}>BAJA CALIFORNIA SUR</option>
+                    <option value="CAMPECHE" {% if form.estadoPunto == 'CAMPECHE' %}selected{% endif %}>CAMPECHE</option>
+                    <option value="CDMX" {% if form.estadoPunto == 'CDMX' %}selected{% endif %}>CDMX</option>
+                    <option value="CHIAPAS" {% if form.estadoPunto == 'CHIAPAS' %}selected{% endif %}>CHIAPAS</option>
+                    <option value="CHIHUAHA" {% if form.estadoPunto == 'CHIHUAHA' %}selected{% endif %}>CHIHUAHA</option>
+                    <option value="COAHUILA" {% if form.estadoPunto == 'COAHUILA' %}selected{% endif %}>COAHUILA</option>
+                    <option value="COLIMA" {% if form.estadoPunto == 'COLIMA' %}selected{% endif %}>COLIMA</option>
+                    <option value="DURANGO" {% if form.estadoPunto == 'DURANGO' %}selected{% endif %}>DURANGO</option>
+                    <option value="EDOMEX" {% if form.estadoPunto == 'EDOMEX' %}selected{% endif %}>EDOMEX</option>
+                    <option value="GUERRERO" {% if form.estadoPunto == 'GUERRERO' %}selected{% endif %}>GUERRERO</option>
+                    <option value="GUANAJUATO" {% if form.estadoPunto == 'GUANAJUATO' %}selected{% endif %}>GUANAJUATO</option>
+                    <option value="HIDALGO" {% if form.estadoPunto == 'HIDALGO' %}selected{% endif %}>HIDALGO</option>
+                    <option value="JALISCO" {% if form.estadoPunto == 'JALISCO' %}selected{% endif %}>JALISCO</option>
+                    <option value="MICHOACÁN" {% if form.estadoPunto == 'MICHOACÁN' %}selected{% endif %}>MICHOACÁN</option>
+                    <option value="MORELOS" {% if form.estadoPunto == 'MORELOS' %}selected{% endif %}>MORELOS</option>
+                    <option value="NAYARIT" {% if form.estadoPunto == 'NAYARIT' %}selected{% endif %}>NAYARIT</option>
+                    <option value="NUEVO LEÓN" {% if form.estadoPunto == 'NUEVO LEÓN' %}selected{% endif %}>NUEVO LEÓN</option>
+                    <option value="OAXACA" {% if form.estadoPunto == 'OAXACA' %}selected{% endif %}>OAXACA</option>
+                    <option value="PUEBLA" {% if form.estadoPunto == 'PUEBLA' %}selected{% endif %}>PUEBLA</option>
+                    <option value="QUERÉTARO" {% if form.estadoPunto == 'QUERÉTARO' %}selected{% endif %}>QUERÉTARO</option>
+                    <option value="QUINTANA ROO" {% if form.estadoPunto == 'QUINTANA ROO' %}selected{% endif %}>QUINTANA ROO</option>
+                    <option value="SAN LUIS POTOSÍ" {% if form.estadoPunto == 'SAN LUIS POTOSÍ' %}selected{% endif %}>SAN LUIS POTOSÍ</option>
+                    <option value="SINALOA" {% if form.estadoPunto == 'SINALOA' %}selected{% endif %}>SINALOA</option>
+                    <option value="SONORA" {% if form.estadoPunto == 'SONORA' %}selected{% endif %}>SONORA</option>
+                    <option value="TABASCO" {% if form.estadoPunto == 'TABASCO' %}selected{% endif %}>TABASCO</option>
+                    <option value="TAMAULIPAS" {% if form.estadoPunto == 'TAMAULIPAS' %}selected{% endif %}>TAMAULIPAS</option>
+                    <option value="TLAXCALA" {% if form.estadoPunto == 'TLAXCALA' %}selected{% endif %}>TLAXCALA</option>
+                    <option value="VERACRUZ" {% if form.estadoPunto == 'VERACRUZ' %}selected{% endif %}>VERACRUZ</option>
+                    <option value="YUCATÁN" {% if form.estadoPunto == 'YUCATÁN' %}selected{% endif %}>YUCATÁN</option>
+                    <option value="ZACATECAS" {% if form.estadoPunto == 'ZACATECAS' %}selected{% endif %}>ZACATECAS</option>
+
+                </select><br>
+
+                <label for="lname" class="elegant-input-label">Nombre del Punto de Revisión:</label><br>
+                <input type="text" id="id_nombrePunto" name="nombrePunto" value="{{ form.nombrePunto }}" class="elegant-input"><br>
+                
+                <label for="lname" class="elegant-input-label">Tipo de Punto:</label><br>
+                <!--<input type="text" id="id_tipoP" name="tipoP" value="{{ form.tipoP }}" class="elegant-input"><br>-->
+                <select type="text" id="id_tipoPunto" name="tipoPunto" value="{{ form.tipoPunto }}" class="elegant-input">
+                    <option value="AEREOS" {% if form.tipoP == 'AEREOS' %}selected{% endif %}>AEREOS</option>
+                    <option value="TERRESTRES" {% if form.tipoP == 'TERRESTRES' %}selected{% endif %}>TERRESTRES</option>
+                    <option value="MARÍTIMOS" {% if form.tipoP == 'MARÍTIMOS' %}selected{% endif %}>MARÍTIMOS</option>
+                </select><br>
+
+
+            <br>
+            <input type="submit" value="Guardar" style="background-color: #4CAF50; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer;">
+        </form>
+        <br>
+        
+    </div>
+    
+    <script>
+        cambiar();
+        function cambiar(){
+            var lat = document.getElementById("id_latitud");
+            var long = document.getElementById("id_longitud");
+
+            var str_lat = lat.value.replace(",",".");
+            var str_long = lat.value.replace(",",".");
+
+            lat.value = str_lat;
+            long.value = str_long;
+        }
+        
+        
+    </script>
+{% endif %}
+    {% endblock content %}
+

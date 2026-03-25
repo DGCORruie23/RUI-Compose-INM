@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Reporte de Retornos</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        @page {
+            size: A4 landscape; /* Establecer formato horizontal */
+            margin: 10mm;
+        }
+
+        body {
+            font-family: 'Montserrat', sans-serif;
+            padding: 0;
+        }
+        h5 {
+            text-align: center;
+            align-items: center;
+            margin-top: -10px;
+            margin-bottom: -10px;
+        }
+        h6 {
+            text-align: center;
+            align-items: center;
+            margin-bottom: -4px;
+        }
+        
+        .fecha {
+            text-align: right;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        table, th, td {
+            border: 1px solid black;
+        }
+        th, td {
+            text-align: center;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .letra {
+            font-size: 3pt;
+            
+        }
+        .colorFondo {
+            background-color: #4E1224;
+            text-align: center;
+            color: #f2f2f2;
+        }
+
+        .letraT5 { 
+            color:rgb(3, 0, 0);
+            background-color:rgb(212, 240, 86); /* Color de fondo */
+            writing-mode: vertical-lr; /* Texto en vertical (de abajo hacia arriba) */
+            font-size: 3pt;
+            border: 1px solid rgb(255, 255, 255); 
+            text-align: center;
+        }
+
+        .letraT6 { 
+            color:rgb(234, 234, 234);
+            background-color:rgb(112, 48, 160); /* Color de fondo */
+            writing-mode: vertical-lr; /* Texto en vertical (de abajo hacia arriba) */
+            font-size: 6pt;
+            border: 1px solid rgb(255, 255, 255); 
+            text-align: center;
+        }
+
+        .letraT0 { 
+            color:rgb(233, 232, 232);
+            background-color:rgb(179, 142, 93); /* Color de fondo */
+            writing-mode: vertical-lr; /* Texto en vertical (de abajo hacia arriba) */
+            font-size: 3pt;
+            border: 1px solid rgb(255, 255, 255); 
+            text-align: center;
+        }
+        
+        .letraT1 { 
+            color: #ffffff;
+            background-color: #761B36;; /* Color de fondo */
+            writing-mode: vertical-lr; /* Texto en vertical (de abajo hacia arriba) */
+            font-size: 3pt;
+            border: 1px solid rgb(255, 255, 255); 
+            text-align: center;
+        }
+
+        .letraT2 { 
+            color:rgb(0, 0, 0);
+            background-color: #d9d9d9; /* Color de fondo */
+            writing-mode: vertical-lr; /* Texto en vertical (de abajo hacia arriba) */
+            font-size: 3pt;
+            border: 1px solid rgb(255, 255, 255); 
+            text-align: center;
+        }
+
+        .letraT3 { 
+            color:rgb(0, 0, 0);
+            background-color:rgb(75, 172, 198); /* Color de fondo */
+            writing-mode: vertical-lr; /* Texto en vertical (de abajo hacia arriba) */
+            font-size: 3pt;
+            border: 1px solid rgb(255, 255, 255); 
+            text-align: center;
+        }
+
+        .letraT7 { 
+            color:rgb(0, 0, 0);
+            background-color:rgb(68, 185, 252); /* Color de fondo */
+            writing-mode: vertical-lr; /* Texto en vertical (de abajo hacia arriba) */
+            font-size: 3pt;
+            border: 1px solid rgb(255, 255, 255); 
+            text-align: center;
+        }
+
+        .letraT4 { 
+            color:rgb(237, 237, 237);
+            background-color:rgb(19, 50, 43); /* Color de fondo */
+            writing-mode: vertical-lr; /* Texto en vertical (de abajo hacia arriba) */
+            font-size: 3pt;
+            border: 1px solid rgb(255, 255, 255); 
+            text-align: center;
+        }
+
+        .contenedor {
+            display: flex;      /* Activa el modo Flexbox */
+            gap: 40px;         /* Espacio entre tablas */
+            justify-content: center; /* Centrar las tablas en la pantalla */
+            align-items: center;
+        }
+
+        .contenedor1 {
+            justify-content: center; /* Centrar las tablas en la pantalla */
+            align-items: center;
+            margin: 3px;
+        }
+
+        .table1 {
+            width: 400px;
+            border-collapse: collapse; 
+        }
+
+        .table2 {
+            width: 100px;
+            border-collapse: collapse; 
+        }
+
+        
+    </style>
+</head>
+<body>
+
+    <p class="letra">INSTITUTO NACIONAL DE MIGRACIÓN<br>DIRECCIÓN GENERAL DE OFICINAS DE REPRESENTACION</p>
+    <div class="colorFondo">
+        <h6 class="letra">Informe Diario de Rescatados<br>{{ fecha_actual}}</h6>
+    </div>
+    
+    <br>
+    <h5>Reporte de Rescates por Oficina</h5>
+
+    <div>
+        <table>
+            <thead class="letraT1">
+                <tr>
+                    <th class="letraT1">Rubro</th>
+                    {% for oficina in rescates %}
+                    <td class="letraT1">{{ oficina}}</td>
+                    {% empty %}
+                    <th>No hay datos disponibles.</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+            
+            <tr>
+                <td class="letraT2"><strong>Aeropuertos</strong></td>
+                {% for oficina, datos in rescates.items %}
+                <td class="letraT2">{{ datos.total_aereos }}</td>
+                {% empty %}
+                <td>No hay datos disponibles.</td>
+                {% endfor %}
+            </tr>
+            <tr>
+                <td class="letraT2"><strong>Carreteros</strong></td>
+                {% for oficina, datos in rescates.items %}
+                <td class="letraT2">{{ datos.total_carreteros }}</td>
+                {% empty %}
+                <td>No hay datos disponibles.</td>
+                {% endfor %}
+            </tr>
+            <tr>
+                <td class="letraT2"><strong>Central de Autobus</strong></td>
+                {% for oficina, datos in rescates.items %}
+                <td class="letraT2">{{ datos.total_central }}</td>
+                {% empty %}
+                <td>No hay datos disponibles.</td>
+                {% endfor %}
+            </tr>
+            <tr>
+                <td class="letraT2"><strong>Ferroviarios</strong></td>
+                {% for oficina, datos in rescates.items %}
+                <td class="letraT2">{{ datos.total_ferro }}</td>
+                {% empty %}
+                <td>No hay datos disponibles.</td>
+                {% endfor %}
+            </tr>
+            <tr>
+                <td class="letraT2"><strong>Puestos a Disposición</strong></td>
+                {% for oficina, datos in rescates.items %}
+                <td class="letraT2">{{ datos.total_puestos }}</td>
+                {% empty %}
+                <td>No hay datos disponibles.</td>
+                {% endfor %}
+            </tr>
+            <tr>
+                <td class="letraT2"><strong>Otros</strong></td>
+                {% for oficina, datos in rescates.items %}
+                <td class="letraT2">{{ datos.total_otros }}</td>
+                {% empty %}
+                <td>No hay datos disponibles.</td>
+                {% endfor %}
+            </tr>
+            <tr>
+                <td class="letraT1"><strong>TOTAL MIGRANTES RESCATADOS</strong></td>
+                {% for oficina, datos in rescates.items %}
+                <td class="letraT1">{{ datos.total }}</td>
+                {% empty %}
+                <td>No hay datos disponibles.</td>
+                {% endfor %}
+            </tr>
+        </tbody>
+        </table>
+    </div>
+
+    
+    <div>
+        <table>
+            <thead class="letraT1">
+                <tr>
+                    <th class="letraT4">Rubro</th>
+                    {% for oficina in reincidentes %}
+                    <td class="letraT4">{{ oficina}}</td>
+                    {% empty %}
+                    <th>No hay datos disponibles.</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+            <tr>
+                <td class="letraT2"><strong>Reincidentes</strong></td>
+                {% for oficina, datos in reincidentes.items %}
+                <td class="letraT2">{{ datos.total_reincidentes }}</td>
+                {% empty %}
+                <td>No hay datos disponibles.</td>
+                {% endfor %}
+            </tr>
+            <tr>
+                <td class="letraT2"><strong>Registros Nuevos</strong></td>
+                {% for oficina, datos in reincidentes.items %}
+                <td class="letraT2">{{ datos.total_nuevos }}</td>
+                {% empty %}
+                <td>No hay datos disponibles.</td>
+                {% endfor %}
+            </tr>
+            <tr>
+                <td class="letraT0"><strong>TOTAL MIGRANTES RESCATADOS</strong></td>
+                {% for oficina, datos in reincidentes.items %}
+                <td class="letraT0">{{ datos.total }}</td>
+                {% empty %}
+                <td>No hay datos disponibles.</td>
+                {% endfor %}
+            </tr>
+        </tbody>
+        </table>
+    </div>
+
+    <br>
+    <h5>Reporte de Rescates por nacionalidad</h5>
+    <br>
+    <br>
+
+    <div class="contenedor">
+        
+        <div class="contenedor1">
+            <h6>Nacionalidades de Rescates Nuevos</h6>
+            
+            <table border="1" class="contenedor1">
+                <thead>
+                    <tr>
+                        <th class="letraT1">Nacionalidad</th>
+    
+                        <th class="letraT2">Adultos Hombres Solos</th>
+                        <th class="letraT3">Adultos Mujeres Solas</th>
+    
+                        <th class="letraT2">Adultos Hombres Acompañan NNA</th>
+                        <th class="letraT3">Adultos Mujeres Acompañan NNA</th>
+                        <th class="letraT2">NNA Acompañados Hombres</th>
+                        <th class="letraT3">NNA Acompañados Mujeres</th>
+    
+                        <th class="letraT2">NNA No Acompañados Hombres</th>
+                        <th class="letraT3">NNA No Acompañados Mujeres</th>
+    
+                        <th class="letraT0">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for nacio, datos in nacionalidades.items %}
+                <tr>
+                    <td class="letraT1">{{ nacio }}</td>
+                    <td class="letraT2">{{ datos.H_AS }}</td>
+                    <td class="letraT3">{{ datos.M_AS }}</td>
+    
+                    <td class="letraT2">{{ datos.H_AA }}</td>
+                    <td class="letraT3">{{ datos.M_AA }}</td>
+                    <td class="letraT2">{{ datos.H_mA }}</td>
+                    <td class="letraT3">{{ datos.M_mA }}</td>
+    
+                    <td class="letraT2">{{ datos.H_mS }}</td>
+                    <td class="letraT3">{{ datos.M_mS }}</td>
+                    
+                    <td class="letraT0">{{ datos.total }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td>No hay datos disponibles.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            </table>
+
+            <table class="table2">
+                <thead>
+                    <tr>
+                        <th class="letraT6">TOTAL DE RETORNADOS A SU PAÍS DE ORIGEN</th>
+                        <th class="letraT6">{{ dato }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+
+                </tbody>
+            </table>
+        
+        </div>
+
+        <div>
+            <h6>Nacionalidades de Reincidentes</h6>
+            <table border="1" class="contenedor1">
+                <thead>
+                    <tr>
+                        <th class="letraT1">Nacionalidad</th>
+    
+                        <th class="letraT2">Adultos Hombres Solos</th>
+                        <th class="letraT3">Adultos Mujeres Solas</th>
+    
+                        <th class="letraT2">Adultos Hombres Acompañan NNA</th>
+                        <th class="letraT3">Adultos Mujeres Acompañan NNA</th>
+                        <th class="letraT2">NNA Acompañados Hombres</th>
+                        <th class="letraT3">NNA Acompañados Mujeres</th>
+    
+                        <th class="letraT2">NNA No Acompañados Hombres</th>
+                        <th class="letraT3">NNA No Acompañados Mujeres</th>
+    
+                        <th class="letraT0">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for nacio, datos in nacionalidades_re.items %}
+                <tr>
+                    <td class="letraT1">{{ nacio }}</td>
+                    <td class="letraT2">{{ datos.H_AS }}</td>
+                    <td class="letraT3">{{ datos.M_AS }}</td>
+    
+                    <td class="letraT2">{{ datos.H_AA }}</td>
+                    <td class="letraT3">{{ datos.M_AA }}</td>
+                    <td class="letraT2">{{ datos.H_mA }}</td>
+                    <td class="letraT3">{{ datos.M_mA }}</td>
+    
+                    <td class="letraT2">{{ datos.H_mS }}</td>
+                    <td class="letraT3">{{ datos.M_mS }}</td>
+                    
+                    <td class="letraT0">{{ datos.total }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td>No hay datos disponibles.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            </table>
+        </div>
+
+    </div>
+
+    
+    
+    <p class="fecha">Fecha: {{ fecha_actual }}</p>
+    
+
+</body>
+</html>

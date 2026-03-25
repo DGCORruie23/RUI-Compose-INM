@@ -1,0 +1,216 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}{% endblock title %}</title>
+
+  <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700,900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tw-elements/dist/css/tw-elements.min.css" />
+  <script src="https://cdn.tailwindcss.com/3.3.0"></script>
+  <script src="{% static 'js/tailwind.config.js' %}"></script>
+
+  {% block styles %} {% endblock styles %}
+
+  <style>
+    body {
+      background: url("{% static 'imgs/fondo.png' %}") no-repeat center center fixed;
+      background-size: cover;
+      margin: 0;
+      padding: 0;
+      font-family: "Open Sans", sans-serif;
+      background-color: #000;
+
+    }
+
+    .panel {
+      margin-left: 35%;
+    }
+
+    .txt {
+      width: 20%;
+      margin-left: 78%;
+      margin-bottom: 7%;
+    }
+
+    .btn1 {
+      width: 100%;
+      height: 25%;
+    }
+
+
+    .btn-container {
+      margin-left: 38%;
+      width: 22%;
+      height: 7%;
+    }
+
+    .btn1 {
+      display: inline-block;
+      vertical-align: middle;
+    }
+
+
+    @media (max-width: 1024px) {
+      .btn-container {
+        margin-left: 38%;
+        width: 22%;
+        height: 7%;
+
+      }
+    }
+
+
+    .ground {
+      min-height: 200px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .main-footer{
+        background-color: #611232;
+        min-height: 56px;
+        color: #FFF;
+        padding: 0px 0 0px;
+        text-align: left;
+        font-weight: 300;
+    }
+
+    footer {
+
+      padding: 10px 0;
+    }
+
+    .footer_container {
+      max-width: 2560px;
+      margin: auto;
+      padding: 0 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap-reverse;
+    }
+
+    .footer-pleca {
+      background-color: #fff;
+      background-image: url(https://framework-gb.cdn.gob.mx/gobmx/img/pleca.svg);
+      background-repeat: repeat-x;
+    }
+
+    .logo {
+      width: 180px;
+      font-size: 16px;
+      font-weight: bold;
+    }
+
+    .social_media {
+      margin: 0;
+    }
+
+    .social_media a {
+      color: #000;
+      font-size: 24px;
+      text-decoration: none;
+      transition: .6s;
+    }
+
+    .social_media a:hover {
+      color: gold;
+    }
+
+    h1 {
+      font-size: 40px;
+
+      font-weight: bold;
+    }
+
+    .header-style {
+      background-color: #10312B;
+    }
+
+    .logoGOB {
+
+      margin-top: auto;
+      margin-bottom: auto;
+    }
+  </style>
+
+</head>
+
+<body class="flex flex-col mx-auto my-auto min-h-screen">
+  
+  <header class="header-style">
+    <div class="flex items-center justify-between">
+        <!-- Columna A: Logo -->
+        <!-- <div class="w-1/4 flex justify-start p-2">
+          <a href="/">
+            <img src="{% static 'icons/logo.png' %}" alt="Logo A" class="h-20 w-20">
+          </a>
+        </div> -->
+        
+        <!-- Columna B: Título y Subtítulo -->
+        <div class="w-4/4 text-center p-2 bg-[#10312B] mx-10">
+            <!-- <h1 class="text-2xl md:text-2xl font-family: 'Montserrat' text-2xl text-gray-100 font-bold">PANEL DE CONTROL</h1>
+            <h3 class="text-lg md:text-lg text-gray-100">
+              <strong class="text-inm-marron-100">R</strong>eporte
+              <strong class="text-inm-marron-100">Ú</strong>nico de
+              <strong class="text-inm-marron-100">I</strong>nformación
+              <strong class="text-inm-marron-100">E</strong>lectrónico
+            </h3>
+            <h5 class="text-lg md:text-sm text-inm-marron-200"> <strong>RESCATE-CAPTURA</strong></h3> -->
+              <a href="/">
+                <img src="{% static 'icons/logo3.png' %}" alt="Logo Completo" class="scale-[0.6]">
+              </a>
+        </div>
+        
+        <!-- Columna C: Logo -->
+        <!-- <div class="w-1/4 flex justify-end p-2">
+            {% comment %} <img src="{% static 'icons/LOGO3.png' %}" alt="Logo G" class="h-16"> {% endcomment %}
+            <img src="{% static 'icons/logo2.png' %}" alt="Logo C" class="h-16 scale-60">
+        </div>
+    </div> -->
+</header>
+   
+  {% if request.user.is_authenticated %}
+
+  <div class="flex justify-center mt-4 space-x-2">
+    <a href="{% url 'dashboard' %}" class="bg-inm-gris-100 text-white px-6 py-3 rounded-xl hover:bg-inm-verde-200">Panel de Control</a>
+    {% block estadistica %} 
+    {% endblock estadistica %}
+    <a href="{% url 'logout' %}" class="bg-inm-rojo-300 text-white px-6 py-3 rounded-xl hover:bg-inm-rojo-100">Cerrar sesión</a>
+  </div>
+
+  <br>
+
+  {% else %}
+
+  <div class="flex justify-center mt-4 space-x-2">
+    <a href="{% url 'descargas' %}" class="bg-inm-gris-100 text-white px-6 py-3 rounded-xl hover:bg-inm-gris-200">Descargas</a>
+    <a href="{% url 'log-in' %}" class="bg-inm-verde-100 text-white px-6 py-3 rounded-xl hover:bg-inm-verde-200">Ingresar</a>
+  </div>
+
+  {% endif %}
+
+  {% block content %}
+
+  {% endblock content %}
+
+  <footer class="main-footer">
+    <div class="footer_container">
+      <div class="logo"> <img src="https://framework-gb.cdn.gob.mx/gobmx/img/logo_blanco.svg" width="150px" alt="logo"
+          style="margin-right: 150px; margin-top: 5px; margin-bottom: 5px"></div>
+      <div class="social_media">
+      </div>
+    </div>
+    <div class="footer-pleca">
+      <br>
+    </div>
+  </footer>
+  <script src="https://cdn.jsdelivr.net/npm/tw-elements/dist/js/tw-elements.umd.min.js"></script>
+</body>
+
+</html>
+

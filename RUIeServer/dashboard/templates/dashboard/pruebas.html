@@ -1,0 +1,230 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- <script src="{% static 'js/carousel.js' %}"></script> -->
+  <title>{% block title %}{% endblock title %}</title>
+
+  <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700,900&display=swap" rel="stylesheet" />
+
+  <!-- TW Elements styles-->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tw-elements/dist/css/tw-elements.min.css" />
+
+  <script src="https://cdn.tailwindcss.com/3.3.0"></script>
+  <script src="{% static 'js/tailwind.config.js' %}"></script>
+
+  <style>
+    body {
+      background: url("{% static 'imgs/fondo.png' %}") no-repeat center center fixed;
+      background-size: cover;
+
+    }
+
+    .panel {
+      margin-left: 400px;
+    }
+    .txt {
+      width: 20%;
+      margin-left: 78%;
+      margin-bottom: 7%;
+    }
+    .btn1 {
+      margin-left: 78%;
+      
+    }
+  </style>
+</head>
+
+<body class="flex flex-col mx-auto my-auto md:h-screen">
+
+  
+<div class="flex justify-between items-center">
+  <a href="/" class="flex items-center text-white hover:text-inm-marron-100">
+    <img class="w-20 h-20" src="{% static 'icons/ruie.svg' %}" alt="logo" style="margin-right: 10px;">
+  </a>
+
+  <div class="bg-inm-marron-100 flex flex-grow">
+    <div class="flex-grow panel">
+      <div class="flex-end">
+
+        <div class="text-center">
+          <p class="font-family: 'Montserrat' text-3xl text-inm-verde-100 font-bold">PANEL DE CONTROL</p>
+        </div>
+        <p class="font-family: 'Montserrat' text-1xl text-inm-rojo-200 text-center">
+          <strong>R</strong>eporte
+          <strong>Ú</strong>nico
+          de
+          <strong>I</strong>nformación
+          <strong>E</strong>lectrónico
+        </p>
+        <p class="text-inm-rojo-200 text-center font-bold">RESCATE-CAPTURA</p>
+      </div>
+    </div>
+
+    <a>
+      <img class="" src="{% static 'icons/LOGO3.png' %}" alt="logo">
+    </a>
+  </div>
+
+  <a>
+    <img class="ps-8" width="60%" src="{% static 'icons/inm.png' %}" alt="logo">
+  </a>
+</div>
+            {% if request.user.is_authenticated %}
+            <br>
+            <a href="{% url 'dashboard' %}" class="btn1 w-1/5 py-4 px-6 bg-inm-marron-100 hover:bg-inm-marron-200 rounded-xl text-center text-white ">Panel de Control</a>
+            <br>
+                <a href="{% url 'logout' %}" class="btn1 w-1/5 py-4 px-6 bg-inm-rojo-200 hover:bg-inm-rojo-300 rounded-xl text-center text-white ">Cerrar sesión</a>
+            {% else %}
+                <a href="{% url 'descargas' %}" class="py-4 px-6 bg-blue-400 rounded-xl text-white hover:text-inm-verde-100">Descargas</a>
+                <a href="{% url 'log-in' %}" class="py-4 px-6 bg-inm-marron-100 rounded-xl text-white hover:text-inm-verde-100">Ingresar</a>
+            {% endif %}
+  {% block content %}
+
+  <div class="grow">
+    <br>
+    <div
+      class="bg-inm-marron-100 h-auto w-auto absolute  left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 p-4">
+      <p class=" text-3xl text-center font-family: 'Montserrat">
+        <span class="text-inm-verde-100">Del </span>
+        <span class="text-inm-verde-100 font-bold"> 01 de enero </span>
+        <span class="text-inm-verde-100">a </span>
+        <span class="text-inm-verde-100 font-bold">{{fecha}}</span>
+        <span class="text-inm-rojo-200 font-bold">RESCATARON:</span>
+      </p>
+
+
+      <!-- TW Elements is free under AGPL, with commercial license required for specific uses. See more details: https://tw-elements.com/license/ and contact us for queries at tailwind@mdbootstrap.com -->
+      <div id="carouselExampleCaptions" class="relative" data-te-carousel-init data-te-carousel-slide>
+        <!--Carousel indicators-->
+        <div class="absolute bottom-0 left-0 right-0 z-[2] mx-[15%] mb-4 flex list-none justify-center p-0"
+          data-te-carousel-indicators>
+          <button type="button" data-te-target="#carouselExampleCaptions" data-te-slide-to="0" data-te-carousel-active
+            class="mx-[3px] box-content h-[3px] w-[30px] flex-initial cursor-pointer border-0 border-y-[10px] border-solid border-transparent bg-white bg-clip-padding p-0 -indent-[999px] opacity-50 transition-opacity duration-[600ms] ease-[cubic-bezier(0.25,0.1,0.25,1.0)] motion-reduce:transition-none"
+            aria-current="true" aria-label="Slide 1"></button>
+          <button type="button" data-te-target="#carouselExampleCaptions" data-te-slide-to="1"
+            class="mx-[3px] box-content h-[3px] w-[30px] flex-initial cursor-pointer border-0 border-y-[10px] border-solid border-transparent bg-white bg-clip-padding p-0 -indent-[999px] opacity-50 transition-opacity duration-[600ms] ease-[cubic-bezier(0.25,0.1,0.25,1.0)] motion-reduce:transition-none"
+            aria-label="Slide 2"></button>
+          <button type="button" data-te-target="#carouselExampleCaptions" data-te-slide-to="2"
+            class="mx-[3px] box-content h-[3px] w-[30px] flex-initial cursor-pointer border-0 border-y-[10px] border-solid border-transparent bg-white bg-clip-padding p-0 -indent-[999px] opacity-50 transition-opacity duration-[600ms] ease-[cubic-bezier(0.25,0.1,0.25,1.0)] motion-reduce:transition-none"
+            aria-label="Slide 3"></button>
+        </div>
+        <div class="flex justify-center">
+          <!--Carousel items-->
+          <div class="relative w-full max-w-[90%] overflow-hidden after:clear-both after:block after:content-['']">
+            <!--First item-->
+            <div
+              class="relative float-left hidden -mr-[100%] w-full mx-auto transition-transform duration-[600ms] ease-in-out motion-reduce:transition-none"
+              data-te-carousel-active data-te-carousel-item style="backface-visibility: hidden">
+              <img src="{% static 'imgs/hombres.jpeg' %}" class="block w-full" alt="..." />
+              <div class="static inset-x-[10%] bottom-5 hidden py-5 text-center ml-40   text-white md:block">
+                <div class="bg-inm-marron-100 bg-opacity-60 h-auto w-auto absolute left-60 mt-10 top-20">
+                  <p class=" text-5xl text-center font-bold">
+                    <span class="text-inm-verde-100">{{totalH}}</span>
+                  </p>
+                  <p class=" text-5xl text-left font-bold">
+                    <span class="text-inm-verde-100">Hombres</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+            <!--Second item-->
+            <div
+              class="relative float-left hidden -mr-[100%] w-full mx-auto transition-transform duration-[600ms] ease-in-out motion-reduce:transition-none"
+              data-te-carousel-item style="backface-visibility: hidden">
+              <img src="{% static 'imgs/total.jpg' %}" class="block w-full" alt="..." />
+              <div class="static inset-x-[10%] bottom-5 hidden py-5 text-center ml-40   text-white md:block">
+                <div class="bg-inm-marron-100 bg-opacity-60 h-auto w-auto absolute left-60 mt-10 top-20">
+                  <p class=" text-5xl text-center font-bold">
+                    <span class="text-inm-cafe-100">{{total}}</span>
+                  </p>
+                  <p class=" text-3xl text-left font-bold">
+                    <span class="text-inm-cafe-100">personas</span>
+                    <span class="text-inm-cafe-100">migrantes</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+            <!--Third item-->
+            <div
+              class="relative float-left hidden -mr-[100%] w-full mx-auto transition-transform duration-[600ms] ease-in-out motion-reduce:transition-none"
+              data-te-carousel-item style="backface-visibility: hidden">
+              <img src="{% static 'imgs/mujeres.jpeg' %}" class="block w-full" alt="..." />
+              <div class="static inset-x-[10%] bottom-5 hidden py-5 text-center ml-55 text-white md:block">
+                <div class="bg-inm-marron-100 bg-opacity-60 h-auto w-auto absolute left-60 mt-10 top-20">
+                  <p class=" text-5xl text-center font-bold">
+                    <span class="text-inm-rojo-100">{{totalM}}</span>
+                  </p>
+                  <p class=" text-5xl text-left font-bold">
+                    <span class="text-inm-rojo-100">Mujeres</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+
+        <!--Carousel controls - prev item-->
+        <button
+          class="absolute bottom-0 left-0 top-0 z-[1] flex w-[15%] items-center justify-center border-0 bg-none p-0 text-center text-white opacity-50 transition-opacity duration-150 ease-[cubic-bezier(0.25,0.1,0.25,1.0)] hover:text-white hover:no-underline hover:opacity-90 hover:outline-none focus:text-white focus:no-underline focus:opacity-90 focus:outline-none motion-reduce:transition-none"
+          type="button" data-te-target="#carouselExampleCaptions" data-te-slide="prev">
+          <span class="inline-block h-8 w-8">
+            <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-6 w-6">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+            </svg>
+          </span>
+          <span
+            class="!absolute !-m-px !h-px !w-px !overflow-hidden !whitespace-nowrap !border-0 !p-0 ![clip:rect(0,0,0,0)]">Previous</span>
+        </button>
+        <!--Carousel controls - next item-->
+        <button
+          class="absolute bottom-0 right-0 top-0 z-[1] flex w-[15%] items-center justify-center border-0 bg-none p-0 text-center text-white opacity-50 transition-opacity duration-150 ease-[cubic-bezier(0.25,0.1,0.25,1.0)] hover:text-white hover:no-underline hover:opacity-90 hover:outline-none focus:text-white focus:no-underline focus:opacity-90 focus:outline-none motion-reduce:transition-none"
+          type="button" data-te-target="#carouselExampleCaptions" data-te-slide="next">
+          <span class="inline-block h-8 w-8">
+            <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-6 w-6">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+            </svg>
+          </span>
+          <span
+            class="!absolute !-m-px !h-px !w-px !overflow-hidden !whitespace-nowrap !border-0 !p-0 ![clip:rect(0,0,0,0)]">Next</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="txt">
+    <p class=" text-2xl text-inm-verde-100 text-center font-bold" >Utiliza el RUI electrónico para el registro de datos sobre la población migrante rescatada en México.
+      ¡Únete y contribuye a agilizar la operación migratoria a lo largo del país!</p>
+    
+  </div>
+  <p class=" text-2xl text-inm-verde-100 text-center font-bold">¡Datos puntuales, verificados y accesibles!</p>
+
+  </div>
+
+
+
+
+  {% endblock content %}
+
+  <footer>
+    <div class="flex justify-between items-center">
+      <a>
+        <img class="w-30 h-20" src="{% static 'icons/felipe.png' %}" alt="logo" style="margin-right: 10px;">
+      </a>
+      <div>
+        <p class=" font-family: 'Montserrat' text-2xl text-inm-marron-100 font-bold margin-right: 5px">
+          ______________________________________________________________________________________________________________________________________
+        </p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/tw-elements/dist/js/tw-elements.umd.min.js"></script>
+</body>
+
+</html>

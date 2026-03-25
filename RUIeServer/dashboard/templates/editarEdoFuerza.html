@@ -1,0 +1,213 @@
+{% extends "base/base.html" %}
+
+{% load static %}
+
+{% block styles %}
+
+    <style>
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 8px;
+        }
+
+        tr:nth-child(even) {
+            background-color: #e1e1e1
+        }
+
+        th {
+
+            color: rgb(165, 27, 27);
+        }
+
+        .bdtable {
+            border: 2px solid #b4b4b4;
+            border-radius: 15px;
+            box-shadow: 0px 1px;
+            margin-left: 100px;
+            margin-right: 100px;
+  
+        }
+        .edit{
+            border: 2px solid #f2eddf;
+            background-color: #f2eddf;
+            border-radius: 15px;
+            box-shadow: 0px 1px;
+            margin-left: 100px;
+            margin-right: 100px;
+            margin-top: 100px;
+            opacity: 0.75;
+        }
+        .elegant-input-label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+    
+        .elegant-input {
+            width: 100%;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-sizing: border-box;
+            margin-bottom: 15px;
+            padding: 8px; 
+        }
+
+
+    </style>
+        {% endblock styles %}
+
+        {% block content %}
+        {% if user.is_authenticated %}
+
+    <!-- tablas de prueba
+    <div class="bdtable bg-inm-marron-100">
+        <table>
+            <tr>
+                <th>Oficina de Representación</th>
+                <th>Nombre del Punto</th>
+                <th>Tipo del Punto</th>
+            </tr>
+      
+                <tr>
+                    <td>{{ data.oficinaR }}</td>
+                    <td>{{ data.nomPuntoRevision }}</td>
+                    <td>{{ data.tipoP }}</td>
+                </tr>
+    
+        </table>
+
+    </div>-->
+    
+    <div class="edit">
+        <br><br>
+        <form method="POST" action="#" style="text-align: center; max-width: 300px; margin: auto;"> {% csrf_token %}
+
+        
+            <input type="hidden" name="idEdoFuerza" value="{{ form.idEdoFuerza }}" class="elegant-input" id="id_idEdoFuerza"><br>
+                
+            
+            <label for="fname" class="elegant-input-label">Oficina de Representacion:</label><br>
+            <!--<input type="text" name="oficinaR" value="{{ form.oficinaR }}" class="elegant-input" id="id_oficinaR"><br>-->
+                <select type="text" name="oficinaR" value="{{ form.oficinaR }}" class="elegant-input" id="id_oficinaR">
+                    <option value="AGUASCALIENTES" {% if form.oficinaR == 'AGUASCALIENTES' %}selected{% endif %}>AGUASCALIENTES</option>
+                    <option value="BAJA CALIFORNIA" {% if form.oficinaR == 'BAJA CALIFORNIA' %}selected{% endif %}>BAJA CALIFORNIA</option>
+                    <option value="BAJA CALIFORNIA SUR" {% if form.oficinaR == 'BAJA CALIFORNIA SUR' %}selected{% endif %}>BAJA CALIFORNIA SUR</option>
+                    <option value="CAMPECHE" {% if form.oficinaR == 'CAMPECHE' %}selected{% endif %}>CAMPECHE</option>
+                    <option value="CDMX" {% if form.oficinaR == 'CDMX' %}selected{% endif %}>CDMX</option>
+                    <option value="CHIAPAS" {% if form.oficinaR == 'CHIAPAS' %}selected{% endif %}>CHIAPAS</option>
+                    <option value="CHIHUAHA" {% if form.oficinaR == 'CHIHUAHUA' %}selected{% endif %}>CHIHUAHUA</option>
+                    <option value="COAHUILA" {% if form.oficinaR == 'COAHUILA' %}selected{% endif %}>COAHUILA</option>
+                    <option value="COLIMA" {% if form.oficinaR == 'COLIMA' %}selected{% endif %}>COLIMA</option>
+                    <option value="DURANGO" {% if form.oficinaR == 'DURANGO' %}selected{% endif %}>DURANGO</option>
+                    <option value="EDOMEX" {% if form.oficinaR == 'EDOMEX' %}selected{% endif %}>EDOMEX</option>
+                    <option value="GUERRERO" {% if form.oficinaR == 'GUERRERO' %}selected{% endif %}>GUERRERO</option>
+                    <option value="GUANAJUATO" {% if form.oficinaR == 'GUANAJUATO' %}selected{% endif %}>GUANAJUATO</option>
+                    <option value="HIDALGO" {% if form.oficinaR == 'HIDALGO' %}selected{% endif %}>HIDALGO</option>
+                    <option value="JALISCO" {% if form.oficinaR == 'JALISCO' %}selected{% endif %}>JALISCO</option>
+                    <option value="MICHOACÁN" {% if form.oficinaR == 'MICHOACÁN' %}selected{% endif %}>MICHOACÁN</option>
+                    <option value="MORELOS" {% if form.oficinaR == 'MORELOS' %}selected{% endif %}>MORELOS</option>
+                    <option value="NAYARIT" {% if form.oficinaR == 'NAYARIT' %}selected{% endif %}>NAYARIT</option>
+                    <option value="NUEVO LEÓN" {% if form.oficinaR == 'NUEVO LEÓN' %}selected{% endif %}>NUEVO LEÓN</option>
+                    <option value="OAXACA" {% if form.oficinaR == 'OAXACA' %}selected{% endif %}>OAXACA</option>
+                    <option value="PUEBLA" {% if form.oficinaR == 'PUEBLA' %}selected{% endif %}>PUEBLA</option>
+                    <option value="QUERÉTARO" {% if form.oficinaR == 'QUERÉTARO' %}selected{% endif %}>QUERÉTARO</option>
+                    <option value="QUINTANA ROO" {% if form.oficinaR == 'QUINTANA ROO' %}selected{% endif %}>QUINTANA ROO</option>
+                    <option value="SAN LUIS POTOSÍ" {% if form.oficinaR == 'SAN LUIS POTOSÍ' %}selected{% endif %}>SAN LUIS POTOSÍ</option>
+                    <option value="SINALOA" {% if form.oficinaR == 'SINALOA' %}selected{% endif %}>SINALOA</option>
+                    <option value="SONORA" {% if form.oficinaR == 'SONORA' %}selected{% endif %}>SONORA</option>
+                    <option value="TABASCO" {% if form.oficinaR == 'TABASCO' %}selected{% endif %}>TABASCO</option>
+                    <option value="TAMAULIPAS" {% if form.oficinaR == 'TAMAULIPAS' %}selected{% endif %}>TAMAULIPAS</option>
+                    <option value="TLAXCALA" {% if form.oficinaR == 'TLAXCALA' %}selected{% endif %}>TLAXCALA</option>
+                    <option value="VERACRUZ" {% if form.oficinaR == 'VERACRUZ' %}selected{% endif %}>VERACRUZ</option>
+                    <option value="YUCATÁN" {% if form.oficinaR == 'YUCATÁN' %}selected{% endif %}>YUCATÁN</option>
+                    <option value="ZACATECAS" {% if form.oficinaR == 'ZACATECAS' %}selected{% endif %}>ZACATECAS</option>
+
+                </select><br>
+            <label for="lname" class="elegant-input-label">Número de Punto:</label><br>
+            <input type="text" id="id_numPunto" name="numPunto" value="{{ form.numPunto }}" class="elegant-input"><br>
+        
+            <label for="lname" class="elegant-input-label">Nombre del Punto de Revisión:</label><br>
+            <input type="text" id="id_nomPuntoRevision" name="nomPuntoRevision" value="{{ form.nomPuntoRevision }}" class="elegant-input"><br>
+
+            <label for="lname" class="elegant-input-label">Tipo de Punto:</label><br>
+            <!--<input type="text" id="id_tipoP" name="tipoP" value="{{ form.tipoP }}" class="elegant-input"><br>-->
+            <select type="text" id="id_tipoP" name="tipoP" value="{{ form.tipoP }}" class="elegant-input">
+                <option value="Aeropuerto" {% if form.tipoP == 'Aeropuerto' %}selected{% endif %}>Aeropuerto</option>
+                <option value="Carretero" {% if form.tipoP == 'Carretero' %}selected{% endif %}>Carretero</option>
+                <option value="Casa de Seguridad" {% if form.tipoP == 'Casa de Seguridad' %}selected{% endif %}>Casa de Seguridad</option>
+                <option value="Central de autobús" {% if form.tipoP == 'Central de autobús' %}selected{% endif %}>Central de autobús</option>
+                <option value="Ferroviario" {% if form.tipoP == 'Ferroviario' %}selected{% endif %}>Ferroviario</option>
+                <option value="Hotel" {% if form.tipoP == 'Hotel' %}selected{% endif %}>Hotel</option>
+                <option value="MARÍTIMOS" {% if form.tipoP == 'MARÍTIMOS' %}selected{% endif %}>MARÍTIMOS</option>
+                <option value="Puestos a Disposición" {% if form.tipoP == 'Puestos a Disposición' %}selected{% endif %}>Puestos a Disposición</option>
+                <option value="Volanta Móvil" {% if form.tipoP == 'Volanta Móvil' %}selected{% endif %}>Volanta Móvil</option>
+                <option value="Voluntarios" {% if form.tipoP == 'Voluntarios' %}selected{% endif %}>Voluntarios</option>
+                <option value="Otro" {% if form.tipoP == 'Otro' %}selected{% endif %}>Otro</option>
+            </select><br>
+
+            <label for="lname" class="elegant-input-label">Ubicación:</label><br>
+            <input type="text" id="id_ubicacion" name="ubicacion" value="{{ form.ubicacion }}" class="elegant-input"><br>
+
+            <label for="lname" class="elegant-input-label">Coordenadas Texto:</label><br>
+            <input type="text" id="id_coordenadasTexto" name="coordenadasTexto" value="{{ form.coordenadasTexto }}" class="elegant-input"><br>
+
+            <label for="lname" class="elegant-input-label">Latitud:</label><br>
+            <input type="text" step=0.01 id="id_latitud" name="latitud" value="{{ form.latitud }}" class="elegant-input"><br>
+
+
+            <label for="lname" class="elegant-input-label">Longitud:</label><br>
+            <input type="text" step=0.01 id="id_longitud" name="longitud" value="{{ form.longitud }}" class="elegant-input"><br>
+            
+            <label for="lname" class="elegant-input-label">Personal INM:</label><br>
+            <input type="text" id="id_personalINM" name="personalINM" value="{{ form.personalINM }}" class="elegant-input"><br>
+
+            <label for="lname" class="elegant-input-label">Personal SEDENA:</label><br>
+            <input type="text" id="id_personalSEDENA" name="personalSEDENA" value="{{ form.personalSEDENA }}" class="elegant-input"><br>
+
+            <label for="lname" class="elegant-input-label">Personal Marina:</label><br>
+            <input type="text" id="id_personalMarina" name="personalMarina" value="{{ form.personalMarina }}" class="elegant-input"><br>
+
+            <label for="lname" class="elegant-input-label">Personal Guardia Nacional:</label><br>
+            <input type="text" id="id_personalGuardiaN" name="personalGuardiaN" value="{{ form.personalGuardiaN }}" class="elegant-input"><br>
+
+            <label for="lname" class="elegant-input-label">Personal OTROS:</label><br>
+            <input type="text" id="id_personalOTROS" name="personalOTROS" value="{{ form.personalOTROS }}" class="elegant-input"><br>
+
+            <label for="lname" class="elegant-input-label">Vehiculos:</label><br>
+            <input type="text" id="id_vehiculos" name="vehiculos" value="{{ form.vehiculos }}" class="elegant-input"><br>
+
+            <label for="lname" class="elegant-input-label">Sección:</label><br>
+            <input type="text" id="id_seccion" name="seccion" value="{{ form.seccion  }}" class="elegant-input"><br>
+            
+            <br>
+            <input type="submit" value="Guardar" style="background-color: #4CAF50; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer;">
+        </form>
+        <br>
+        
+    </div>
+    
+    <script>
+        cambiar();
+        function cambiar(){
+            var lat = document.getElementById("id_latitud");
+            var long = document.getElementById("id_longitud");
+
+            var str_lat = lat.value.replace(",",".");
+            var str_long = lat.value.replace(",",".");
+
+            lat.value = str_lat;
+            long.value = str_long;
+        }
+        
+        
+    </script>
+{% endif %}
+    {% endblock content %}
+

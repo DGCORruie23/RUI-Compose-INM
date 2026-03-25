@@ -1,0 +1,304 @@
+{% extends "base/base.html" %}
+
+{% load static %}
+
+{% block styles %}
+    <style>
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 8px;
+        }
+
+        tr:nth-child(even) {
+            background-color: #e1e1e1
+        }
+
+        th {
+            background-colrgb(197, 122, 69)AA6D;
+            color: rgb(255, 255, 255);
+        }
+
+        .bdtable {
+            border: 2px solid #b4b4b4;
+            border-radius: 15px;
+            box-shadow: 0px 1px;
+            margin-left: 100px;
+            margin-right: 100px;
+  
+        }
+        .punto {
+            margin-right: 100px;
+        }
+        
+        #myInput {
+            background-position: 10px 10px;
+            background-repeat: no-repeat;
+            width: 220px;
+            font-size: 16px;
+            padding: 8px 1px 8px 8px;
+            border: 1px solid #ddd;
+            margin-left: 12%;
+            border-radius: 10px;
+            margin-bottom: 20px;
+          }
+
+          #myInput2 {
+            background-position: 10px 10px;
+            background-repeat: no-repeat;
+            width: 180px;
+            font-size: 16px;
+            padding: 8px 1px 8px 8px;
+            border: 1px solid #ddd;
+            margin-left: 12%;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            margin-right: 20px;
+          }
+          
+          .flex-container {
+            display: flex;
+            align-items: stretch;
+            }
+
+            .flex-container > div {
+                margin: 10px;
+                text-align: center;
+                line-height: 20px;
+                font-size: 15px;
+            }
+
+            .overlay { 
+                position: fixed;
+                top: 0;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                background: rgba(0, 0, 0, 0.7);
+                transition: opacity 500ms;
+                visibility: hidden;
+                opacity: 0;
+            }
+
+            .overlay:target{
+                visibility: visible;
+                opacity: 1;
+            }
+
+            #popupBody{
+                width: 46%;
+                padding: 2%;
+                border-radius: 15px;
+                box-shadow: 0 0 5px #CCC;
+                background: #FFF;
+                position: relative;
+                margin: 20% auto;
+                transition: all 5s ease-in-out;
+
+            }
+
+
+            #cerrar{
+                position: absolute;
+                top: 20px;
+                right: 30px;
+                font-size: 30px;
+                font-weight: bold;
+                text-decoration: none;
+                color: #F00;
+                transition: all 100ms;
+            }
+
+
+            tr.header {
+                background-color: #235B4E;
+            }
+
+    </style>
+    {% endblock styles %}
+
+
+    {% block content %}
+
+    <br><br>
+
+
+
+    <!-- <div class="flex-container">
+        <div class="px-1" style="flex-grow: 0; width: 600px;"><input type="text" id="myInput" onkeyup="myFunction()" placeholder="Buscar por nombre completo..."></div>
+        <div style="flex-grow: 1; margin-top: 25px; margin-right: 30%;"><a href="#popup" class="py-3 px-5 mx-1 bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-xl text-white ">Carga masiva</a></div> 
+        <div style="flex-grow: 1; margin-top: 25px; margin-right: 8%;"><a href="{% url 'agregar_usuario' %}" class="py-4 px-6 bg-inm-rojo-300 rounded-xl text-white hover:bg-inm-marron-100 btn-sm ml-auto">
+            Agregar Usuario
+        </a></div>
+    </div> -->
+
+    <div class="contIcons flex items-center ">
+        <br>
+        <div class="ml-8 basis-1/8 py-5 px-5 mx-1"><input type="text" id="myInput" onkeyup="myFunction()" placeholder="Buscar por nombre completo"></div>
+        <div class="ml-8 basis-1/8 py-5 px-5 mx-1"><input type="text" id="myInput2" onkeyup="myFunction2()" placeholder="Buscar por OR"></div>
+        <div style="margin-right: 5%;"  class="ml-8 basis-1/8 py-5 px-5 mx-1 bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-xl text-white "><a href="#popup" class="">Carga masiva</a></div> 
+        <div style="margin-right: 15%;" class="ml-8 basis-1/8 py-5 px-5 mx-1 bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-xl text-white  "><a href="{% url 'agregar_usuario' %}" >
+            Agregar Usuario
+        </a></div> 
+        <div style="margin-right: 15%;">
+            <form action="{% url 'descarga_excelUsuarios' %}" method="post">
+                {% csrf_token %}
+                <button type="submit" class="ml-8 basis-1/8 py-5 px-5 mx-1 bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-xl text-white">Descargar</button>
+            </form>
+        </div>
+
+    </div>
+
+    <div id="popup" class="overlay">
+        <div id="popupBody">
+            <a href="#" id="cerrar">&times;</a>
+            <div class="popupContent">
+                {% if user.is_authenticated %}
+                <center>
+                    <h3>
+                        Carga el archivo de Usuarios
+                    </h3>
+                    <br>
+                </center>
+                <form action="{% url 'cargar_usuarios' %}" method="post" enctype="multipart/form-data">{% csrf_token %}
+                    <p>
+                        {{ form.archivo }}
+                    </p>
+                    <br>
+                    <p>
+                        <input class="py-2 px-5 mx-1 bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-xl text-white" type="submit" value="Cargar" />
+                    </p>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="bdtable bg-inm-marron-100">
+        <table id="myTable">
+            <tr class="header">
+                <th>ID</th>
+                <th>Estado</th>
+                <th>Nickname</th>
+                <th>Nombre completo</th>
+                <th>Tipo de Usuario</th>
+                <th>Acciones</th>
+                <th></th>
+            </tr>
+            {% for item in usuario %}
+                <tr>
+                    <td>{{ item.idUser }}</td>
+                    <td>
+
+                        {% if item.estado == '1' %}AGUASCALIENTES{% endif %}
+                        {% if item.estado == '2' %}BAJA CALIFORNIA{% endif %}
+                        {% if item.estado == '3' %}BAJA CALIFORNIA SUR{% endif %}
+                        {% if item.estado == '4' %}CAMPECHE{% endif %}
+                        {% if item.estado == '9' %}CDMX{% endif %}
+                        {% if item.estado == '7' %}CHIAPAS{% endif %}
+                        {% if item.estado == '8' %}CHIHUAHA{% endif %}
+                        {% if item.estado == '5' %}COAHUILA{% endif %}
+                        {% if item.estado == '6' %}COLIMA{% endif %}
+                        {% if item.estado == '10' %}DURANGO{% endif %}
+                        {% if item.estado == '15' %}EDOMEX{% endif %}
+                        {% if item.estado == '12' %}GUERRERO{% endif %}
+                        {% if item.estado == '11' %}GUANAJUATO{% endif %}
+                        {% if item.estado == '13' %}HIDALGO{% endif %}
+                        {% if item.estado == '14' %}JALISCO{% endif %}
+                        {% if item.estado == '16' %}MICHOACÁN{% endif %}
+                        {% if item.estado == '17' %}MORELOS{% endif %}
+                        {% if item.estado == '18' %}NAYARIT{% endif %}
+                        {% if item.estado == '19' %}NUEVO LEÓN{% endif %}
+                        {% if item.estado == '20' %}OAXACA{% endif %}
+                        {% if item.estado == '21' %}PUEBLA{% endif %}
+                        {% if item.estado == '22' %}QUERÉTARO{% endif %}
+                        {% if item.estado == '23' %}QUINTANA ROO{% endif %}
+                        {% if item.estado == '24' %}SAN LUIS POTOSÍ{% endif %}
+                        {% if item.estado == '25' %}SINALOA{% endif %}
+                        {% if item.estado == '26' %}SONORA{% endif %}
+                        {% if item.estado == '27' %}TABASCO{% endif %}
+                        {% if item.estado == '28' %}TAMAULIPAS{% endif %}
+                        {% if item.estado == '29' %}TLAXCALA{% endif %}
+                        {% if item.estado == '30' %}VERACRUZ{% endif %}
+                        {% if item.estado == '31' %}YUCATÁN{% endif %}
+                        {% if item.estado == '32' %}ZACATECAS{% endif %}
+                    </td>
+                    <td>{{ item.nickname }}</td>
+                    <td>{{ item.nombre }} {{ item.apellido }}</td>
+                    <td>
+                        {% if item.tipo == '1' %}Administrador{% endif %}
+                        {% if item.tipo == '2' %}Validador{% endif %}
+                        {% if item.tipo == '3' %}Capturador{% endif %}
+                    </td>
+                    <td>
+                        <a href="{% url 'editar_usuario' id_usuario=item.idUser %}" class="py-2 px-6 bg-inm-verde-200 rounded-xl text-white hover:bg-inm-marron-100">
+                            Editar
+                        </a>
+                    </td>
+                    <td>
+                        <a href="{% url 'eliminar_usuario' id_usuario=item.idUser %}" class="
+                        py-2 px-6 mx-1 bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-xl text-white">
+                            Eliminar
+                        </a>
+                    </td>
+                </tr>
+            {% endfor %}
+        </table>
+    </div>
+    
+    
+    
+
+
+    <br><br><br>
+
+    <script>
+        function myFunction() {
+            var input, filter, table, tr, td, i, txtValue;
+            input = document.getElementById("myInput");
+            filter = input.value.toUpperCase();
+            table = document.getElementById("myTable");
+            tr = table.getElementsByTagName("tr");
+            for (i = 0; i < tr.length; i++) {
+              td = tr[i].getElementsByTagName("td")[3];
+              if (td) {
+                txtValue = td.textContent || td.innerText;
+                if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                  tr[i].style.display = "";
+                } else {
+                  tr[i].style.display = "none";
+                }
+              }       
+            }
+          }
+
+          function myFunction2() {
+            var input, filter, table, tr, td, i, txtValue;
+            input = document.getElementById("myInput2");
+            filter = input.value.toUpperCase();
+            table = document.getElementById("myTable");
+            tr = table.getElementsByTagName("tr");
+            for (i = 0; i < tr.length; i++) {
+              td = tr[i].getElementsByTagName("td")[1];
+              if (td) {
+                txtValue = td.textContent || td.innerText;
+                if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                  tr[i].style.display = "";
+                } else {
+                  tr[i].style.display = "none";
+                }
+              }       
+            }
+          }
+    </script>
+    {% endblock content %}
+
+</body>
+
+</html>

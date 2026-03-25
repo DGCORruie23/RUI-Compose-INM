@@ -1,0 +1,1341 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>Reporte de Retornos</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      font-family: "Montserrat", sans-serif;
+      padding: 20px;
+    }
+
+    h5 {
+      text-align: center;
+      align-items: center;
+      margin-top: -10px;
+      margin-bottom: -10px;
+    }
+
+    h6 {
+      text-align: center;
+      align-items: center;
+      margin-bottom: -4px;
+    }
+
+    .fecha {
+      text-align: right;
+      font-size: 14px;
+      margin-bottom: 10px;
+    }
+
+    .letra {
+      font-size: 5pt;
+    }
+
+    .letraT1 {
+      color: #ffffff;
+      background-color: #761b36;
+      /* Color de fondo */
+      font-size: 3pt;
+      border: 1px solid rgb(255, 255, 255);
+      text-align: center;
+    }
+
+    .letraT2 {
+      color: rgb(0, 0, 0);
+      background-color: #d9d9d9;
+      /* Color de fondo */
+      font-size: 3pt;
+      border: 1px solid rgb(255, 255, 255);
+      text-align: center;
+    }
+
+    .letraT4 {
+      color: rgb(237, 237, 237);
+      background-color: rgb(19, 50, 43);
+      /* Color de fondo */
+      font-size: 3pt;
+      border: 1px solid rgb(255, 255, 255);
+      text-align: center;
+    }
+
+    .colorFondo {
+      background-color: #4e1224;
+      text-align: center;
+      color: #f2f2f2;
+    }
+
+    .letraT5 {
+      color: rgb(3, 0, 0);
+      background-color: rgb(212, 240, 86);
+      /* Color de fondo */
+      writing-mode: vertical-lr;
+      /* Texto en vertical (de abajo hacia arriba) */
+      font-size: 3pt;
+      border: 1px solid rgb(255, 255, 255);
+      text-align: center;
+    }
+
+    .letraT6 {
+      color: rgb(234, 234, 234);
+      background-color: rgb(112, 48, 160);
+      /* Color de fondo */
+      font-size: 6pt;
+      border: 1px solid rgb(255, 255, 255);
+      text-align: center;
+    }
+
+    .letraT0 {
+      color: rgb(233, 232, 232);
+      background-color: rgb(179, 142, 93);
+      /* Color de fondo */
+      font-size: 3pt;
+      border: 1px solid rgb(255, 255, 255);
+      text-align: center;
+    }
+
+    .letraT3 {
+      color: rgb(0, 0, 0);
+      background-color: rgb(75, 172, 198);
+      /* Color de fondo */
+      font-size: 3pt;
+      border: 1px solid rgb(255, 255, 255);
+      text-align: center;
+    }
+
+    .letraT7 {
+      color: rgb(0, 0, 0);
+      background-color: rgb(68, 185, 252);
+      /* Color de fondo */
+      font-size: 3pt;
+      border: 1px solid rgb(255, 255, 255);
+      text-align: center;
+    }
+
+    .contenedor {
+      display: flex;
+      /* Activa el modo Flexbox */
+      gap: 40px;
+      /* Espacio entre tablas */
+      justify-content: center;
+      /* Centrar las tablas en la pantalla */
+      align-items: center;
+    }
+
+    .contenedor1 {
+      justify-content: center;
+      /* Centrar las tablas en la pantalla */
+      align-items: center;
+      margin: 3px;
+    }
+
+    .table2 {
+      width: 100px;
+      border-collapse: collapse;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+
+    table,
+    th,
+    td {
+      border: 1px solid black;
+    }
+
+    th,
+    td {
+      text-align: center;
+    }
+
+    th {
+      background-color: #f2f2f2;
+    }
+
+    .table1 {
+      width: 400px;
+      border-collapse: collapse;
+    }
+
+    .page-break {
+      page-break-before: always;
+    }
+
+    .letraT3C {
+      color: rgb(244, 244, 244);
+      background-color: rgb(40, 92, 77);
+      /* Color de fondo */
+      font-size: 3pt;
+      border: 1px solid rgb(255, 255, 255);
+      text-align: center;
+    }
+
+    .tabla-oficinaC {
+      width: 32%;
+      /* 🔹 3 columnas sin perder espacio */
+      border-collapse: collapse;
+      margin-bottom: 10px;
+    }
+
+    .tabla-oficinaC th,
+    .tabla-oficinaC td {
+      border: 1px solid black;
+      padding: 5px;
+      text-align: center;
+      font-size: 5pt;
+    }
+
+    .tabla-oficinaC th {
+      background-color: rgb(40, 92, 77);
+      color: rgb(250, 250, 250);
+    }
+
+    .tabla-oficinaC td {
+      background-color: rgb(233, 233, 233);
+    }
+
+    .contenedor-datos {
+      margin: 0;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      /* Encabezado, contenido, pie de página */
+      height: 110vh;
+    }
+
+    .contenedor-2T {
+      margin-top: 40px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      margin-bottom: 20px;
+    }
+
+    .letras-Tit {
+      color: rgb(5, 11, 9);
+      text-align: center;
+    }
+
+    .texto-f {
+      font-size: 8pt;
+      text-indent: 30px;
+      text-align: justify;
+      line-height: 1.5;
+    }
+
+    .color-temp td {
+      background-color: rgb(217, 217, 217);
+    }
+
+    .letras-temp td:last-child {
+      color: rgb(157, 36, 73);
+    }
+
+    .tabla-oficina {
+      width: 80%;
+      border-collapse: collapse;
+      margin: auto;
+    }
+
+    .tabla-oficina th,
+    .tabla-oficina td {
+      border: 1px solid black;
+      padding: 5px;
+      text-align: center;
+      font-size: 10pt;
+    }
+
+    .tabla-oficina th {
+      background-color: rgb(255, 255, 255);
+      color: rgb(0, 0, 0);
+      font-weight: bold;
+    }
+
+    .tabla-oficina td {
+      color: rgb(139, 107, 65);
+    }
+
+    .tabla-oficina tr:last-child td {
+      background-color: rgb(139, 107, 65);
+      color: rgb(250, 250, 250);
+      font-weight: bold;
+    }
+
+
+    .tabla-oficina1 {
+      width: 80%;
+      border-collapse: collapse;
+      margin: auto;
+    }
+
+    .tabla-oficina1 th,
+    .tabla-oficina1 td {
+      border: 1px solid black;
+      padding: 5px;
+      text-align: center;
+      font-size: 10pt;
+    }
+
+    .tabla-oficina1 th {
+      background-color: rgb(255, 255, 255);
+      color: rgb(0, 0, 0);
+      font-weight: bold;
+    }
+
+    .tabla-oficina1 td {
+      color: rgb(112, 48, 160);
+    }
+
+    .tabla-oficina1 tr:last-child td {
+      background-color: rgb(112, 48, 160);
+      color: rgb(250, 250, 250);
+      font-weight: bold;
+    }
+
+    .tabla-resumen {
+      width: 45%;
+      border-collapse: collapse;
+      margin-bottom: 10px;
+      margin: auto;
+    }
+
+    .tabla-resumen th,
+    .tabla-resumen td {
+      border: 1px solid black;
+      padding: 5px;
+      text-align: center;
+      font-size: 10pt;
+    }
+
+    .tabla-resumen th {
+      background-color: rgb(255, 255, 255);
+      color: rgb(98, 17, 50);
+      font-weight: bold;
+    }
+
+    .tabla-resumen td {
+      color: rgb(0, 0, 0);
+    }
+
+    .tabla-resumen tr:last-child td {
+      background-color: rgb(98, 17, 50);
+      color: rgb(250, 250, 250);
+      font-weight: bold;
+      /* Opcional: negrita */
+    }
+
+    .letras-DIF {
+      color: rgb(112, 48, 160);
+      text-align: center;
+    }
+
+    .letras-EM {
+      color: rgb(40, 92, 77);
+      text-align: center;
+    }
+
+
+
+    .letra-Rio {
+      color: rgb(230, 230, 230);
+      text-align: center;
+      background-color: rgb(157, 36, 73);
+      font-size: 8pt;
+    }
+
+    .letra-Rio-S {
+      color: rgb(0, 0, 0);
+      text-align: center;
+      background-color: rgb(232, 119, 164);
+      font-size: 8pt;
+      font-weight: bold;
+    }
+
+    .letra-Suchiate {
+      color: rgb(230, 230, 230);
+      text-align: center;
+      background-color: rgb(40, 92, 77);
+      font-size: 8pt;
+    }
+
+    .letra-Suchiate-S {
+      color: rgb(0, 0, 0);
+      text-align: center;
+      background-color: rgb(97, 186, 159);
+      font-size: 8pt;
+      font-weight: bold;
+    }
+
+    .letra-Centro {
+      color: rgb(0, 0, 0);
+      text-align: center;
+      background-color: rgb(166, 166, 166);
+      font-size: 8pt;
+    }
+
+    .letra-Centro-S {
+      color: rgb(0, 0, 0);
+      text-align: center;
+      background-color: rgb(128, 128, 128);
+      font-size: 8pt;
+      font-weight: bold;
+    }
+
+    .letra-TablaT {
+      color: rgb(230, 230, 230);
+      text-align: center;
+      background-color: rgb(40, 92, 77);
+      font-size: 8pt;
+      font-weight: bold;
+    }
+
+    .letra-TablaTT {
+      color: rgb(98, 17, 50);
+      text-align: center;
+      background-color: rgb(212, 193, 156);
+      font-size: 8pt;
+      font-weight: bold;
+    }
+
+    .letra-TablaT0 {
+      color: rgb(230, 230, 230);
+      text-align: center;
+      background-color: rgb(51, 51, 51);
+      font-size: 8pt;
+      font-weight: bold;
+    }
+
+    .letra-TablaT1 {
+      color: rgb(230, 230, 230);
+      text-align: center;
+      background-color: rgb(92, 71, 44);
+      font-size: 8pt;
+      font-weight: bold;
+    }
+
+    .letra-TablaT2 {
+      color: rgb(98, 17, 50);
+      text-align: center;
+      background-color: rgb(243, 203, 215);
+      font-size: 8pt;
+      font-weight: bold;
+    }
+
+    .letra-TablaT3 {
+      color: rgb(40, 92, 77);
+      text-align: center;
+      background-color: rgb(202, 232, 223);
+      font-size: 8pt;
+      font-weight: bold;
+    }
+
+    .letra-TablaC1 {
+      color: rgb(98, 17, 50);
+      text-align: center;
+      background-color: rgb(230, 230, 230);
+      font-size: 8pt;
+    }
+
+    .letra-TablaC2 {
+      color: rgb(0, 0, 0);
+      text-align: center;
+      background-color: rgb(230, 230, 230);
+      font-size: 8pt;
+      font-weight: bold;
+    }
+
+    .lineaD {
+      size: 2px;
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.3/html2pdf.bundle.min.js"></script>
+</head>
+
+<body>
+
+  <button id="btn-cuadroDatos">Descargar Cuadro de Datos</button>
+  <button id="btn-informeO">Descargar Informe Diario de Operaciones</button>
+  <button id="btn-cuadro1ra">Descargar Cuadro de Registros</button>
+  <button id="btn-cecoPuntos">Descargar Reporte CECO por Puntos</button>
+  <button id="btn-cecoNacs">Descargar Reporte CECO por Nacionalidad</button>
+
+  <form action="{% url 'exportar_excel_reporteT' %}" method="post" style="display:inline;">
+    {% csrf_token %}
+    <input type="hidden" name="fechaI" value="{{ fecha|date:'Y-m-d' }}">
+    <input type="hidden" name="retornos" value="{{ dato }}">
+    <button type="submit" id="btn-excelT">Descargar Excel Completo</button>
+  </form>
+
+  <div>
+    <hr class='lineaD' />
+    {% comment %} ========================================================== {% endcomment %}
+    {% comment %} ===================== CUADRO DATOS ========================{% endcomment %}
+    {% comment %} ========================================================== {% endcomment %}
+    <div id="pdf-cuadroDatos" class="contenedor-datos">
+      <div>
+        <h4 class="letras-Tit">
+          INSTITUTO NACIONAL DE MIGRACIÓN<br />DIRECCIÓN GENERAL DE COORDINACIÓN DE OFICINAS DE REPRESENTACION
+        </h4>
+
+        <div>
+          <h3 class="letras-Tit">Cuadro de Datos<br />{{ fecha|date:"d b Y" }}</h3>
+        </div>
+
+        <table class="tabla-resumen">
+          <thead>
+            <tr>
+              <th>FECHA</th>
+              <th>{{ fecha }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Rescatados:</td>
+              <td>{{ rescatados }}</td>
+            </tr>
+            <tr class="letras-temp">
+              <td>Reincidentes:</td>
+              <td>-{{ reincidentesC }}</td>
+            </tr>
+            <tr class="color-temp">
+              <td>Subtotal:</td>
+              <td>{{ subtotal1 }}</td>
+            </tr>
+            <tr class="letras-temp">
+              <td>Inadmitidos:</td>
+              <td>-{{ inadmitidos }}</td>
+            </tr>
+            <tr class="color-temp">
+              <td>Subtotal:</td>
+              <td>{{ subtotal2 }}</td>
+            </tr>
+            <tr class="letras-temp">
+              <td>Retornados:</td>
+              <td>-{{ retornados }}</td>
+            </tr>
+            <tr class="color-temp">
+              <td>Subtotal:</td>
+              <td><strong>{{ rescates_nuevos }}</strong></td>
+            </tr>
+            <tr>
+              <td>De estos:</td>
+              <td>
+                {{ EM_total }} Alojados en EM y<br />{{ DIF_total }}
+                canalizados al DIF
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="contenedor-2T">
+        <div>
+          <h3 class="letras-EM">Alojados en EM</h3>
+          <table class="tabla-oficina">
+            <thead>
+              <tr>
+                <th>NACIONALIDAD</th>
+                <th>TOTAL</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for oficina, datos in rescates_EM.items %}
+              <tr>
+                <td>{{ oficina }}</td>
+                <td>{{ datos.total_EM }}</td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="2"><strong>Sin rescates.</strong></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div>
+          <h3 class="letras-DIF">Alojados en DIF/ALBERGUE</h3>
+          <table class="tabla-oficina1">
+            <thead>
+              <tr>
+                <th>NACIONALIDAD</th>
+                <th>TOTAL</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for oficina, datos in rescates_DIF.items %}
+              <tr>
+                <td>{{ oficina }}</td>
+                <td>{{ datos.total_DIF }}</td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="2"><strong>Sin rescates.</strong></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <br />
+      <br />
+      <p class="texto-f">
+        Por lo que hace al número de rescates reportados, se precisa, que:<br /><br />
+        1.El mayor porcentaje de rescates, son extranjeros que se quedaron en
+        Territorio Nacional, esperando cita de CBP-ONE y ahora son detectados
+        en trayecto hacia el sur, solicitando el retorno voluntario su país de
+        origen.<br />
+        2.En el caso de Guatemala y Honduras se continúa con retornos
+        inmediatos y los programados vía aérea y terrestre al interior de sus
+        países.<br />
+        3.En el caso de los venezolanos (que representan el mayor porcentaje
+        de extranjeros en situación irregular en nuestro país) cada día se incrementa el número de solicitantes, para
+        el Retorno Voluntario a
+        su país.
+      </p>
+      <br>
+      <br>
+      <br>
+      <br>
+    </div>
+
+    <hr class='lineaD' />
+    {% comment %} ========================================================== {% endcomment %}
+    {% comment %} ================ INFORME DE OPERACIONES ==================={% endcomment %}
+    {% comment %} ========================================================== {% endcomment %}
+    <div id="pdf-informeO">
+      <p class="letra">
+        INSTITUTO NACIONAL DE MIGRACIÓN<br />DIRECCIÓN GENERAL DE OFICINAS DE
+        REPRESENTACION
+      </p>
+      <div class="colorFondo">
+        <h6 class="letra">
+          Informe Diario de Rescatados<br />{{ fecha_actual}}
+        </h6>
+      </div>
+
+      <br />
+      <h5>Reporte de Rescates por Oficina</h5>
+
+      <div>
+        <table>
+          <thead class="letraT1">
+            <tr>
+              <th class="letraT1">Rubro</th>
+              {% for oficina in rescates %}
+              <td class="letraT1">{{ oficina}}</td>
+              {% empty %}
+              <th>No hay datos disponibles.</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="letraT2"><strong>Aeropuertos</strong></td>
+              {% for oficina, datos in rescates.items %}
+              <td class="letraT2">{{ datos.total_aereos }}</td>
+              {% empty %}
+              <td>No hay datos disponibles.</td>
+              {% endfor %}
+            </tr>
+            <tr>
+              <td class="letraT2"><strong>Carreteros</strong></td>
+              {% for oficina, datos in rescates.items %}
+              <td class="letraT2">{{ datos.total_carreteros }}</td>
+              {% empty %}
+              <td>No hay datos disponibles.</td>
+              {% endfor %}
+            </tr>
+            <tr>
+              <td class="letraT2"><strong>Central de Autobus</strong></td>
+              {% for oficina, datos in rescates.items %}
+              <td class="letraT2">{{ datos.total_central }}</td>
+              {% empty %}
+              <td>No hay datos disponibles.</td>
+              {% endfor %}
+            </tr>
+            <tr>
+              <td class="letraT2"><strong>Ferroviarios</strong></td>
+              {% for oficina, datos in rescates.items %}
+              <td class="letraT2">{{ datos.total_ferro }}</td>
+              {% empty %}
+              <td>No hay datos disponibles.</td>
+              {% endfor %}
+            </tr>
+            <tr>
+              <td class="letraT2"><strong>Puestos a Disposición</strong></td>
+              {% for oficina, datos in rescates.items %}
+              <td class="letraT2">{{ datos.total_puestos }}</td>
+              {% empty %}
+              <td>No hay datos disponibles.</td>
+              {% endfor %}
+            </tr>
+            <tr>
+              <td class="letraT2"><strong>Otros</strong></td>
+              {% for oficina, datos in rescates.items %}
+              <td class="letraT2">{{ datos.total_otros }}</td>
+              {% empty %}
+              <td>No hay datos disponibles.</td>
+              {% endfor %}
+            </tr>
+            <tr>
+              <td class="letraT1">
+                <strong>TOTAL MIGRANTES RESCATADOS</strong>
+              </td>
+              {% for oficina, datos in rescates.items %}
+              <td class="letraT1">{{ datos.total }}</td>
+              {% empty %}
+              <td>No hay datos disponibles.</td>
+              {% endfor %}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div>
+        <table>
+          <thead class="letraT1">
+            <tr>
+              <th class="letraT4">Rubro</th>
+              {% for oficina in reincidentes %}
+              <td class="letraT4">{{ oficina}}</td>
+              {% empty %}
+              <th>No hay datos disponibles.</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="letraT2"><strong>Reincidentes</strong></td>
+              {% for oficina, datos in reincidentes.items %}
+              <td class="letraT2">{{ datos.total_reincidentes }}</td>
+              {% empty %}
+              <td>No hay datos disponibles.</td>
+              {% endfor %}
+            </tr>
+            <tr>
+              <td class="letraT2"><strong>Registros Nuevos</strong></td>
+              {% for oficina, datos in reincidentes.items %}
+              <td class="letraT2">{{ datos.total_nuevos }}</td>
+              {% empty %}
+              <td>No hay datos disponibles.</td>
+              {% endfor %}
+            </tr>
+            <tr>
+              <td class="letraT0">
+                <strong>TOTAL MIGRANTES RESCATADOS</strong>
+              </td>
+              {% for oficina, datos in reincidentes.items %}
+              <td class="letraT0">{{ datos.total }}</td>
+              {% empty %}
+              <td>No hay datos disponibles.</td>
+              {% endfor %}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <br />
+      <h5>Reporte de Rescates por nacionalidad</h5>
+      <br />
+      <br />
+
+      <div class="contenedor">
+        <div class="contenedor1">
+          <h6>Nacionalidades de Rescates Nuevos</h6>
+
+          <table border="1" class="contenedor1">
+            <thead>
+              <tr>
+                <th class="letraT1">Nacionalidad</th>
+
+                <th class="letraT2">Adultos Hombres Solos</th>
+                <th class="letraT3">Adultos Mujeres Solas</th>
+
+                <th class="letraT2">Adultos Hombres Acompañan NNA</th>
+                <th class="letraT3">Adultos Mujeres Acompañan NNA</th>
+                <th class="letraT2">NNA Acompañados Hombres</th>
+                <th class="letraT3">NNA Acompañados Mujeres</th>
+
+                <th class="letraT2">NNA No Acompañados Hombres</th>
+                <th class="letraT3">NNA No Acompañados Mujeres</th>
+
+                <th class="letraT0">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for nacio, datos in nacionalidades.items %}
+              <tr>
+                <td class="letraT1">{{ nacio }}</td>
+                <td class="letraT2">{{ datos.H_AS }}</td>
+                <td class="letraT3">{{ datos.M_AS }}</td>
+
+                <td class="letraT2">{{ datos.H_AA }}</td>
+                <td class="letraT3">{{ datos.M_AA }}</td>
+                <td class="letraT2">{{ datos.H_mA }}</td>
+                <td class="letraT3">{{ datos.M_mA }}</td>
+
+                <td class="letraT2">{{ datos.H_mS }}</td>
+                <td class="letraT3">{{ datos.M_mS }}</td>
+
+                <td class="letraT0">{{ datos.total }}</td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td>No hay datos disponibles.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+
+          <table class="table2">
+            <thead>
+              <tr>
+                <th class="letraT6">
+                  TOTAL DE RETORNADOS A SU PAÍS DE ORIGEN
+                </th>
+                <th class="letraT6">{{ dato }}</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <div>
+          <h6>Nacionalidades de Reincidentes</h6>
+          <table border="1" class="contenedor1">
+            <thead>
+              <tr>
+                <th class="letraT1">Nacionalidad</th>
+
+                <th class="letraT2">Adultos Hombres Solos</th>
+                <th class="letraT3">Adultos Mujeres Solas</th>
+
+                <th class="letraT2">Adultos Hombres Acompañan NNA</th>
+                <th class="letraT3">Adultos Mujeres Acompañan NNA</th>
+                <th class="letraT2">NNA Acompañados Hombres</th>
+                <th class="letraT3">NNA Acompañados Mujeres</th>
+
+                <th class="letraT2">NNA No Acompañados Hombres</th>
+                <th class="letraT3">NNA No Acompañados Mujeres</th>
+
+                <th class="letraT0">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for nacio, datos in nacionalidades_re.items %}
+              <tr>
+                <td class="letraT1">{{ nacio }}</td>
+                <td class="letraT2">{{ datos.H_AS }}</td>
+                <td class="letraT3">{{ datos.M_AS }}</td>
+
+                <td class="letraT2">{{ datos.H_AA }}</td>
+                <td class="letraT3">{{ datos.M_AA }}</td>
+                <td class="letraT2">{{ datos.H_mA }}</td>
+                <td class="letraT3">{{ datos.M_mA }}</td>
+
+                <td class="letraT2">{{ datos.H_mS }}</td>
+                <td class="letraT3">{{ datos.M_mS }}</td>
+
+                <td class="letraT0">{{ datos.total }}</td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td>No hay datos disponibles.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div>
+          <h6>Nacionalidades de Inadmitidos</h6>
+          <table border="1" class="contenedor1">
+            <thead>
+              <tr>
+                <th class="letraT1">Nacionalidad</th>
+
+                <th class="letraT2">Adultos Hombres</th>
+                <th class="letraT3">Adultos Mujeres</th>
+                <th class="letraT2">Menores Hombres</th>
+                <th class="letraT3">Menores Mujeres</th>
+
+                <th class="letraT0">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for nacio, datos in nacionalidades_inad.items %}
+              <tr>
+                <td class="letraT1">{{ nacio }}</td>
+                <td class="letraT2">{{ datos.H_A }}</td>
+                <td class="letraT3">{{ datos.M_A }}</td>
+
+                <td class="letraT2">{{ datos.H_m }}</td>
+                <td class="letraT3">{{ datos.M_m }}</td>
+
+                <td class="letraT0">{{ datos.total }}</td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td>No hay datos disponibles.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+      <p class="fecha">Fecha: {{ fecha_actual }}</p>
+    </div>
+
+    <hr class='lineaD' />
+    {% comment %} ========================================================== {% endcomment %}
+    {% comment %} ========== Cuadro primera vez y reincidentes ============= {% endcomment %}
+    {% comment %} ========================================================== {% endcomment %}
+    <div id="pdf-cuadro1ra">
+      <h3 class="letras-Tit">Informe de personas extranjeras rescatadas registradas por primera vez y reincidentes</h3>
+      <h3 class="letras-Tit">{{ fecha|date:"j F Y" }}</h3>
+
+      <div class="contenedor">
+        <div>
+          <table border="1" class="contenedor1">
+            <thead>
+              <tr>
+                <th class="letra-TablaT0">CECO</th>
+                <th class="letra-TablaT0">OFICIA DE REPRESENTACION</th>
+                <th class="letra-TablaT1">RESCATES PRIMERA VEZ</th>
+                <th class="letra-TablaT2">REINCIDENTES</th>
+                <th class="letra-TablaT3">TOTAL CECO</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for oficina, datos in CECO_N.items %}
+              <tr>
+                <td class="letra-Rio">RIO BRAVO</td>
+                <td class="letra-Rio">{{ oficina }}</td>
+                <td class="letra-Rio">{{ datos.nuevos }}</td>
+                <td class="letra-Rio">{{ datos.reincidentes }}</td>
+                <td class="letra-Rio">{{ datos.total }}</td>
+              </tr>
+              {% endfor %}
+              <tr>
+                <td class="letra-Rio-S"></td>
+                <td class="letra-Rio-S">SUBTOTAL</td>
+                <td class="letra-Rio-S">{{ Sub_CECO_N.nuevos }}</td>
+                <td class="letra-Rio-S">{{ Sub_CECO_N.reincidentes }}</td>
+                <td class="letra-Rio-S">{{ Sub_CECO_N.total }}</td>
+              </tr>
+              {% for oficina, datos in CECO_S.items %}
+              <tr>
+                <td class="letra-Suchiate">SUCHIATE</td>
+                <td class="letra-Suchiate">{{ oficina }}</td>
+                <td class="letra-Suchiate">{{ datos.nuevos }}</td>
+                <td class="letra-Suchiate">{{ datos.reincidentes }}</td>
+                <td class="letra-Suchiate">{{ datos.total }}</td>
+              </tr>
+              {% endfor %}
+              <tr>
+                <td class="letra-Suchiate-S"></td>
+                <td class="letra-Suchiate-S">SUBTOTAL</td>
+                <td class="letra-Suchiate-S">{{ Sub_CECO_S.nuevos }}</td>
+                <td class="letra-Suchiate-S">{{ Sub_CECO_S.reincidentes }}</td>
+                <td class="letra-Suchiate-S">{{ Sub_CECO_S.total }}</td>
+              </tr>
+
+              {% for oficina, datos in CECO_C.items %}
+              <tr>
+                <td class="letra-Centro">CENTRO</td>
+                <td class="letra-Centro">{{ oficina }}</td>
+                <td class="letra-Centro">{{ datos.nuevos }}</td>
+                <td class="letra-Centro">{{ datos.reincidentes }}</td>
+                <td class="letra-Centro">{{ datos.total }}</td>
+              </tr>
+              {% endfor %}
+              <tr>
+                <td class="letra-Centro-S"></td>
+                <td class="letra-Centro-S">SUBTOTAL</td>
+                <td class="letra-Centro-S">{{ Sub_CECO_C.nuevos }}</td>
+                <td class="letra-Centro-S">{{ Sub_CECO_C.reincidentes }}</td>
+                <td class="letra-Centro-S">{{ Sub_CECO_C.total }}</td>
+              </tr>
+
+              <tr>
+                <td></td>
+                <td class="letra-TablaTT">TOTAL</td>
+                <td class="letra-TablaT1">{{ Sub_CECO_N.nuevos|add:Sub_CECO_C.nuevos|add:Sub_CECO_S.nuevos }}</td>
+                <td class="letra-TablaT2">{{
+                  Sub_CECO_N.reincidentes|add:Sub_CECO_C.reincidentes|add:Sub_CECO_S.reincidentes }}</td>
+                <td class="letra-TablaT3">{{ Sub_CECO_N.total|add:Sub_CECO_C.total|add:Sub_CECO_S.total }}</td>
+              </tr>
+
+            </tbody>
+          </table>
+        </div>
+        <div>
+          <table border="1" class="contenedor1">
+            <thead>
+              <tr>
+                <th class="letra-TablaT">NACIONALIDAD</th>
+                <th class="letra-TablaT1">RESCATES PRIMERA VEZ</th>
+                <th class="letra-TablaT2">REINCIDENTES</th>
+                <th class="letra-TablaT3">TOTAL RESCATES</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for nac, datos in Nac_1_Rein.items %}
+              <tr>
+                <td class="letra-TablaC1">{{ nac }}</td>
+                <td class="letra-TablaC2">{{ datos.nuevos }}</td>
+                <td class="letra-TablaC2">{{ datos.reincidentes }}</td>
+                <td class="letra-TablaC2">{{ datos.total }}</td>
+              </tr>
+              {% endfor %}
+              <tr>
+                <td class="letra-TablaTT">TOTAL</td>
+                <td class="letra-TablaT1">{{ Total_Nac_1_Rein.nuevos }}</td>
+                <td class="letra-TablaT2">{{ Total_Nac_1_Rein.reincidentes }}</td>
+                <td class="letra-TablaT3">{{ Total_Nac_1_Rein.total }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    {% comment %} ========================================================== {% endcomment %}
+    {% comment %} ======================== CECO ============================ {% endcomment %}
+    {% comment %} ========================================================== {% endcomment %}
+
+    {% comment %} ===================== CECO X Puntos ====================== {% endcomment %}
+    <div id="pdf-cecoPuntos">
+      <p class="letra">
+        INSTITUTO NACIONAL DE MIGRACIÓN<br />DIRECCIÓN GENERAL DE OFICINAS DE
+        REPRESENTACION
+      </p>
+      <div class="colorFondo">
+        <h6 class="letra">Informe Diario<br />{{ fecha_actual}}</h6>
+      </div>
+      <div class="contenedor">
+        <div>
+          <br />
+          <h5>Rescates por Oficina - PRHs (Nuevos + Reincidentes)</h5>
+          <br />
+          <div>
+            {% for oficina, datos in rescOR_puntoT.items %}
+            <table class="tabla-oficinaC">
+              <thead>
+                <tr>
+                  <th class="letraT3C" colspan="2">{{ oficina }}</th>
+                </tr>
+                <tr>
+                  <th class="letraT3C">Punto</th>
+                  <th class="letraT3C">Rescates</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% if datos.total == 0 %}
+                <tr>
+                  <td colspan="2"><strong>Sin rescates.</strong></td>
+                </tr>
+                {% else %}
+                {% for key, value in datos.puntos.items %}
+                <tr>
+                  <td>{{ key }}</td>
+                  <td>{{ value }}</td>
+                </tr>
+                {% endfor %}
+                {% endif %}
+              </tbody>
+            </table>
+
+            {% if forloop.counter|divisibleby:4 %}
+            {# Cada 6 tablas, forzar un salto de página #}
+            <div class="page-break"></div>
+            {% endif %}
+            {% endfor %}
+          </div>
+        </div>
+
+        {% comment %}
+        <div>
+          <br />
+          <h5>Rescates por Oficina y Punto Reincidentes</h5>
+          <br />
+          <div>
+            {% for oficina, datos in rescOR_puntoR.items %}
+            <table class="tabla-oficinaC">
+              <thead>
+                <tr>
+                  <th class="letraT3C" colspan="2">{{ oficina }}</th>
+                </tr>
+                <tr>
+                  <th class="letraT3C">Punto</th>
+                  <th class="letraT3C">Rescates</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% if datos.total == 0 %}
+                <tr>
+                  <td colspan="2"><strong>Sin rescates.</strong></td>
+                </tr>
+                {% else %}
+                {% for key, value in datos.puntos.items %}
+                <tr>
+                  <td>{{ key }}</td>
+                  <td>{{ value }}</td>
+                </tr>
+                {% endfor %}
+                {% endif %}
+              </tbody>
+            </table>
+            {% if forloop.counter|divisibleby:4 %}
+            {# Cada 6 tablas, forzar un salto de página #}
+            <div class="page-break"></div>
+            {% endif %}
+            {% endfor %}
+          </div>
+          <div class="page-break"></div>
+        </div>
+        {% endcomment %}
+
+      </div>
+    </div>
+
+    {% comment %} ===================== CECO X Nacs ======================== {% endcomment %}
+    <div id="pdf-cecoNacs">
+      <br />
+      <h5>Rescates por Oficina y Nacionalidad (CECO 2)</h5>
+
+      {% for oficina, nacionalidades in rescOR_nacN.items %}
+      <div class="contenedor1">
+        <h6>{{ oficina }}</h6>
+
+        <table border="1" class="contenedor1">
+          <thead>
+            <tr>
+              <th class="letraT1">Nacionalidad</th>
+
+              <th class="letraT2">Adultos Hombres Solos</th>
+              <th class="letraT3C">Adultos Mujeres Solas</th>
+
+              <th class="letraT2">Adultos Hombres Acompañan NNA</th>
+              <th class="letraT3C">Adultos Mujeres Acompañan NNA</th>
+              <th class="letraT2">NNA Acompañados Hombres</th>
+              <th class="letraT3C">NNA Acompañados Mujeres</th>
+
+              <th class="letraT2">NNA No Acompañados Hombres</th>
+              <th class="letraT3C">NNA No Acompañados Mujeres</th>
+
+              <th class="letraT0">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for nacio, datos in nacionalidades.items %}
+            <tr>
+              <td class="letraT1">{{ nacio }}</td>
+              <td class="letraT2">{{ datos.H_AS }}</td>
+              <td class="letraT3C">{{ datos.M_AS }}</td>
+
+              <td class="letraT2">{{ datos.H_AA }}</td>
+              <td class="letraT3C">{{ datos.M_AA }}</td>
+              <td class="letraT2">{{ datos.H_mA }}</td>
+              <td class="letraT3C">{{ datos.M_mA }}</td>
+
+              <td class="letraT2">{{ datos.H_mS }}</td>
+              <td class="letraT3C">{{ datos.M_mS }}</td>
+
+              <td class="letraT0">{{ datos.total }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="9">Sin rescates.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if forloop.counter0|divisibleby:8 and not forloop.first %}
+      <div class="page-break"></div>
+      <!-- 🔹 Salto de página cada 8 oficinas -->
+      {% endif %}
+
+      {% endfor %}
+
+      <br />
+      <h5>Rescates por Oficina y Nacionalidad (CECO)</h5>
+
+      {% for oficina, nacionalidades in rescOR_nacT.items %}
+      <div class="contenedor1">
+        <h6>{{ oficina }}</h6>
+
+        <table border="1" class="contenedor1">
+          <thead>
+            <tr>
+              <th class="letraT1">Nacionalidad</th>
+
+              <th class="letraT2">Adultos Hombres Solos</th>
+              <th class="letraT3C">Adultos Mujeres Solas</th>
+
+              <th class="letraT2">Adultos Hombres Acompañan NNA</th>
+              <th class="letraT3C">Adultos Mujeres Acompañan NNA</th>
+              <th class="letraT2">NNA Acompañados Hombres</th>
+              <th class="letraT3C">NNA Acompañados Mujeres</th>
+
+              <th class="letraT2">NNA No Acompañados Hombres</th>
+              <th class="letraT3C">NNA No Acompañados Mujeres</th>
+
+              <th class="letraT0">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for nacio, datos in nacionalidades.items %}
+            <tr>
+              <td class="letraT1">{{ nacio }}</td>
+              <td class="letraT2">{{ datos.H_AS }}</td>
+              <td class="letraT3C">{{ datos.M_AS }}</td>
+
+              <td class="letraT2">{{ datos.H_AA }}</td>
+              <td class="letraT3C">{{ datos.M_AA }}</td>
+              <td class="letraT2">{{ datos.H_mA }}</td>
+              <td class="letraT3C">{{ datos.M_mA }}</td>
+
+              <td class="letraT2">{{ datos.H_mS }}</td>
+              <td class="letraT3C">{{ datos.M_mS }}</td>
+
+              <td class="letraT0">{{ datos.total }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="9">Sin rescates.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {% if forloop.counter0|divisibleby:8 and not forloop.first %}
+      <div class="page-break"></div>
+      <!-- 🔹 Salto de página cada 9 oficinas -->
+      {% endif %}
+
+      {% endfor %}
+    </div>
+
+  </div>
+
+  <script>
+    document.getElementById("btn-cuadroDatos").addEventListener("click", () => {
+      // Obtén el nodo DOM
+      const element = document.getElementById("pdf-cuadroDatos");
+
+      const opt = {
+        margin: 10, // márgenes en pulgadas
+        filename: "reporte-cuadroDatos_" + "{{ fecha }}" + ".pdf",
+        image: { type: "jpeg", quality: 1 }, // calidad máxima
+        html2canvas: { scale: 4, useCORS: true }, // ⬅️ calidad de render (más escala = mejor definición)
+        jsPDF: { unit: "pt", format: "a4", orientation: "portrait" },
+      };
+
+      // Lanza la generación y descarga
+      html2pdf().set(opt).from(element).save();
+    });
+
+    document.getElementById("btn-informeO").addEventListener("click", () => {
+      // Obtén el nodo DOM
+      const element = document.getElementById("pdf-informeO");
+
+      // Configura opciones (márgenes, unidad, formato, etc.)
+      const opt = {
+        margin: 10, // márgenes en pulgadas
+        filename: "Informe_Operaciones_" + "{{ fecha }}" + ".pdf",
+        image: { type: "jpeg", quality: 1 }, // calidad máxima
+        html2canvas: { scale: 4, useCORS: true }, // ⬅️ calidad de render (más escala = mejor definición)
+        jsPDF: { unit: "pt", format: "a4", orientation: "landscape" },
+      };
+
+      // Lanza la generación y descarga
+      html2pdf().set(opt).from(element).save();
+    });
+
+    document.getElementById("btn-cuadro1ra").addEventListener("click", () => {
+      // Obtén el nodo DOM
+      const element = document.getElementById("pdf-cuadro1ra");
+      // Configura opciones (márgenes, unidad, formato, etc.)
+
+      // const opt = {
+      //  margin:       0.5,
+      //  filename:     'informe.pdf',
+      //  image:        { type: 'jpeg', quality: 0.98 },
+      //  html2canvas:  { scale: 2 },
+      //  jsPDF:        { unit: 'in', format: 'letter', orientation: 'landscape' }
+      // };
+
+      const opt = {
+        margin: 10, // márgenes en pulgadas
+        filename: "Cuadro_Rescates_1rayReinc_" + "{{ fecha }}" + ".pdf",
+        image: { type: "jpeg", quality: 1 }, // calidad máxima
+        html2canvas: { scale: 4, useCORS: true }, // ⬅️ calidad de render (más escala = mejor definición)
+        jsPDF: { unit: "pt", format: "a4", orientation: "portrait" },
+      };
+
+      // Lanza la generación y descarga
+      html2pdf().set(opt).from(element).save();
+    });
+
+    document.getElementById("btn-cecoPuntos").addEventListener("click", () => {
+      // Obtén el nodo DOM
+      const element = document.getElementById("pdf-cecoPuntos");
+      // Configura opciones (márgenes, unidad, formato, etc.)
+
+      // const opt = {
+      //  margin:       0.5,
+      //  filename:     'informe.pdf',
+      //  image:        { type: 'jpeg', quality: 0.98 },
+      //  html2canvas:  { scale: 2 },
+      //  jsPDF:        { unit: 'in', format: 'letter', orientation: 'landscape' }
+      // };
+
+      const opt = {
+        margin: 10, // márgenes en pulgadas
+        filename: "CECO_Puntos_1rayReinc_" + "{{ fecha }}" + ".pdf",
+        image: { type: "jpeg", quality: 1 }, // calidad máxima
+        html2canvas: { scale: 4, useCORS: true }, // ⬅️ calidad de render (más escala = mejor definición)
+        jsPDF: { unit: "pt", format: "a4", orientation: "portrait" },
+      };
+
+      // Lanza la generación y descarga
+      html2pdf().set(opt).from(element).save();
+    });
+
+    document.getElementById("btn-cecoNacs").addEventListener("click", () => {
+      // Obtén el nodo DOM
+      const element = document.getElementById("pdf-cecoNacs");
+      // Configura opciones (márgenes, unidad, formato, etc.)
+
+      // const opt = {
+      //  margin:       0.5,
+      //  filename:     'informe.pdf',
+      //  image:        { type: 'jpeg', quality: 0.98 },
+      //  html2canvas:  { scale: 2 },
+      //  jsPDF:        { unit: 'in', format: 'letter', orientation: 'landscape' }
+      // };
+
+      const opt = {
+        margin: 10, // márgenes en pulgadas
+        filename: "CECO_NACS_1rayReinc_" + "{{ fecha }}" + ".pdf",
+        image: { type: "jpeg", quality: 1 }, // calidad máxima
+        html2canvas: { scale: 4, useCORS: true }, // ⬅️ calidad de render (más escala = mejor definición)
+        jsPDF: { unit: "pt", format: "a4", orientation: "portrait" },
+      };
+
+      // Lanza la generación y descarga
+      html2pdf().set(opt).from(element).save();
+    });
+  </script>
+</body>
+
+</html>

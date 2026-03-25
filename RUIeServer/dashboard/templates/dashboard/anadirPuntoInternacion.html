@@ -1,0 +1,177 @@
+{% extends "base/base.html" %}
+
+{% load static %}
+
+{% block styles %}
+
+    <style>
+
+
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 8px;
+        }
+
+        tr:nth-child(even) {
+            background-color: #e1e1e1
+        }
+
+        th {
+
+            color: rgb(165, 27, 27);
+        }
+
+        .bdtable {
+            border: 2px solid #b4b4b4;
+            border-radius: 15px;
+            box-shadow: 0px 1px;
+            margin-left: 100px;
+            margin-right: 100px;
+  
+        }
+        .edit{
+            border: 2px solid #f2eddf;
+            background-color: #f2eddf;
+            border-radius: 15px;
+            box-shadow: 0px 1px;
+            margin-left: 100px;
+            margin-right: 100px;
+            margin-top: 100px;
+            opacity: 0.75;
+        }
+        .elegant-input-label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+    
+        .elegant-input {
+            width: 100%;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-sizing: border-box;
+            margin-bottom: 15px;
+            padding: 8px; 
+        }
+        </style>
+        {% endblock styles %}
+
+{% block content %}
+
+
+{% if user.is_authenticated %}
+
+
+    <!-- tablas de prueba
+    <div class="bdtable bg-inm-marron-100">
+        <table>
+            <tr>
+                <th>Oficina de Representación</th>
+                <th>Nombre del Punto</th>
+                <th>Tipo del Punto</th>
+            </tr>
+      
+                <tr>
+                    <td>{{ data.oficinaR }}</td>
+                    <td>{{ data.nomPuntoRevision }}</td>
+                    <td>{{ data.tipoP }}</td>
+                </tr>
+    
+        </table>
+
+    </div>-->
+    
+    <div class="edit">
+        <br><br>
+        <form method="POST" action="#" style="text-align: center; max-width: 300px; margin: auto;"> {% csrf_token %}
+
+        
+                
+            
+            <label for="fname" class="elegant-input-label">Oficina de Representacion:</label><br>
+            <!--<input type="text" name="oficinaR" value="{{ form.oficinaR }}" class="elegant-input" id="id_oficinaR"><br>-->
+            <select name="estadoPunto" value="{{ form.estadoPunto }}" class="elegant-input" id="id_estadoPunto">
+                <option value="AGUASCALIENTES">AGUASCALIENTES</option>
+                <option value="BAJA CALIFORNIA">BAJA CALIFORNIA</option>
+                <option value="BAJA CALIFORNIA SUR">BAJA CALIFORNIA SUR</option>
+                <option value="CAMPECHE">CAMPECHE</option>
+                <option value="CDMX">CDMX</option>
+                <option value="CHIAPAS">CHIAPAS</option>
+                <option value="CHIHUAHA">CHIHUAHA</option>
+                <option value="COAHUILA">COAHUILA</option>
+                <option value="COLIMA">COLIMA</option>
+                <option value="DURANGO">DURANGO</option>
+                <option value="EDOMEX">EDOMEX</option>
+                <option value="GUERRERO">GUERRERO</option>
+                <option value="GUANAJUATO">GUANAJUATO</option>
+                <option value="HIDALGO">HIDALGO</option>
+                <option value="JALISCO">JALISCO</option>
+                <option value="MICHOACÁN">MICHOACÁN</option>
+                <option value="MORELOS">MORELOS</option>
+                <option value="NAYARIT">NAYARIT</option>
+                <option value="NUEVO LEÓN">NUEVO LEÓN</option>
+                <option value="OAXACA">OAXACA</option>
+                <option value="PUEBLA">PUEBLA</option>
+                <option value="QUERÉTARO">QUERÉTARO</option>
+                <option value="QUINTANA ROO">QUINTANA ROO</option>
+                <option value="SAN LUIS POTOSÍ">SAN LUIS POTOSÍ</option>
+                <option value="SINALOA">SINALOA</option>
+                <option value="SONORA">SONORA</option>
+                <option value="TABASCO">TABASCO</option>
+                <option value="TAMAULIPAS">TAMAULIPAS</option>
+                <option value="TLAXCALA">TLAXCALA</option>
+                <option value="VERACRUZ">VERACRUZ</option>
+                <option value="YUCATÁN">YUCATÁN</option>
+                <option value="ZACATECAS">ZACATECAS</option>
+
+            </select><br>
+
+        
+            <label for="lname" class="elegant-input-label">Nombre del Punto de Revisión:</label><br>
+            <input type="text" id="id_nombrePunto" name="nombrePunto" value="{{ form.nombrePunto }}" class="elegant-input"><br>
+            
+            <label for="lname" class="elegant-input-label">Tipo de Punto:</label><br>
+            <!--<input type="text" id="id_tipoP" name="tipoP" value="{{ form.tipoP }}" class="elegant-input"><br>-->
+            <select type="text" id="id_tipoPunto" name="tipoPunto" value="{{ form.tipoPunto }}" class="elegant-input">
+                <option value="AEREOS" {% if form.tipoP == 'AEREOS' %}selected{% endif %}>AEREOS</option>
+                <option value="TERRESTRES" {% if form.tipoP == 'TERRESTRES' %}selected{% endif %}>TERRESTRES</option>
+                <option value="MARÍTIMOS" {% if form.tipoP == 'MARÍTIMOS' %}selected{% endif %}>MARÍTIMOS</option>
+            </select><br>
+
+            
+            <br>
+            <input type="submit" value="Añadir" style="background-color: #4CAF50; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer;">
+        </form>
+        <br>
+        
+    </div>
+    
+    <script>
+        cambiar();
+        function cambiar(){
+            var lat = document.getElementById("id_latitud");
+            var long = document.getElementById("id_longitud");
+
+            var str_lat = lat.value.replace(",",".");
+            var str_long = lat.value.replace(",",".");
+
+            lat.value = str_lat;
+            long.value = str_long;
+        }
+        
+        
+    </script>
+</div>
+
+{% endif %}
+  
+{% endblock content %}
+
+

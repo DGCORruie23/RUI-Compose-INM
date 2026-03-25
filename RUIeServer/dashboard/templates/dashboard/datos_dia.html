@@ -1,0 +1,179 @@
+{% extends "base/base.html" %}
+
+{% block title %}
+    {% comment %} {% for user in usuario %}
+        Dashboard de {{user.oficinaR}}
+    {% endfor %}  {% endcomment %}
+    Dashboard de {{usuario.0.oficinaR}}
+{% endblock title %}
+
+{% block navigation %}
+    Panel de Control de {{usuario.0.oficinaR}}
+{% endblock navigation %}
+
+{% block linkSuperior %}
+{% comment %} <form action="." method="post">
+    {% csrf_token %}
+        <input name="username" type="hidden">
+        <input name="password" type="hidden">
+    <button type="submit" class="py-4 px-6 bg-blue-400 rounded-xl text-white hover:text-inm-verde-100">Descargar</button>
+</form> {% endcomment %}
+{% comment %} <a href="{% url 'descargas' %}" class="py-4 px-6 bg-blue-400 rounded-xl text-white hover:text-inm-verde-100">Descargas</a>            {% endcomment %}
+{% endblock linkSuperior %}
+
+
+{% block content %}
+    {% comment %} <h1 class="text-xl">Dashboard de {{usuario.0.oficinaR}} </h1> {% endcomment %}
+
+    <div class="py-3 flex flex-row center">
+        {% comment %} <label for="filtro_hora">Filtrar por hora:</label> {% endcomment %}
+        <input class="px-2 py-1 rounded border-2 border-inm-marron-100 text-inm-cafe-200 mx-3" type="text" id="myInput" onkeyup="myFunction(2, 'myInput')" placeholder="Buscar por hora" name="filtro_hora">
+
+        {% comment %} <label for="filtro_punto">Filtrar por Punto:</label> {% endcomment %}
+        <input class="px-2 py-1 rounded border-2 border-inm-marron-100 text-inm-cafe-200 mx-3" type="text" id="myInput1" onkeyup="myFunction(5, 'myInput1')" placeholder="Buscar por punto" name="filtro_punto">
+
+        {% comment %} <label for="filtro_nacio">Filtrar por Nacionalidad:</label> {% endcomment %}
+        <input class="px-2 py-1 rounded border-2 border-inm-marron-100 text-inm-cafe-200 mx-3" type="text" id="myInput2" onkeyup="myFunction(6, 'myInput2')" placeholder="Buscar por Nacionalidad" name="filtro_nacio">
+
+        <label class="px-2 py-1 text-inm-rojo-200" id="totales"></label>
+
+        <form action="{% url 'descarga_excel' %}" method="post">
+            {% csrf_token %}
+                <input name="fechaDescarga" type="hidden" value="{{fecha_P}}" id="id_fechaDescarga">
+                <input name="oficina" type="hidden" value="{{usuario.0.oficinaR}}" id="id_oficina">
+            <button type="submit" class="py-4 px-6 bg-blue-400 rounded-xl text-white hover:text-inm-verde-100">Descargar</button>
+        </form>
+    </div>
+    
+    <table id="myTable" class="border-separate border border-slate-200 hover:table-fixed" >
+        <thead class="bg-inm-cafe-100 text-white">
+            <tr>
+                <th class="border border-slate-300">#</th>
+                <th class="border border-slate-300 px-3 text-sm">Fecha</th>
+                <th class="border border-slate-300 px-1 text-sm">Hora</th>
+                <th class="border border-slate-300 text-sm">Nombre del Agente</th>
+
+                <th class="border border-slate-300 text-sm">Tipo de Punto</th>
+
+                {% comment %} <th class="border border-slate-300">Aeropuerto</th>
+                <th class="border border-slate-300">Carretero</th>
+                <th class="border border-slate-300">Casa de seguridad</th>
+                <th class="border border-slate-300">Central de Autobus</th>
+                <th class="border border-slate-300">Ferrocarril</th>
+                <th class="border border-slate-300">Hotel</th>
+                <th class="border border-slate-300">Puestos a Disposicion</th>
+                <th class="border border-slate-300">voluntarios</th> {% endcomment %}
+
+                {% comment %} <th class="border border-slate-300">Municipio</th> {% endcomment %}
+                <th class="border border-slate-300 text-sm">Punto Estrategico</th>
+                <th class="border border-slate-300 text-sm">Nacionalidad</th>
+                <th class="border border-slate-300 px-2 text-sm">ISO</th>
+                <th class="border border-slate-300">Nombre</th>
+                <th class="border border-slate-300">Apellidos</th>
+                <th class="border border-slate-300 text-sm">Parentesco</th>
+                <th class="border border-slate-300 text-xs">Fecha de Nacimiento</th>
+                <th class="border border-slate-300 text-sm">Edad</th>
+                <th class="border border-slate-300 px-2">Sexo</th>
+                <th class="border border-slate-300 text-sm">Embarazo</th>
+                <th class="border border-slate-300 text-sm">Numero de familia</th>
+            </tr>
+        </thead>
+        <tbody class="bg-gray-200">
+            {% for val in values %}
+            <tr>
+                <td class="text-xs text-center">{{ forloop.counter }}</td>
+                <td class="text-xs text-center">{{val.fecha}}</td>
+                <td class="text-xs text-center">{{val.hora}}</td>
+                <td class="text-xs text-center">{{val.nombreAgente}}</td>
+
+                {% if val.aeropuerto == True %}
+                    <td class="text-xs text-center">Aeropuerto</td>
+                {% elif val.carretero == True %}
+                    <td class="text-xs text-center">Carretero</td>
+                {% elif val.casaSeguridad == True %}
+                    <td class="text-xs text-center">Disuadidos</td> 
+                {% elif val.centralAutobus == True %}
+                    <td class="text-xs text-center">Central de Autobus</td>  
+                {% elif val.ferrocarril == True %}
+                    <td class="text-xs text-center">Ferrocarril</td>
+                {% elif val.hotel == True %}
+                    <td class="text-xs text-center">Visitas de Verificación</td>
+                {% elif val.puestosADispo == True %}
+                    <td class="text-xs text-center">Puestos a Disposición</td>
+                {% elif val.voluntarios == True %}
+                    <td class="text-xs text-center">Voluntarios</td>
+                {% else %}
+                    <td class="text-xs text-center">Otro</td>
+                {% endif %}
+                {% comment %} <th>{{val.aeropuerto}}</th>
+                <th>{{val.carretero}}</th>
+                <th>{{val.casaSeguridad}}</th>
+                <th>{{val.centralAutobus}}</th>
+                <th>{{val.ferrocarril}}</th>
+                <th>{{val.hotel}}</th>
+                <th>{{val.puestosADispo}}</th>
+                <th>{{val.voluntarios}}</th> {% endcomment %}
+
+
+                {% comment %} <th>{{val.municipio}}</th> {% endcomment %}
+                <td class="text-xs text-center">{{val.puntoEstra}}</td>
+                <td class="text-xs text-center">{{val.nacionalidad}}</td>
+                <td class="text-xs text-center">{{val.iso3}}</td>
+                <td class="text-xs text-center">{{val.nombre}}</td>
+                <td class="text-xs text-blue-500 text-center"><a href="{% url 'editar' val.idRescate %}">{{val.apellidos}}</a></td>
+                <td class="text-xs text-center">{{val.parentesco}}</td>
+                <td class="text-xs text-center">{{val.fechaNacimiento}}</td>
+                <td class="text-xs text-center">{{val.edad}}</td>
+                {% if val.sexo == True %}
+                <td class="text-xs text-center">Hombre</td>
+                {% else %}
+                <td class="text-xs text-center">Mujer</td>
+                {% endif %}
+
+                {% if val.embarazo == True %}
+                <td class="text-xs text-center">Si</td>
+                {% else %}
+                <td class="text-xs text-center">No</td>
+                {% endif %}
+
+                {% if val.numFamilia == 0 %}
+                <td class="text-xs text-center"> </td>
+                {% else %}
+                <td class="text-xs text-center">{{val.numFamilia}}</td>
+                {% endif %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    
+
+    <script>
+        function myFunction(x1,idInput) {
+          // Declare variables 
+          var input, filter, table, tr, td, i, txtValue, conteo;
+          input = document.getElementById(idInput);
+          filter = input.value.toUpperCase();
+          table = document.getElementById("myTable");
+          tr = table.getElementsByTagName("tr");
+        
+          conteo = 0
+          // Loop through all table rows, and hide those who don't match the search query
+          for (i = 0; i < tr.length; i++) {
+            td = tr[i].getElementsByTagName("td")[x1];
+            if (td) {
+              txtValue = td.textContent || td.innerText;
+              if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                tr[i].style.display = "";
+                conteo++
+              } else {
+                tr[i].style.display = "none";
+              }
+            } 
+          }
+          
+          document.getElementById("totales").innerHTML = "Registros: " + conteo
+        }
+    </script>
+
+{% endblock content %}

@@ -1,0 +1,564 @@
+{% extends "base/base.html" %}
+
+{% load static %}
+
+{% block title %}Estadistica{% endblock title %}
+
+{% block styles %}
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.17.0/dist/xlsx.full.min.js"></script>
+
+<style>
+    .pure-material-progress-circular {
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+        box-sizing: border-box;
+        border: none;
+        border-radius: 50%;
+        padding: 0.25em;
+        width: 3em;
+        height: 3em;
+        color: #285C4D;
+        background-color: transparent;
+        font-size: 16px;
+        overflow: hidden;
+    }
+
+    .pure-material-progress-circular::-webkit-progress-bar {
+        background-color: transparent;
+    }
+
+    /* Indeterminate */
+    .pure-material-progress-circular:indeterminate {
+        -webkit-mask-image: linear-gradient(transparent 50%, black 50%), linear-gradient(to right, transparent 50%, black 50%);
+        mask-image: linear-gradient(transparent 50%, black 50%), linear-gradient(to right, transparent 50%, black 50%);
+        animation: pure-material-progress-circular 6s infinite cubic-bezier(0.3, 0.6, 1, 1);
+    }
+
+    :-ms-lang(x),
+    .pure-material-progress-circular:indeterminate {
+        animation: none;
+    }
+
+    .pure-material-progress-circular:indeterminate::before,
+    .pure-material-progress-circular:indeterminate::-webkit-progress-value {
+        content: "";
+        display: block;
+        box-sizing: border-box;
+        margin-bottom: 0.25em;
+        border: solid 0.25em transparent;
+        border-top-color: currentColor;
+        border-radius: 50%;
+        width: 100% !important;
+        height: 100%;
+        background-color: transparent;
+        animation: pure-material-progress-circular-pseudo 0.75s infinite linear alternate;
+    }
+
+    .pure-material-progress-circular:indeterminate::-moz-progress-bar {
+        box-sizing: border-box;
+        border: solid 0.25em transparent;
+        border-top-color: currentColor;
+        border-radius: 50%;
+        width: 100%;
+        height: 100%;
+        background-color: transparent;
+        animation: pure-material-progress-circular-pseudo 0.75s infinite linear alternate;
+    }
+
+    .pure-material-progress-circular:indeterminate::-ms-fill {
+        animation-name: -ms-ring;
+    }
+
+    @keyframes pure-material-progress-circular {
+        0% {
+            transform: rotate(0deg);
+        }
+
+        12.5% {
+            transform: rotate(180deg);
+            animation-timing-function: linear;
+        }
+
+        25% {
+            transform: rotate(630deg);
+        }
+
+        37.5% {
+            transform: rotate(810deg);
+            animation-timing-function: linear;
+        }
+
+        50% {
+            transform: rotate(1260deg);
+        }
+
+        62.5% {
+            transform: rotate(1440deg);
+            animation-timing-function: linear;
+        }
+
+        75% {
+            transform: rotate(1890deg);
+        }
+
+        87.5% {
+            transform: rotate(2070deg);
+            animation-timing-function: linear;
+        }
+
+        100% {
+            transform: rotate(2520deg);
+        }
+    }
+
+    @keyframes pure-material-progress-circular-pseudo {
+        0% {
+            transform: rotate(-30deg);
+        }
+
+        29.4% {
+            border-left-color: transparent;
+        }
+
+        29.41% {
+            border-left-color: currentColor;
+        }
+
+        64.7% {
+            border-bottom-color: transparent;
+        }
+
+        64.71% {
+            border-bottom-color: currentColor;
+        }
+
+        100% {
+            border-left-color: currentColor;
+            border-bottom-color: currentColor;
+            transform: rotate(225deg);
+        }
+    }
+</style>
+
+
+{% endblock styles %}
+
+{% block estadistica %}
+{% if request.user.is_superuser %}
+<a href="{% url 'estadistica' %}"
+    class="bg-inm-verde-100 text-white px-6 py-3 rounded-xl hover:bg-inm-marron-200">Estadistica</a>
+{% endif %}
+{% endblock estadistica %}
+
+{% block content %}
+
+
+<!-- <body class="flex flex-col mx-auto my-auto min-h-screen"></body> -->
+<div class="flex-grow flex flex-col justify-center items-center p-4">
+
+    <!-- Fila Superior -->
+    <div class="bg-white p-4 rounded-lg shadow mb-8">
+        <h1 class="text-xl text-center font-semibold">Reincidencia diaria</h1>
+        <h2 class="text-xxl font-semibold">Seleccione fecha de busqueda:</h2>
+        <form id="form-fecha">
+            {% csrf_token %}
+            <input type="date" name="fecha" id="id_fecha" value="{{ hoy }}">
+            <button class="bg-inm-verde-200 px-1 rounded-l text-white hover:bg-inm-rojo-200"
+                type="submit">Buscar</button>
+        </form>
+    </div>
+
+    <!-- Contenedor de carga -->
+    <div id="loading" hidden class="bg-white p-4 rounded-lg shadow mb-8 text-center">Cargando resultados<br>
+        <progress class="pure-material-progress-circular" />
+    </div>
+
+
+    <!-- Contenedor de dos columnas -->
+    <div id="seccion" class="grid grid-cols-2 gap-8 w-full max-w-2xl hidden">
+
+        <!-- Columna Izquierda -->
+        <div class="flex flex-col justify-center items-center bg-white p-4 rounded-lg shadow">
+            <h2 class="text-xl font-semibold text-center">Total de Reincidentes<br>
+                <h2 id="fechaR" class="text-xl font-semibold text-center"></h2><br>
+            </h2>
+            <h3 id="resultados" class="text-xl text-gray-600"></h3>
+        </div>
+
+        <!-- Columna Derecha -->
+        <div class="flex justify-center items-center bg-white p-4 rounded-lg shadow">
+            <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+                onclick="generarExcel()">
+                Descargar <br> Listado Reincidentes
+            </button>
+        </div>
+
+        <div class="flex justify-center items-center bg-white p-4 rounded-lg shadow">
+            <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+                onclick="generarExcelNuevos()">
+                Descargar <br> Listado Nuevos
+            </button>
+        </div>
+
+    </div>
+
+    <div class="my-2">
+        <div class="bg-white p-4 rounded-lg shadow mb-8">
+            <h1 class="text-xl text-center font-semibold">Reincidencia por fechas</h1>
+            <h2 class="text-xxl font-semibold">Seleccione Intervalo de tiempo de busqueda:</h2>
+            <center>
+                <form id="form-fecha1">
+                    {% csrf_token %}
+                    <label class="font-semibold text-inm-marron-100">Fecha de Inicio</label>
+                    <input type="date" name="fechaI" id="id_fechaI" value="{{ hoy }}">
+                    <br>
+                    <label class="font-semibold text-inm-marron-100">Fecha de Termino</label>
+                    <input type="date" name="fechaF" id="id_fechaF" value="{{ hoy }}">
+                    <br>
+                    <button class="bg-inm-verde-200 px-1 rounded-l text-white hover:bg-inm-rojo-200"
+                        type="submit">Buscar</button>
+                </form>
+            </center>
+
+        </div>
+
+        <!-- Contenedor de carga -->
+        <div id="loading1" hidden class="bg-white p-4 rounded-lg shadow mb-8 text-center">Cargando resultados<br>
+            <progress class="pure-material-progress-circular" />
+        </div>
+
+
+        <!-- Contenedor de dos columnas -->
+        <div id="seccion1" class="grid grid-cols-2 gap-8 w-full max-w-2xl hidden">
+
+            <!-- Columna Izquierda -->
+            <div class="flex flex-col justify-center items-center bg-white p-4 rounded-lg shadow">
+                <h2 class="text-xl font-semibold text-center">Datos de Reincidentes<br>
+                    <h2 id="fechaR1" class="text-xl font-semibold text-center"></h2><br>
+                </h2>
+                <h3 id="resultados1" class="text-xl text-gray-600"></h3>
+            </div>
+
+            <!-- Columna Derecha -->
+            <div class="flex justify-center items-center bg-white p-4 rounded-lg shadow">
+                <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+                    onclick="generarExcel1()">
+                    Descargar <br> Listado Reincidentes
+                </button>
+            </div>
+
+            <div class="flex justify-center items-center bg-white p-4 rounded-lg shadow">
+                <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+                    onclick="generarExcelNuevos1()">
+                    Descargar <br> Listado Nuevos
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+</div>
+
+
+<script>
+    let infoExcel = null;
+    let infoExcel1 = null;
+    let infoExcelN = null;
+    let infoExcelN1 = null;
+    let fechaArchivo = "2024-01-01";
+
+    function convertirFecha(fecha) {
+        let partes = fecha.split("-"); // Divide la fecha en partes (día-mes-año)
+        let dia = partes[0];
+        let mes = partes[1];
+        let año = "20" + partes[2]; // Agrega "20" para convertir "24" en "2024"
+
+        return `${dia}/${mes}/${año}`;
+    }
+
+    function calcularEdad(fechaNacimiento) {
+        // Dividir la fecha en partes (Día, Mes, Año)
+        let partes = fechaNacimiento.split("/");
+        let dia = parseInt(partes[0], 10);
+        let mes = parseInt(partes[1], 10) - 1; // Restar 1 porque los meses en JS van de 0 a 11
+        let anio = parseInt(partes[2], 10);
+
+        // Crear objeto de fecha con la fecha de nacimiento
+        let fechaNac = new Date(anio, mes, dia);
+        let fechaHoy = new Date();
+
+        // Calcular la diferencia de años
+        let edad = fechaHoy.getFullYear() - fechaNac.getFullYear();
+
+        // Ajustar si aún no ha pasado el cumpleaños este año
+        let mesActual = fechaHoy.getMonth();
+        let diaActual = fechaHoy.getDate();
+
+        if (mesActual < mes || (mesActual === mes && diaActual < dia)) {
+            edad--; // Restar 1 si el cumpleaños no ha llegado este año
+        }
+
+        return edad;
+    }
+
+    $(document).ready(function () {
+        // $('#form-fecha').on('submit', function(e) {
+        //     e.preventDefault();
+
+        //     $('#loading').show();
+
+        //     let fecha = $('#id_fecha').val();
+
+        //     $.ajax({
+        //         url: '{% url "reincidencia" %}',
+        //         type: 'GET',
+        //         data: {
+        //             'fecha': fecha,
+        //         },
+        //         success: function(response) {
+        //             $('#loading').hide();
+        //             $('#seccion').show();
+
+        //             let resultados = $('#resultados');
+        //             let fechaC = $('#fechaR');
+        //             resultados.empty(); // Limpiar resultados previos
+        //             fechaC.empty();
+
+        //             //console.log(response.data[0].resultados);
+        //             //console.log(response.data[0].resultados);
+
+        //             if (response.data.length > 0) {
+        //                 infoExcel = response.data[0].resultados;
+
+        //                 resultados.append('Reincidentes: ');
+        //                 resultados.append((response.data[0].conteo).toLocaleString());
+        //                 resultados.append('<br>');
+        //                 resultados.append('Registros: ');
+        //                 resultados.append((response.data[0].total_r).toLocaleString());
+        //                 let totalR = response.data[0].total_r - response.data[0].conteo;
+        //                 resultados.append('<br>');
+        //                 resultados.append('Rescate Real: ');
+        //                 resultados.append(totalR.toLocaleString());
+
+
+        //                 fechaC.append(response.data[0].fecha);
+        //                 fechaArchivo = response.data[0].fecha;
+        //                 infoExcelN = response.data[0].rescatesNuevos;
+        //                 // Diccionario pasado desde Django
+        //             } else {
+        //                 resultados.append('<h1>No se encontraron resultados</h1>');
+        //             }
+        //         },
+        //         error: function() {
+        //             $('#loading').hide();
+        //             $('#seccion').hide();
+        //             alert('Error al buscar los rescates');
+        //         }
+        //     });
+        // });
+
+        $('#form-fecha').on('submit', function (e) {
+            e.preventDefault();
+
+            $('#loading').show();
+            $('#seccion').hide();
+            $('#loading1').hide();
+            $('#seccion1').hide();
+
+            let fechaI = $('#id_fecha').val();
+            let fechaF = $('#id_fecha').val();
+
+            $.ajax({
+                url: '{% url "reincidenciaFechas" %}',
+                type: 'GET',
+                data: {
+                    'fechaI': fechaI,
+                    'fechaF': fechaF,
+                },
+                success: function (response) {
+                    $('#loading').hide();
+                    $('#seccion').show();
+
+                    let resultados = $('#resultados');
+                    let fechaC = $('#fechaR');
+                    resultados.empty(); // Limpiar resultados previos
+                    fechaC.empty();
+
+                    //console.log(response.data[0].resultados);
+                    // console.log(response.data[0].resultados);
+
+                    if (response.data.length > 0) {
+                        infoExcel = response.data[0].reincidentesOR;
+                        resultados.append('Reincidentes: ');
+                        resultados.append((response.data[0].conteo).toLocaleString());
+                        resultados.append('<br>');
+                        resultados.append('Registros: ');
+                        resultados.append((response.data[0].total_r1).toLocaleString());
+                        let totalR1 = response.data[0].total_r1 - response.data[0].conteo;
+                        resultados.append('<br>');
+                        resultados.append('Rescate Real: ');
+                        resultados.append(totalR1.toLocaleString());
+
+                        fechaC.append(fechaI);
+                        fechaArchivo = fechaI;
+                        infoExcelN = response.data[0].rescatesNuevos1;
+                        // Diccionario pasado desde Django
+                    } else {
+                        resultados.append('<h1>No se encontraron resultados</h1>');
+                    }
+                },
+                error: function () {
+                    $('#loading').hide();
+                    $('#seccion').hide();
+                    alert('Error al buscar los rescates');
+                }
+            });
+        });
+
+
+        $('#form-fecha1').on('submit', function (e) {
+            e.preventDefault();
+
+            $('#loading1').show();
+            $('#seccion1').hide();
+            $('#loading').hide();
+            $('#seccion').hide();
+
+            let fechaI = $('#id_fechaI').val();
+            let fechaF = $('#id_fechaF').val();
+
+            $.ajax({
+                url: '{% url "reincidenciaFechas" %}',
+                type: 'GET',
+                data: {
+                    'fechaI': fechaI,
+                    'fechaF': fechaF,
+                },
+                success: function (response) {
+                    $('#loading1').hide();
+                    $('#seccion1').show();
+
+                    let resultados = $('#resultados1');
+                    let fechaC = $('#fechaR1');
+                    resultados.empty(); // Limpiar resultados previos
+                    fechaC.empty();
+
+                    //console.log(response.data[0].resultados);
+                    // console.log(response.data[0].resultados);
+
+                    if (response.data.length > 0) {
+                        infoExcel1 = response.data[0].reincidentesOR;
+                        resultados.append('Reincidentes: ');
+                        resultados.append((response.data[0].conteo).toLocaleString());
+                        resultados.append('<br>');
+                        resultados.append('Registros: ');
+                        resultados.append((response.data[0].total_r1).toLocaleString());
+                        let totalR1 = response.data[0].total_r1 - response.data[0].conteo;
+                        resultados.append('<br>');
+                        resultados.append('Rescate Real: ');
+                        resultados.append(totalR1.toLocaleString());
+
+                        fechaC.append(response.data[0].fecha);
+                        fechaArchivo1 = response.data[0].fecha;
+                        infoExcelN1 = response.data[0].rescatesNuevos1;
+                        // Diccionario pasado desde Django
+                    } else {
+                        resultados.append('<h1>No se encontraron resultados</h1>');
+                    }
+                },
+                error: function () {
+                    $('#loading1').hide();
+                    $('#seccion1').hide();
+                    alert('Error al buscar los rescates');
+                }
+            });
+        });
+
+    });
+
+    function generarExcel() {
+        const diccionario = infoExcel;
+
+        let datosConvertidos = diccionario.map(item => ({
+            ...item,
+            fecha: convertirFecha(item.fecha),
+            sexo: (item.sexo == 1) ? "H" : "M",
+            edad: calcularEdad(item.fechaNacimiento),
+        }));
+
+        const workbook = XLSX.utils.book_new();
+        const worksheet = XLSX.utils.json_to_sheet(datosConvertidos);
+
+        // Añadir la hoja al libro
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Datos");
+
+        // Descargar el archivo Excel
+        XLSX.writeFile(workbook, "Reincidentes_" + fechaArchivo + ".xlsx");
+    }
+
+    function generarExcel1() {
+        const diccionario = infoExcel1;
+
+        let datosConvertidos = diccionario.map(item => ({
+            ...item,
+            fecha: convertirFecha(item.fecha),
+            sexo: (item.sexo == 1) ? "H" : "M",
+            edad: calcularEdad(item.fechaNacimiento),
+        }));
+
+        const workbook = XLSX.utils.book_new();
+        const worksheet = XLSX.utils.json_to_sheet(datosConvertidos);
+
+        // Añadir la hoja al libro
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Datos");
+
+        // Descargar el archivo Excel
+        XLSX.writeFile(workbook, "Reincidentes_" + fechaArchivo1 + ".xlsx");
+    }
+
+    function generarExcelNuevos() {
+        const diccionario = infoExcelN;
+
+        let datosConvertidos = diccionario.map(item => ({
+            ...item,
+            fecha: convertirFecha(item.fecha),
+            sexo: (item.sexo == 1) ? "H" : "M",
+            edad: calcularEdad(item.fechaNacimiento),
+        }));
+
+        const workbook = XLSX.utils.book_new();
+        const worksheet = XLSX.utils.json_to_sheet(datosConvertidos);
+
+        // Añadir la hoja al libro
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Datos");
+
+        // Descargar el archivo Excel
+        XLSX.writeFile(workbook, "Rescates_Nuevos_" + fechaArchivo + ".xlsx");
+    }
+
+    function generarExcelNuevos1() {
+        const diccionario = infoExcelN1;
+
+        let datosConvertidos = diccionario.map(item => ({
+            ...item,
+            fecha: convertirFecha(item.fecha),
+            sexo: (item.sexo == 1) ? "H" : "M",
+            edad: calcularEdad(item.fechaNacimiento),
+        }));
+
+        const workbook = XLSX.utils.book_new();
+        const worksheet = XLSX.utils.json_to_sheet(datosConvertidos);
+
+        // Añadir la hoja al libro
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Datos");
+
+        // Descargar el archivo Excel
+        XLSX.writeFile(workbook, "Rescates_Nuevos_" + fechaArchivo1 + ".xlsx");
+    }
+</script>
+
+
+{% endblock content %}

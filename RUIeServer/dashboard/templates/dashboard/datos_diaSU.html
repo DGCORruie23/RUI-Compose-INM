@@ -1,0 +1,592 @@
+{% extends "base/base.html" %}
+
+{% block title %}
+{% comment %} {% for user in usuario %}
+Dashboard de {{user.oficinaR}}
+{% endfor %} {% endcomment %}
+Dashboard de {{usuario.0.oficinaR}}
+{% endblock title %}
+
+{% block navigation %}
+Panel de Control de Administrador
+{% endblock navigation %}
+
+{% block linkSuperior %}
+{% comment %} <form action="." method="post">
+    {% csrf_token %}
+    <input name="username" type="hidden">
+    <input name="password" type="hidden">
+    <button type="submit"
+        class="py-4 px-6 bg-blue-400 rounded-xl text-white hover:text-inm-verde-100">Descargar</button>
+</form> {% endcomment %}
+{% comment %} <a href="{% url 'descargas' %}"
+    class="py-4 px-6 bg-blue-400 rounded-xl text-white hover:text-inm-verde-100">Descargas</a> {% endcomment %}
+{% endblock linkSuperior %}
+
+
+{% block content %}
+{% comment %} <h1 class="text-xl">Dashboard de {{usuario.0.oficinaR}} </h1> {% endcomment %}
+
+<div class="py-2 flex flex-row center">
+    <input class="px-2 rounded border-2 border-inm-marron-100 text-inm-cafe-200 text-sm text-center mx-3" type="text"
+        id="myInputAG" onkeyup="myFunction(5, 'myInputAG')" placeholder="Buscar por Agente" name="filtro_Agente">
+
+    <input class="px-2 rounded border-2 border-inm-marron-100 text-inm-cafe-200 text-sm text-center mx-3" type="text"
+        id="myInputOR" onkeyup="myFunction(2, 'myInputOR')" placeholder="Buscar por Oficina" name="filtro_OR">
+
+    <input class="px-2 rounded border-2 border-inm-marron-100 text-inm-cafe-200 text-sm text-center mx-3" type="text"
+        id="myInputHRS" onkeyup="myFunction(4, 'myInputHRS')" placeholder="Buscar por Hora" name="filtro_hora">
+
+    <input class="px-2 rounded border-2 border-inm-marron-100 text-inm-cafe-200 text-sm text-center mx-3" type="text"
+        id="myInputP" onkeyup="myFunction(7, 'myInputP')" placeholder="Buscar por Punto" name="filtro_punto">
+
+    <input class="px-2 rounded border-2 border-inm-marron-100 text-inm-cafe-200 text-sm text-center mx-3" type="text"
+        id="myInputNac" onkeyup="myFunction(8, 'myInputNac')" placeholder="Buscar por Nacionalidad" name="filtro_nacio">
+
+    <label class="px-2 py-2 mx-3 text-inm-rojo-200" id="totales"></label>
+
+    <form action="{% url 'descarga_excel' %}" method="post">
+        {% csrf_token %}
+        <input name="fechaDescarga" type="hidden" value="{{fecha_P}}" id="id_fechaDescarga">
+        <input name="oficina" type="hidden" value="{{usuario.0.oficinaR}}" id="id_oficina">
+        <button type="submit"
+            class="py-2 px-6 bg-blue-400 rounded-xl text-white hover:text-inm-verde-100">Descargar</button>
+    </form>
+</div>
+
+<form method="post" action="{% url 'eliminar_varios_registros' %}" id="formEliminar">
+    {% csrf_token %}
+    <input class="py-1 px-2 bg-inm-rojo-300 rounded-xl text-sm text-white hover:bg-inm-rojo-100" type="button"
+        value="Eliminar" onclick="mostrarModal()">
+    <table id="myTable" class="border-separate border border-slate-200 hover:table-fixed">
+        <thead class="bg-inm-cafe-100 text-white">
+            <tr>
+                <th class="border border-slate-300"><input type="checkbox" id="cboxAll" /></th>
+                <th class="border border-slate-300">#</th>
+                <th class="border border-slate-300 px-3 text-sm">
+                    <div class="flex items-center justify-between">
+                        Oficina
+                        <button type="button" onclick="toggleFilterMenu(event, 2)"
+                            class="filter-btn text-gray-500 hover:text-black">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                stroke="currentColor" class="w-4 h-4">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z" />
+                            </svg>
+                        </button>
+                    </div>
+                </th>
+                <th class="border border-slate-300 px-3 text-sm">Fecha</th>
+                <th class="border border-slate-300 px-1 text-sm">Hora</th>
+                <th class="border border-slate-300 text-sm">Nombre del Agente</th>
+
+                <th class="border border-slate-300 text-sm">Tipo de Punto</th>
+
+                {% comment %} <th class="border border-slate-300">Aeropuerto</th>
+                <th class="border border-slate-300">Carretero</th>
+                <th class="border border-slate-300">Casa de seguridad</th>
+                <th class="border border-slate-300">Central de Autobus</th>
+                <th class="border border-slate-300">Ferrocarril</th>
+                <th class="border border-slate-300">Hotel</th>
+                <th class="border border-slate-300">Puestos a Disposicion</th>
+                <th class="border border-slate-300">voluntarios</th> {% endcomment %}
+
+                {% comment %} <th class="border border-slate-300">Municipio</th> {% endcomment %}
+                <th class="border border-slate-300 text-sm">Punto Estrategico</th>
+                <th class="border border-slate-300 text-sm">
+                    <div class="flex items-center justify-between">
+                        Nacionalidad
+                        <button type="button" onclick="toggleFilterMenu(event, 8)"
+                            class="filter-btn text-gray-500 hover:text-black">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                stroke="currentColor" class="w-4 h-4">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z" />
+                            </svg>
+                        </button>
+                    </div>
+                </th>
+                <th class="border border-slate-300 px-2 text-sm">ISO</th>
+                <th class="border border-slate-300">
+                    <div class="flex items-center justify-between">
+                        Nombre
+                        <button type="button" onclick="toggleFilterMenu(event, 10)"
+                            class="filter-btn text-gray-500 hover:text-black">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                stroke="currentColor" class="w-4 h-4">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z" />
+                            </svg>
+                        </button>
+                    </div>
+                </th>
+                <th class="border border-slate-300">
+                    <div class="flex items-center justify-between">
+                        Apellidos
+                        <button type="button" onclick="toggleFilterMenu(event, 11)"
+                            class="filter-btn text-gray-500 hover:text-black">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                stroke="currentColor" class="w-4 h-4">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z" />
+                            </svg>
+                        </button>
+                    </div>
+                </th>
+                <th class="border border-slate-300 text-sm">Parentesco</th>
+                <th class="border border-slate-300 text-xs">Fecha de Nacimiento</th>
+                <th class="border border-slate-300 text-sm">Edad</th>
+                <th class="border border-slate-300 px-2">Sexo</th>
+                <th class="border border-slate-300 text-sm">Embarazo</th>
+                <th class="border border-slate-300 text-sm">Numero de familia</th>
+            </tr>
+        </thead>
+        <tbody class="bg-gray-200">
+            {% for val in values %}
+            <tr>
+                <td class="text-xs text-center"><input type="checkbox" id="cbox{{val.idRescate}}"
+                        name="registros_seleccionados" value="{{val.idRescate}}" class="checkbox"
+                        onClick="checkALLT(this)" /></td>
+                <td class="text-xs text-center">{{ forloop.counter }}</td>
+                <td class="text-xs text-center">{{val.oficinaRepre}}</td>
+                <td class="text-xs text-center">{{val.fecha}}</td>
+                <td class="text-xs text-center">{{val.hora}}</td>
+                <td class="text-xs text-center">{{val.nombreAgente}}</td>
+
+                {% if val.aeropuerto == True %}
+                <td class="text-xs text-center">Aeropuerto</td>
+                {% elif val.carretero == True %}
+                <td class="text-xs text-center">Carretero</td>
+                {% elif val.casaSeguridad == True %}
+                <td class="text-xs text-center">Disuadidos</td>
+                {% elif val.centralAutobus == True %}
+                <td class="text-xs text-center">Central de Autobus</td>
+                {% elif val.ferrocarril == True %}
+                <td class="text-xs text-center">Ferrocarril</td>
+                {% elif val.hotel == True %}
+                <td class="text-xs text-center">Visitas de Verificación</td>
+                {% elif val.puestosADispo == True %}
+                <td class="text-xs text-center">Puestos a Disposición</td>
+                {% elif val.voluntarios == True %}
+                <td class="text-xs text-center">Voluntarios</td>
+                {% else %}
+                <td class="text-xs text-center">Otro</td>
+                {% endif %}
+                {% comment %} <th>{{val.aeropuerto}}</th>
+                <th>{{val.carretero}}</th>
+                <th>{{val.casaSeguridad}}</th>
+                <th>{{val.centralAutobus}}</th>
+                <th>{{val.ferrocarril}}</th>
+                <th>{{val.hotel}}</th>
+                <th>{{val.puestosADispo}}</th>
+                <th>{{val.voluntarios}}</th> {% endcomment %}
+
+
+                {% comment %} <th>{{val.municipio}}</th> {% endcomment %}
+                <td class="text-xs text-center">{{val.puntoEstra}}</td>
+                <td class="text-xs text-center">{{val.nacionalidad}}</td>
+                <td class="text-xs text-center">{{val.iso3}}</td>
+                <td class="text-xs text-center">{{val.nombre}}</td>
+                <td class="text-xs text-blue-500 text-center"><a
+                        href="{% url 'editar' val.idRescate %}">{{val.apellidos}}</a></td>
+                <td class="text-xs text-center">{{val.parentesco}}</td>
+                <td class="text-xs text-center">{{val.fechaNacimiento}}</td>
+                <td class="text-xs text-center">{{val.edad}}</td>
+                {% if val.sexo == True %}
+                <td class="text-xs text-center">Hombre</td>
+                {% else %}
+                <td class="text-xs text-center">Mujer</td>
+                {% endif %}
+
+                {% if val.embarazo == True %}
+                <td class="text-xs text-center">Si</td>
+                {% else %}
+                <td class="text-xs text-center">No</td>
+                {% endif %}
+
+                {% if val.numFamilia == 0 %}
+                <td class="text-xs text-center"> </td>
+                {% else %}
+                <td class="text-xs text-center">{{val.numFamilia}}</td>
+                {% endif %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</form>
+
+
+<!-- Modal de Confirmación -->
+<div id="modalConfirmacion" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden"
+    style="z-index: 50;">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="mt-3 text-center">
+            <h3 class="text-lg leading-6 font-medium text-gray-900">Confirmar Eliminación</h3>
+            <div class="mt-2 px-7 py-3">
+                <p class="text-sm text-gray-500">
+                    ¿Estás seguro de que deseas eliminar los siguientes registros?
+                </p>
+                <ul id="listaRegistros"
+                    class="text-left text-xs text-gray-700 mt-2 list-disc pl-5 max-h-40 overflow-y-auto">
+                    <!-- Aquí se llenarán los datos dinámicamente -->
+                </ul>
+            </div>
+            <div class="items-center px-4 py-3">
+                <button id="btnConfirmar"
+                    class="px-4 py-2 bg-red-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-300">
+                    Eliminar
+                </button>
+                <button onclick="cerrarModal()"
+                    class="mt-3 px-4 py-2 bg-gray-300 text-gray-700 text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300">
+                    Cancelar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="filterDetails"
+    class="hidden absolute bg-white border border-gray-300 shadow-lg rounded-md p-2 z-50 w-64 text-sm text-black">
+    <div class="flex flex-col gap-2">
+        <button onclick="sortColumn('asc')" class="text-left hover:bg-gray-100 p-1 rounded flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                stroke="currentColor" class="w-4 h-4">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M3 4.5h14.25M3 9h9.75M3 13.5h9.75m4.5-4.5v12m0 0l-3.75-3.75M17.25 21L21 17.25" />
+            </svg>
+            Ordenar de A a Z
+        </button>
+        <button onclick="sortColumn('desc')" class="text-left hover:bg-gray-100 p-1 rounded flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                stroke="currentColor" class="w-4 h-4">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M3 4.5h14.25M3 9h9.75M3 13.5h5.25m5.25-.75L17.25 9m0 0L21 12.75M17.25 9v12" />
+            </svg>
+            Ordenar de Z a A
+        </button>
+        <hr class="border-gray-200">
+        <input type="text" id="filterSearch" placeholder="Buscar..."
+            class="border border-gray-300 rounded p-1 text-xs w-full mb-1" onkeyup="filterCheckboxes()">
+        <div id="filterCheckboxes" class="max-h-40 overflow-y-auto flex flex-col gap-1 pl-1">
+            <!-- Checkboxes generated dynamically -->
+        </div>
+        <div class="flex justify-between mt-2">
+            <button onclick="applyFilter()"
+                class="bg-blue-500 text-white px-3 py-1 rounded text-xs hover:bg-blue-600">Aceptar</button>
+            <button onclick="closeFilter()"
+                class="bg-gray-300 text-black px-3 py-1 rounded text-xs hover:bg-gray-400">Cancelar</button>
+        </div>
+    </div>
+</div>
+<script>
+    function mostrarModal() {
+        var checkboxes = document.querySelectorAll('input[name="registros_seleccionados"]:checked');
+        var lista = document.getElementById('listaRegistros');
+        lista.innerHTML = ''; // Limpiar lista anterior
+
+        if (checkboxes.length === 0) {
+            alert("Por favor selecciona al menos un registro para eliminar.");
+            return;
+        }
+
+        checkboxes.forEach(function (checkbox) {
+            var fila = checkbox.closest('tr');
+            var id = checkbox.value;
+            // var oficina = fila.cells[2].innerText; 
+            // var fecha = fila.cells[3].innerText;   
+            var iso3 = fila.cells[8].innerText;
+            var nomM = fila.cells[10].innerText;
+            var apeM = fila.cells[11].innerText;
+
+            var item = document.createElement('li');
+            item.textContent = `${nomM} ${apeM}${"\n"}${iso3}`;
+            item.style.whiteSpace = "pre-line";
+            lista.appendChild(item);
+        });
+
+        document.getElementById('modalConfirmacion').classList.remove('hidden');
+    }
+
+    function cerrarModal() {
+        document.getElementById('modalConfirmacion').classList.add('hidden');
+    }
+
+    function checkALLT(checkbox) {
+        var checkboxSeleccionarTodo = document.getElementById('cboxAll');
+        if (!checkbox.checked) {
+            checkboxSeleccionarTodo.checked = false;
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        var btn = document.getElementById('btnConfirmar');
+        if (btn) {
+            btn.addEventListener('click', function () {
+                document.getElementById('formEliminar').submit();
+            });
+        }
+
+        var checkboxSeleccionarTodo = document.getElementById('cboxAll');
+        if (checkboxSeleccionarTodo) {
+            checkboxSeleccionarTodo.addEventListener('change', function () {
+                if (checkboxSeleccionarTodo.checked === true) {
+                    var filas = document.querySelectorAll('tbody tr');
+                    filas.forEach(function (fila) {
+                        if (fila.style.display !== 'none') {
+                            var tdCheckbox = fila.cells[0];
+                            var checkbox = tdCheckbox.querySelector('input.checkbox');
+                            if (checkbox) {
+                                checkbox.checked = true;
+                            }
+                        }
+                    });
+                } else {
+                    var checkboxes = document.querySelectorAll('.checkbox');
+                    checkboxes.forEach(function (checkbox) {
+                        checkbox.checked = checkboxSeleccionarTodo.checked;
+                    });
+                }
+            });
+        }
+    });
+
+    // Global state for filters
+    let currentColumnIndex = -1;
+    let activeFilters = {}; // { columnIndex: ["Value1", "Value2"] }
+    let allValuesForColumn = {}; // Cache unique values per column { columnIndex: ["A", "B"] }
+
+    // Close filter when clicking outside
+    document.addEventListener('click', function (event) {
+        const filterMenu = document.getElementById('filterDetails');
+        const isClickInside = filterMenu.contains(event.target);
+        const isButton = event.target.closest('.filter-btn');
+        if (!isClickInside && !isButton && !filterMenu.classList.contains('hidden')) {
+            closeFilter();
+        }
+    });
+
+    function toggleFilterMenu(event, index) {
+        event.stopPropagation();
+        const menu = document.getElementById('filterDetails');
+
+        // If opening same column, just toggle
+        if (currentColumnIndex === index && !menu.classList.contains('hidden')) {
+            closeFilter();
+            return;
+        }
+
+        currentColumnIndex = index;
+
+        // Position menu
+        const button = event.currentTarget;
+        const rect = button.getBoundingClientRect();
+        menu.style.top = `${window.scrollY + rect.bottom}px`;
+        menu.style.left = `${window.scrollX + rect.left}px`;
+        menu.classList.remove('hidden');
+
+        // Populate checkboxes
+        populateFilterCheckboxes(index);
+    }
+
+    function closeFilter() {
+        document.getElementById('filterDetails').classList.add('hidden');
+    }
+
+    function getTableRows() {
+        const table = document.getElementById("myTable");
+        return Array.from(table.getElementsByTagName("tbody")[0].getElementsByTagName("tr"));
+    }
+
+    function populateFilterCheckboxes(index) {
+        const rows = getTableRows();
+        const container = document.getElementById('filterCheckboxes');
+        container.innerHTML = '';
+
+        // Get unique values
+        let values = new Set();
+        rows.forEach(row => {
+            // Only consider visible rows? No, we should filter based on all rows originally?
+            // Excel shows all unique values present in the column usually.
+            // Let's get all values from the table.
+            const cell = row.getElementsByTagName("td")[index];
+            if (cell) {
+                values.add(cell.textContent.trim());
+            }
+        });
+
+        // Allow searching within the filter dropdown
+        const sortedValues = Array.from(values).sort();
+        allValuesForColumn[index] = sortedValues;
+
+        // "Select All" Option
+        const divAll = document.createElement('div');
+        divAll.className = 'flex items-center gap-2';
+        divAll.innerHTML = `<input type="checkbox" id="filter_all" checked onchange="toggleAllCheckboxes(this)"> <label for="filter_all" class="truncate font-semibold">(Seleccionar todo)</label>`;
+        container.appendChild(divAll);
+
+        const currentlyActive = activeFilters[index];
+
+        sortedValues.forEach(val => {
+            const div = document.createElement('div');
+            div.className = 'flex items-center gap-2 checkbox-item';
+            const isChecked = currentlyActive ? currentlyActive.includes(val) : true;
+            div.innerHTML = `<input type="checkbox" class="filter-option" value="${val}" ${isChecked ? 'checked' : ''}> <label class="truncate" title="${val}">${val}</label>`;
+            container.appendChild(div);
+        });
+
+        // Sync "Select All" state
+        updateSelectAllState();
+    }
+
+    function toggleAllCheckboxes(source) {
+        const checkboxes = document.querySelectorAll('.filter-option');
+        checkboxes.forEach(cb => {
+            // Only toggle visible checkboxes (if filtered by local search input)
+            if (cb.parentElement.style.display !== 'none') {
+                cb.checked = source.checked;
+            }
+        });
+    }
+
+    function updateSelectAllState() {
+        const checkboxes = document.querySelectorAll('.filter-option');
+        const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+        const selectAll = document.getElementById('filter_all');
+        if (selectAll) selectAll.checked = allChecked;
+    }
+
+    function filterCheckboxes() {
+        const search = document.getElementById('filterSearch').value.toUpperCase();
+        const items = document.querySelectorAll('.checkbox-item');
+        items.forEach(item => {
+            const text = item.textContent || item.innerText;
+            if (text.toUpperCase().indexOf(search) > -1) {
+                item.style.display = "";
+            } else {
+                item.style.display = "none";
+            }
+        });
+    }
+
+    function applyFilter() {
+        // Save state for this column
+        const checkboxes = document.querySelectorAll('.filter-option:checked');
+        const selectedValues = Array.from(checkboxes).map(cb => cb.value);
+
+        // If all selected (or none, which implies clear), remove from activeFilters to save performance? 
+        // Better to just store what is allowed.
+        // If list is equal to allValues, we can remove it from active filters to indicate "no filter".
+        const allVals = allValuesForColumn[currentColumnIndex] || [];
+
+        // Logic: If user keeps everything checked, it's effectively "no filter" for this column
+        // But we must be careful if the user search-filtered the list and selected a subset.
+        // Let's just store the allowed list.
+
+        if (checkboxes.length === document.querySelectorAll('.filter-option').length) {
+            delete activeFilters[currentColumnIndex];
+        } else {
+            activeFilters[currentColumnIndex] = selectedValues;
+        }
+
+        runAllFilters();
+        closeFilter();
+    }
+
+    function runAllFilters() {
+        const rows = getTableRows();
+        let count = 0;
+
+        // Get values from external search inputs (the ones at the top of page)
+        // We need to integrate with existing "myFunction" logic.
+        // Ideally, we rewrite myFunction to just toggle a "search-hidden" class, 
+        // and this function toggles a "filter-hidden" class, and we show row if neither.
+        // BUT, modifying the existing HTML structure too much might be risky.
+        // Let's reuse the logic. The existing 'myFunction' hides rows directly via style.display.
+        // We should probably cooperate with it.
+        // Actually, the user asked to ADD filters, implying they should work together.
+
+        // Strategy: We will apply OUR filters. The external inputs call 'myFunction'.
+        // 'myFunction' loops through ALL rows and checks its own input. 
+        // If we hide a row, 'myFunction' might show it again if it matches the text search?
+        // NO. `tr[i].style.display = ""` vs `"none"`.
+        // If I set "none", and then they type in the search box, `myFunction` runs.
+        // `myFunction` does: `tr[i].style.display = ""` if match. This overrides my filter.
+
+        // CORRECT APPROACH: Modify `myFunction` to also check `isRowVisibleByExcelFilters(tr)`.
+        // But first, let's just make `runAllFilters` do the heavy lifting or simply trigger `myFunction`.
+        // Since `myFunction` is specific to one input, calling it for all inputs is tricky.
+
+        // Let's MAKE `runAllFilters` base of truth.
+        // We can check the values of the external inputs here too.
+
+        const inputAgente = document.getElementById('myInputAG').value.toUpperCase();
+        const inputOR = document.getElementById('myInputOR').value.toUpperCase();
+        const inputHora = document.getElementById('myInputHRS').value.toUpperCase();
+        const inputPunto = document.getElementById('myInputP').value.toUpperCase();
+        const inputNacio = document.getElementById('myInputNac').value.toUpperCase();
+
+        rows.forEach(row => {
+            let show = true;
+
+            // Check Excel Filters
+            for (const [colIdx, allowedVals] of Object.entries(activeFilters)) {
+                const cell = row.cells[colIdx];
+                if (!cell) continue;
+                const val = cell.textContent.trim();
+                if (!allowedVals.includes(val)) {
+                    show = false;
+                    break;
+                }
+            }
+
+            // Check External Inputs (Logical AND)
+            if (show) {
+                if (inputAgente && row.cells[5].textContent.toUpperCase().indexOf(inputAgente) === -1) show = false;
+                if (show && inputOR && row.cells[2].textContent.toUpperCase().indexOf(inputOR) === -1) show = false;
+                // For Hora (col 4 usually?) existing code says index 4.
+                if (show && inputHora && row.cells[4].textContent.toUpperCase().indexOf(inputHora) === -1) show = false;
+                // For Punto (col 7? existing code says 7)
+                if (show && inputPunto && row.cells[7].textContent.toUpperCase().indexOf(inputPunto) === -1) show = false;
+                // For Nac (col 8? existing code says 8)
+                if (show && inputNacio && row.cells[8].textContent.toUpperCase().indexOf(inputNacio) === -1) show = false;
+            }
+
+            if (show) {
+                row.style.display = "";
+                count++;
+            } else {
+                row.style.display = "none";
+            }
+        });
+
+        document.getElementById("totales").innerHTML = "Registros: " + count;
+    }
+
+    // Override/Update the existing myFunction to simply trigger runAllFilters
+    // This ensures compatibility.
+    function myFunction(x1, idInput) {
+        // We ignore x1, as we check all inputs in runAllFilters now for consistency
+        runAllFilters();
+    }
+
+    function sortColumn(direction) {
+        const table = document.getElementById("myTable");
+        const tbody = table.querySelector("tbody");
+        const rows = Array.from(tbody.querySelectorAll("tr"));
+        const idx = currentColumnIndex;
+
+        rows.sort((a, b) => {
+            const valA = a.cells[idx].textContent.trim().toLowerCase();
+            const valB = b.cells[idx].textContent.trim().toLowerCase();
+
+            if (valA < valB) return direction === 'asc' ? -1 : 1;
+            if (valA > valB) return direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+
+        rows.forEach(row => tbody.appendChild(row));
+        closeFilter();
+    }
+</script>
+
+{% endblock content %}

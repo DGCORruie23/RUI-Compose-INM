@@ -1,0 +1,217 @@
+{% extends "base/base.html" %}
+
+{% load static %}
+
+{% block styles %}
+    <style>
+
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 8px;
+        }
+
+        tr:nth-child(even) {
+            background-color: #e1e1e1
+        }
+
+        th {
+            color: rgb(255, 255, 255);
+        }
+
+        .bdtable {
+            border: 2px solid #b4b4b4;
+            border-radius: 15px;
+            box-shadow: 0px 1px;
+            margin-left: 100px;
+            margin-right: 100px;
+  
+        }
+        .punto {
+            margin-right: 100px;
+        }
+        
+        #myInput {
+            background-position: 10px 10px;
+            background-repeat: no-repeat;
+            width: 45%;
+            font-size: 16px;
+            padding: 12px 10px 12px 40px;
+            border: 1px solid #ddd;
+            margin-left: 12%;
+            border-radius: 10px;
+            margin-bottom: 20px;
+          }
+          
+          .flex-container {
+            display: flex;
+            align-items: stretch;
+            }
+
+            .flex-container > div {
+                margin: 10px;
+                text-align: center;
+                line-height: 20px;
+                font-size: 15px;
+            }
+
+            .overlay { 
+                position: fixed;
+                top: 0;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                background: rgba(0, 0, 0, 0.7);
+                transition: opacity 500ms;
+                visibility: hidden;
+                opacity: 0;
+            }
+
+            .overlay:target{
+                visibility: visible;
+                opacity: 1;
+            }
+
+            #popupBody{
+                width: 46%;
+                padding: 2%;
+                border-radius: 15px;
+                box-shadow: 0 0 5px #CCC;
+                background: #FFF;
+                position: relative;
+                margin: 20% auto;
+                transition: all 5s ease-in-out;
+
+            }
+
+
+            #cerrar{
+                position: absolute;
+                top: 20px;
+                right: 30px;
+                font-size: 30px;
+                font-weight: bold;
+                text-decoration: none;
+                color: #F00;
+                transition: all 100ms;
+            }
+            
+            tr.header {
+                background-color: #235B4E;
+            }
+
+
+
+    </style>
+    {% endblock styles %}
+
+    {% block content %}
+
+    <br><br>
+
+
+
+    <div class=" contIcons flex items-center ">
+        <div class="ml-8 basis-1/2 py-5 "><input type="text" id="myInput" onkeyup="myFunction()" placeholder="Buscar por OR..."></div>
+        <div style="margin-right: 5%;"  class=" ml-8 basis-1/8 py-5 px-5 mx-1 bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-xl text-white "><a href="#popup" class="">Carga masiva</a></div> 
+        <div style="margin-right: 15%;" class=" ml-8 basis-1/8 py-5 px-5 mx-1 bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-xl text-white  "><a href="{% url 'agregar_punto' %}" >
+            Agregar Punto
+        </a></div>
+        <div style="margin-right: 15%;">
+            <form action="{% url 'descarga_excelEdoFuerza' %}" method="post">
+                {% csrf_token %}
+                <button type="submit" class="ml-8 basis-1/8 py-5 px-5 mx-1 bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-xl text-white">Descargar</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="popup" class="overlay">
+        <div id="popupBody">
+            <a href="#" id="cerrar">&times;</a>
+            <div class="popupContent">
+                {% if user.is_authenticated %}
+                <center>
+                    <h3>
+                        Carga el archivo del Estado de Fuerza
+                    </h3>
+                    <br>
+                </center>
+                <form action="{% url 'cargar_fuerza' %}" method="post" enctype="multipart/form-data">{% csrf_token %}
+                    <p>
+                        {{ form.archivo }}
+                    </p>
+                    <br>
+                    <p>
+                        <input class="py-2 px-5 mx-1 bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-xl text-white" type="submit" value="Cargar" />
+                    </p>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="bdtable bg-inm-marron-100">
+        <table id="myTable">
+            <tr class="header">
+                <th>Oficina de Representación</th>
+                <th>Tipo del Punto</th>
+                <th>Nombre del Punto</th>
+                <th>Acciones</th>
+                <th></th>
+            </tr>
+            {% for item in edoFuerza %}
+                <tr>
+                    <td>{{ item.oficinaR }}</td>
+                    <td>{{ item.tipoP }}</td>
+                    <td>{{ item.nomPuntoRevision }}</td>
+                    <td>
+                        <a href="{% url 'editar_estado_fuerza' id_edo_fuerza=item.idEdoFuerza %}" class="py-2 px-6 bg-inm-verde-200 rounded-xl text-white hover:bg-inm-marron-100">
+                            Editar
+                        </a>
+                        
+                    </td>
+                    <td>
+                        <a href="{% url 'eliminar_estado_fuerza' id_edo_fuerza=item.idEdoFuerza %}" class="
+                        py-2 px-6 mx-1 bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-xl text-white">
+                            Eliminar
+                        </a>
+                    </td>
+                </tr>
+            {% endfor %}
+        </table>
+    </div>
+    
+    
+    
+
+
+    <br><br><br>
+
+    <script>
+        function myFunction() {
+            var input, filter, table, tr, td, i, txtValue;
+            input = document.getElementById("myInput");
+            filter = input.value.toUpperCase();
+            table = document.getElementById("myTable");
+            tr = table.getElementsByTagName("tr");
+            for (i = 0; i < tr.length; i++) {
+              td = tr[i].getElementsByTagName("td")[0];
+              if (td) {
+                txtValue = td.textContent || td.innerText;
+                if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                  tr[i].style.display = "";
+                } else {
+                  tr[i].style.display = "none";
+                }
+              }       
+            }
+          }
+
+    </script>
+    {% endblock content %}

@@ -1,0 +1,115 @@
+{% extends "base/base.html" %}
+
+{% load static %}
+
+{% block title %}Estadistica{% endblock title %}
+
+{% block estadistica %}
+    {% if request.user.is_superuser %}
+        <a href="{% url 'estadistica' %}" class="bg-inm-verde-100 text-white px-6 py-3 rounded-xl hover:bg-inm-marron-200">Estadistica</a>
+    {% endif %}
+{% endblock estadistica %}
+
+{% block styles %}
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+{% endblock styles %}
+
+{% block content %}
+
+<div class="flex-grow flex flex-col justify-center items-center p-4">
+    
+    <!-- Fila Superior -->
+    <div class="bg-white p-4 rounded-lg shadow mb-8">
+        <h2 class="text-xl font-semibold text-center">Ingresa los datos</h2>
+        <form id="form-buscar">
+            {% csrf_token %}
+            <label for="id_nombre">Nombre:</label>
+            <input type="text" name="nombre" id="id_nombre">
+            
+            <label for="id_apellidos">Apellido:</label>
+            <input type="text" name="apellidos" id="id_apellidos">
+
+            <label for="id_nacioalidad">Nacionalidad:</label>
+            <input type="text" name="Nacionalidad" id="id_nacionalidad">
+            
+            <button type="submit">Buscar</button>
+        </form>
+    </div>
+
+    <div id="loading" hidden class="bg-white p-4 rounded-lg shadow mb-8">Cargando resultados...</div>
+
+    <!-- Contenedor de tabla -->
+    <div class="bg-white p-4 rounded-lg shadow mb-8 w-full max-w-4xl">
+      <table id="tabla_incidencias" class="min-w-full divide-y divide-gray-200">
+        <thead>
+          <tr>
+            <th class="px-6 py-3 bg-gray-100 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">No.</th>
+            <th class="px-6 py-3 bg-gray-100 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+            <th class="px-6 py-3 bg-gray-100 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">OR</th>
+            <th class="px-6 py-3 bg-gray-100 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Punto Estrategico</th>
+            <th class="px-6 py-3 bg-gray-100 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
+            <th class="px-6 py-3 bg-gray-100 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">apellidos</th>
+            <th class="px-6 py-3 bg-gray-100 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nacionalidad</th>
+          </tr>
+        </thead>
+        <tbody id="resultados" class="bg-white divide-y divide-gray-200"> </tbody>
+      </table>
+    </div>
+
+</div>
+
+<script>
+    $(document).ready(function() {
+        $('#form-buscar').on('submit', function(e) {
+            e.preventDefault();
+
+            $('#loading').show();
+
+            let nombre = $('#id_nombre').val();
+            let apellidos = $('#id_apellidos').val();
+            let nacionalidad = $('#id_nacionalidad').val();
+
+            $.ajax({
+                url: '{% url "buscar_rescate" %}',
+                type: 'GET',
+                data: {
+                    'nombre': nombre,
+                    'apellidos': apellidos,
+                    'nacionalidad': nacionalidad,
+                },
+                success: function(response) {
+                    $('#loading').hide();
+
+                    let resultados = $('#resultados');
+                    resultados.empty(); // Limpiar resultados previos
+
+                    if (response.data.length > 0) {
+                        response.data.forEach(function(rescate) {
+                            resultados.append(
+                                `<tr>
+                                    <td class="text-center">${rescate.No}</td>
+                                    <td class="text-center">${rescate.fecha}</td>
+                                    <td class="text-center">${rescate.oficina}</td>
+                                    <td class="text-center">${rescate.punto}</td>
+                                    <td class="text-center">${rescate.nombre}</td>
+                                    <td class="text-center">${rescate.apellidos}</td>
+                                    <td class="text-center">${rescate.nacionalidad}</td>
+                                </tr>`
+                            );
+                        });
+                    } else {
+                        resultados.append('<tr><td colspan="6">No se encontraron resultados</td></tr>');
+                    }
+                },
+                error: function() {
+                    $('#loading').hide();
+                    alert('Error al buscar los rescates');
+                }
+            });
+        });
+    });
+</script>
+
+{% endblock content %}

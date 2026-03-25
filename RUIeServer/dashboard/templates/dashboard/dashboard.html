@@ -1,0 +1,491 @@
+
+{% extends "base/base.html" %}
+{% load static %}
+{% block title %}
+    {% comment %} {% for user in usuario %}
+    Dashboard de {{user.oficinaR}}
+    {% endfor %} {% endcomment %}
+    Dashboard de {{usuario.0.oficinaR}}
+{% endblock title %}
+
+{% block navigation %}
+    Panel de Control de {{usuario.0.oficinaR}}
+{% endblock navigation %}
+
+{% block styles %}
+    <style>
+        
+            #popupBody{
+                width: 46%;
+                padding: 2%;
+                border-radius: 15px;
+                box-shadow: 0 0 5px #CCC;
+                background: #FFF;
+                position: relative;
+                margin: 20% auto;
+                transition: all 5s ease-in-out;
+
+            }
+
+
+            #cerrar{
+                position: absolute;
+                top: 20px;
+                right: 30px;
+                font-size: 30px;
+                font-weight: bold;
+                text-decoration: none;
+                color: #F00;
+                transition: all 100ms;
+            }
+
+            .overlay { 
+                position: fixed;
+                top: 0;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                background: rgba(0, 0, 0, 0.7);
+                transition: opacity 500ms;
+                visibility: hidden;
+                opacity: 0;
+            }
+
+            .overlay:target{
+                visibility: visible;
+                opacity: 1;
+            }
+
+            .contIcons{
+                width: 55%;
+                margin-bottom: 2%;
+            }
+            
+    </style>
+{% endblock styles %}
+
+{% block estadistica %}
+    {% if request.user.is_superuser %}
+        <a href="{% url 'estadistica' %}" class="bg-inm-verde-100 text-white px-6 py-3 rounded-xl hover:bg-inm-marron-200">Estadistica</a>
+    {% endif %}
+{% endblock estadistica %}
+
+{% block content %}
+<div class="grow">
+    {% if request.user.is_superuser %}
+        <div class="mt-5 flex flex-col content-center px-5 py-5">
+            <center>
+                <h1>Cargar Información de:</h1>
+            </center>
+        </div>
+
+        <div class="flex flex-col content-center px-5 py-2">
+            <center>
+                <div class="py-5 contIcons flex flex-row basis-1/2">
+                    <div class="ml-5 basis-1/3">
+                        <img class="w-20 h-20" src="{% static 'icons/INSUMOS/militar.png' %}" alt="logo" style="margin-right: 10px;">
+                    </div>
+                    <div class="ml-5 basis-1/3">
+                        <img class="w-20 h-20" src="{% static 'icons/INSUMOS/iniciar-sesion.png' %}" alt="logo" style="margin-right: 10px;">
+                    </div>
+                    <div class="ml-5 basis-1/3">
+                        <img class="w-20 h-20" src="{% static 'icons/INSUMOS/grupo.png' %}" alt="logo" style="margin-right: 10px;">
+                    </div>
+                </div>
+                <div class="py-5 contIcons flex items-center basis-1/2">
+                    <div class=" ml-5 basis-1/3 py-5 px-5 mx-1 bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-xl text-white ">
+                        <a href="{% url 'pagina_pruebas_edoFuerza' %}" class="">Estado de Fuerza</a>
+                    </div>
+                    <div class=" ml-5 basis-1/3 py-5 px-5 mx-1 bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-xl text-white ">
+                        <a href="{% url 'paginaPuntosI' %}" class="">Puntos de Internación</a>
+                    </div>
+                    <div class=" ml-5 basis-1/3 py-5 px-5 mx-1 bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-xl text-white ">
+                        <a href="{% url 'pagina_pruebas_usuarios' %}" class="">Usuarios</a>
+                    </div>
+                </div>
+            </center>
+        </div>
+
+        <!-- <div id="popupPI" class="overlay">
+            <div id="popupBody">
+                <a href="#" id="cerrar">&times;</a>
+                <div class="popupContent">
+                    {% if user.is_authenticated %}
+                    <center>
+                        <h3>
+                            Carga el archivo de los Puntos de Internación
+                        </h3>
+                        <br>
+                    </center>
+                    <form action="{% url 'cargar_puntoI' %}" method="post" enctype="multipart/form-data">{% csrf_token %}
+                        <p>
+                            {{ formCargar1.archivo }}
+                        </p>
+                        <br>
+                        <p>
+                            <input class="py-2 px-5 mx-1 bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-xl text-white" type="submit" value="Cargar" />
+                        </p>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div> -->
+
+        <div class="flex flex-col content-center px-5 py-2 ">
+            <center>
+                <div class="py-5 contIcons flex flex-row basis-1/2">
+                    <div class=" ml-8 basis-1/3">
+                        <img class="w-20 h-20" src="{% static 'icons/INSUMOS/inadmitidos.png' %}" alt="logo" style="margin-right: 10px;">
+                    </div>
+                    <div class=" ml-8 basis-1/3">
+                        <img class="w-20 h-20" src="{% static 'icons/INSUMOS/bandera.png' %}" alt="logo" style="margin-right: 10px;">
+                    </div>
+                    <div class="ml-5 basis-1/3">
+                        <img class="w-20 h-20" src="{% static 'icons/INSUMOS/municipalidad.png' %}" alt="logo" style="margin-right: 10px;">
+                    </div>
+                </div>
+                <div class="py-5 contIcons flex items-center basis-1/2">
+                    <div class=" ml-8 basis-1/3 py-5 px-5 mx-1 bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-xl text-white ">
+                        <a href="#popupInadmitidos" class="">Inadmitidos</a>
+                    </div>
+                    <div class=" ml-8 basis-1/3 py-5 px-5 mx-1 bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-xl text-white ">
+                        <a href="#popupNacionalidades" class="">Nacionalidades</a>
+                    </div>
+                    <div class=" ml-5 basis-1/3 py-5 px-5 mx-1 bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-xl text-white ">
+                        <a href="#popupMunicipios" class=" ">Municipios</a>
+                    </div>
+                </div>
+            </center>
+        </div>
+
+        <div id="popupInadmitidos" class="overlay">
+            <div id="popupBody">
+                <a href="#" id="cerrar">&times;</a>
+                <div class="popupContent">
+                    {% if user.is_authenticated %}
+                        <center>
+                            <h3>Carga el archivo de los Inadmitidos</h3> <br>
+                        </center>
+                        <form action="{% url 'cargar_Inadmitidos' %}" method="post" enctype="multipart/form-data">{% csrf_token %}
+                            <p>{{ formCargar1.archivo }}</p> <br>
+                            <p>
+                                <input class="py-2 px-5 mx-1 bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-xl text-white" type="submit" value="Cargar" />
+                            </p>
+                        </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div id="popupNacionalidades" class="overlay">
+            <div id="popupBody">
+                <a href="#" id="cerrar">&times;</a>
+                <div class="popupContent">
+                    {% if user.is_authenticated %}
+                    <center>
+                        <h3>
+                            Carga el archivo de las Nacionalidades disponibles
+                        </h3>
+                        <br>
+                    </center>
+                    <form action="{% url 'cargar_pais' %}" method="post" enctype="multipart/form-data">{% csrf_token %}
+                        <p class="">
+                            {{ formCargar1.archivo }}
+                        </p>
+                        <br>
+                        <p>
+                            <input class="py-2 px-5 mx-1 bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-xl text-white" type="submit" value="Cargar" />
+                        </p>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div id="popupMunicipios" class="overlay">
+            <div id="popupBody">
+                <a href="#" id="cerrar">&times;</a>
+                <div class="popupContent">
+                    {% if user.is_authenticated %}
+                    <center>
+                        <h3>
+                            Carga el archivo de los Municipios
+                        </h3>
+                        <br>
+                    </center>
+                    <form action="{% url 'cargar_municipios' %}" method="post" enctype="multipart/form-data">{% csrf_token %}
+                        <p>
+                            {{ formCargar1.archivo }}
+                        </p>
+                        <br>
+                        <p>
+                            <input class="py-2 px-5 mx-1 bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-xl text-white" type="submit" value="Cargar" />
+                        </p>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-5 flex flex-col content-center px-5 py-4">
+            <center>
+                <h1>Mostrar datos de Reincidentes:</h1>
+            </center>
+        </div>
+
+        <center>
+            <div class="w-1/12 h-1/10  py-5 px-5 mx-1 bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-xl text-white ">
+                <a href="{% url 'descarga_duplicados' %}"class="">
+                    Al <p id="fechaReincidencia"></p>
+                </a>
+            </div>
+        </center>
+
+        <div class="mt-5 my-6">
+
+            <h1 style="color: black;" class="flex flex-col items-center justify-center mb-2 ">Descargar archivo por fechas</h1>
+            <form action="{% url 'fechas_descarga' %}" method="post" enctype="multipart/form-data"
+                class="flex justify-center items-center px-2" onsubmit="return validarFechas()">{% csrf_token %}
+
+            
+                <label for="fechaInicio">Fecha de inicio:</label>
+                <input class="px-2 mx-4" type="date" name="fechaInicio" id="fechaInicio" required="">
+
+                <label class="px-2" for="fechaFin">Fecha de fin:</label>
+                <input type="date" name="fechaFin" id="fechaFin" required="">
+
+                <button class=" py-2 px-4 mx-4 bg-inm-verde-100 hover:bg-inm-verde-200 rounded-xl text-white"
+                    type="submit">Descargar</button>
+            </form>
+        </div>
+    {% else %}
+        <div class="mt-5 my-6">
+
+            <p class="flex flex-col items-center justify-center mb-2 ">Descargar archivo por fechas</p>
+            <form action="{% url 'fechas_OR' %}" method="post" enctype="multipart/form-data"
+                class="flex justify-center items-center px-2" onsubmit="return validarFechas()">{% csrf_token %}
+
+                <input type="hidden" value="{{usuario.0.oficinaR}}" id="oficinaR" name="oficinaR"> 
+
+                <label for="fechaInicio">Fecha de inicio:</label>
+                <input class="px-2 mx-4" type="date" name="fechaInicio" id="fechaInicio" required="">
+
+                <label class="px-2" for="fechaFin">Fecha de fin:</label>
+                <input type="date" name="fechaFin" id="fechaFin" required="">
+
+                <button class=" py-2 px-4 mx-4 bg-inm-verde-100 hover:bg-inm-verde-200 rounded-xl text-white"
+                    type="submit">Descargar</button>
+                
+                </button>
+            </form>
+        </div>
+    {% endif %}
+
+    {% comment %} <div class="mt-5 my-6">
+
+        <p class="flex flex-col items-center justify-center mb-2 ">Visualizar archivo por fechas</p>
+        <form action="{% url 'datos_por_fechas' %}" method="post" enctype="multipart/form-data"
+            class="flex justify-center items-center px-2" onsubmit="return validarFechas()">{% csrf_token %}
+
+            <input type="hidden" value="{{usuario.0.oficinaR}}" id="oficinaR" name="oficinaR"> 
+
+            <label for="fechaInicio">Fecha de inicio:</label>
+            <input class="px-2 mx-4" type="date" name="fechaInicio" id="fechaInicio" required="">
+
+            <label class="px-2" for="fechaFin">Fecha de fin:</label>
+            <input type="date" name="fechaFin" id="fechaFin" required="">
+
+            <button class=" py-2 px-4 mx-4 bg-inm-verde-100 hover:bg-inm-verde-200 rounded-xl text-white"
+                type="submit">Visualizar Datos</button>
+            
+            </button>
+        </form>
+    </div> {% endcomment %}
+    
+    <div class="flex flex-col content-center px-5 py-2">
+        <form action="{% url 'datos_por_fecha' %}" method="post" enctype="multipart/form-data"
+            class="flex flex-col items-center justify-center">{% csrf_token %}
+            {% comment %} <form action="" method="post" enctype="multipart/form-data">{% csrf_token %} {% endcomment %}
+            <p class="py-3">
+                Seleccionar la fecha para visualizar
+            </p>
+            <p>
+                {{form.fechaDescarga}}
+            </p>
+
+            <p class="py-4">
+                <input class="py-2 px-2 bg-inm-verde-100 hover:bg-inm-verde-200 rounded-xl text-white" type="submit"
+                    value="Visualizar Datos" />
+            </p>
+        </form>
+    </div>
+
+</div>
+
+<script>
+
+    document.getElementById('fechaReincidencia').innerText = obtenerFechaActual();
+    // Función para obtener la fecha actual en formato 'YYYY-MM-DD'
+    function obtenerFechaActual() {
+        var hoy = new Date();
+        var dd = String(hoy.getDate()).padStart(2, '0');
+        var mm = String(hoy.getMonth() + 1).padStart(2, '0'); // Enero es 0
+        var yyyy = hoy.getFullYear();
+        return yyyy + '-' + mm + '-' + dd;
+    }
+
+    // Establecer la fecha de fin como la fecha actual al cargar la página
+    document.getElementById('fechaFin').value = obtenerFechaActual();
+
+    function validarFechas() {
+        var fechaInicio = document.getElementById('fechaInicio').value;
+        var fechaFin = document.getElementById('fechaFin').value;
+
+        var fechaInicioObj = new Date(fechaInicio);
+        var fechaFinObj = new Date(fechaFin);
+
+        if (fechaInicioObj > fechaFinObj) {
+            alert('La fecha de inicio no puede ser mayor que la fecha de fin.');
+            return false;
+        }
+
+        return true;
+    }
+</script>
+
+{% endblock content %}
+
+<div class="py-3 flex flex-row center">
+    {% comment %} <label for="filtro_hora">Filtrar por hora:</label> {% endcomment %}
+    <input class="px-2 py-1 rounded border-2 border-teal-600 mx-3" type="text" id="myInput"
+        onkeyup="myFunction(2, 'myInput')" placeholder="Buscar por hora" name="filtro_hora">
+
+    {% comment %} <label for="filtro_punto">Filtrar por Punto:</label> {% endcomment %}
+    <input class="px-2 py-1 rounded border-2 border-teal-600 mx-3" type="text" id="myInput1"
+        onkeyup="myFunction(5, 'myInput1')" placeholder="Buscar por punto" name="filtro_punto">
+
+    {% comment %} <label for="filtro_nacio">Filtrar por Nacionalidad:</label> {% endcomment %}
+    <input class="px-2 py-1 rounded border-2 border-teal-600 mx-3" type="text" id="myInput2"
+        onkeyup="myFunction(6, 'myInput2')" placeholder="Buscar por Nacionalidad" name="filtro_nacio">
+
+    <label class="px-2 py-1" id="totales"></label>
+</div>
+
+<table id="myTable" class="border-separate border border-slate-200 hover:table-fixed">
+    <thead class="bg-teal-500 text-white">
+        <tr>
+            <th class="border border-slate-300">#</th>
+            <th class="border border-slate-300 px-3 text-sm">Fecha</th>
+            <th class="border border-slate-300 px-1 text-sm">Hora</th>
+            <th class="border border-slate-300 text-sm">Nombre del Agente</th>
+
+            <th class="border border-slate-300 text-sm">Tipo de Punto</th>
+
+            {% comment %} <th class="border border-slate-300">Aeropuerto</th>
+            <th class="border border-slate-300">Carretero</th>
+            <th class="border border-slate-300">Casa de seguridad</th>
+            <th class="border border-slate-300">Central de Autobus</th>
+            <th class="border border-slate-300">Ferrocarril</th>
+            <th class="border border-slate-300">Hotel</th>
+            <th class="border border-slate-300">Puestos a Disposicion</th>
+            <th class="border border-slate-300">voluntarios</th> {% endcomment %}
+
+            {% comment %} <th class="border border-slate-300">Municipio</th> {% endcomment %}
+            <th class="border border-slate-300 text-sm">Punto Estrategico</th>
+            <th class="border border-slate-300 text-sm">Nacionalidad</th>
+            <th class="border border-slate-300 px-2 text-sm">ISO</th>
+            <th class="border border-slate-300">Nombre</th>
+            <th class="border border-slate-300">Apellidos</th>
+            <th class="border border-slate-300 text-sm">Parentesco</th>
+            <th class="border border-slate-300 text-xs">Fecha de Nacimiento</th>
+            <th class="border border-slate-300 text-sm">Edad</th>
+            <th class="border border-slate-300 px-2">Sexo</th>
+            <th class="border border-slate-300 text-sm">Embarazo</th>
+            <th class="border border-slate-300 text-sm">Numero de familia</th>
+        </tr>
+    </thead>
+    <tbody class="bg-gray-200">
+        {% for val in values %}
+        <tr>
+            <td class="text-xs text-center">{{ forloop.counter }}</td>
+            <td class="text-xs text-center">{{val.fecha}}</td>
+            <td class="text-xs text-center">{{val.hora}}</td>
+            <td class="text-xs text-center">{{val.nombreAgente}}</td>
+
+            {% if val.aeropuerto == True %}
+                <td class="text-xs text-center">Aeropuerto</td>
+            {% elif val.carretero == True %}
+                <td class="text-xs text-center">Carretero</td>
+            {% elif val.casaSeguridad == True %}
+                <td class="text-xs text-center">Casa de Seguridad</td>
+            {% elif val.centralAutobus == True %}
+                <td class="text-xs text-center">Central de Autobus</td>
+            {% elif val.ferrocarril == True %}
+                <td class="text-xs text-center">Ferrocarril</td>
+            {% elif val.hotel == True %}
+                <td class="text-xs text-center">Hotel</td>
+            {% elif val.puestosADispo == True %}
+                <td class="text-xs text-center">Puestos a Disposicion</td>
+            {% elif val.voluntarios == True %}
+                <td class="text-xs text-center">Voluntarios</td>
+            {% else %}
+                <td class="text-xs text-center">Otro</td>
+            {% endif %}
+
+            {% comment %} <th>{{val.municipio}}</th> {% endcomment %}
+                <td class="text-xs text-center">{{val.puntoEstra}}</td>
+                <td class="text-xs text-center">{{val.nacionalidad}}</td>
+                <td class="text-xs text-center">{{val.iso3}}</td>
+                <td class="text-xs text-center">{{val.nombre}}</td>
+                <td class="text-xs text-blue-500 text-center"><a href="{% url 'editar' val.idRescate %}">{{val.apellidos}}</a></td>
+                <td class="text-xs text-center">{{val.parentesco}}</td>
+                <td class="text-xs text-center">{{val.fechaNacimiento}}</td>
+                <td class="text-xs text-center">{{val.edad}}</td>
+            {% if val.sexo == True %}
+                <td class="text-xs text-center">Hombre</td>
+            {% else %}
+                <td class="text-xs text-center">Mujer</td>
+            {% endif %}
+
+            {% if val.sexo == embarazo %}
+                <td class="text-xs text-center">Si</td>
+            {% else %}
+                <td class="text-xs text-center">No</td>
+            {% endif %}
+
+            {% if val.numFamilia == 0 %}
+                <td class="text-xs text-center"> </td>
+            {% else %}
+                <td class="text-xs text-center">{{val.numFamilia}}</td>
+            {% endif %}
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<script>
+    function myFunction(x1, idInput) {
+        // Declare variables 
+        var input, filter, table, tr, td, i, txtValue, conteo;
+        input = document.getElementById(idInput);
+        filter = input.value.toUpperCase();
+        table = document.getElementById("myTable");
+        tr = table.getElementsByTagName("tr");
+
+        conteo = 0
+        // Loop through all table rows, and hide those who don't match the search query
+        for (i = 0; i < tr.length; i++) {
+            td = tr[i].getElementsByTagName("td")[x1];
+            if (td) {
+                txtValue = td.textContent || td.innerText;
+                if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                    tr[i].style.display = "";
+                    conteo++
+                } else {
+                    tr[i].style.display = "none";
+                }
+            }
+        }
+        document.getElementById("totales").innerHTML = "Registros: " + conteo
+    }
+</script>
