@@ -7,3 +7,4 @@
 ### 3.- Agregar los archivos de .env.db -- .env.dev juto con las claves
 ### 4.- Collectar los archivos estaticos
 ### 5.- Copiar la carpeta de RUIeServer/tmp
+### 
