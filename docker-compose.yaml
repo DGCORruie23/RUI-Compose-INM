@@ -18,6 +18,7 @@ services:
       - ./RUIeServer/estadistica:/src/backendRUIe/estadistica
       - ./RUIeServer/dashboard:/src/backendRUIe/dashboard
       - ./RUIeServer/usuario:/src/backendRUIe/usuario
+      - ./RUIeServer/mapa:/src/backendRUIe/mapa
 
   db:
     container_name: dbPGruie

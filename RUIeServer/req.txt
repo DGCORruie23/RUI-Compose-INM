@@ -5,3 +5,4 @@ sqlparse==0.4.4
 weasyprint==64.0
 gunicorn
 psycopg2
+bokeh

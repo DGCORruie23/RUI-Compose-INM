@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     'usuarioL',
     'dashboard',
     'estadistica',
+    'mapa',
 ]
 
 MIDDLEWARE = [
