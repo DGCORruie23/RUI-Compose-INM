@@ -17,6 +17,11 @@
     to { opacity: 1; transform: translateY(0); }
   }
   .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
+
+  /* Ocultar botones de navegación del base.html en esta vista */
+  .flex.justify-center.mt-4.space-x-2 {
+    display: none !important;
+  }
 </style>
 {% endblock styles %}
 
@@ -29,13 +34,26 @@
 
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 w-full max-w-7xl mx-auto">
     <!-- Panel Izquierdo: Mapa Bokeh -->
-    <div class="col-span-1 lg:col-span-2 bg-white p-4 rounded-xl shadow-md border border-gray-200 flex justify-center items-center overflow-hidden h-[450px]">
+    <div class="col-span-1 lg:col-span-2 bg-white p-4 rounded-xl shadow-md border border-gray-200 flex justify-center items-center overflow-hidden h-[600px] relative">
+      <!-- Controles de Zoom Personalizados (Abajo a la derecha) -->
+      <div class="absolute bottom-6 right-6 flex flex-col gap-2 z-10 scale-90 md:scale-100">
+        <button onclick="zoomMap(0.8)" title="Acercar" class="bg-white/90 backdrop-blur-md p-3 rounded-2xl shadow-xl border border-gray-100 hover:bg-white text-inm-verde-100 transition-all active:scale-95 group">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
+        </button>
+        <button onclick="zoomMap(1.2)" title="Alejar" class="bg-white/90 backdrop-blur-md p-3 rounded-2xl shadow-xl border border-gray-100 hover:bg-white text-inm-verde-100 transition-all active:scale-95 group">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M20 12H4"></path></svg>
+        </button>
+        <button onclick="resetMap()" title="Reiniciar Vista" class="bg-inm-verde-100 p-3 rounded-2xl shadow-xl border border-emerald-800/10 hover:bg-inm-verde-200 text-white transition-all active:scale-95 mt-1">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+        </button>
+      </div>
+
       <!-- Contenedor del Div Generado por Bokeh -->
       {{ map_div|safe }}
     </div>
 
     <!-- Panel Derecho: Información del Estado (Rediseñado) -->
-    <div class="col-span-1 bg-white p-6 rounded-xl shadow-md border border-gray-200 flex flex-col h-full max-h-[450px] overflow-hidden">
+    <div class="col-span-1 bg-white p-6 rounded-xl shadow-md border border-gray-200 flex flex-col h-full max-h-[600px] overflow-hidden">
       <!-- Tabs -->
       <div class="flex mb-6 border-b border-gray-100">
         <button id="btnCS" onclick="switchPeriod('cs')" class="px-6 py-2 text-sm font-semibold transition-all duration-300 border-b-2 border-inm-verde-100 text-inm-verde-100">Periodo CS</button>
@@ -79,16 +97,6 @@
           </div>
         </div>
 
-        <!-- Detail Card (Sub-tarjeta) -->
-        <div id="detailCard" class="hidden mt-6 bg-inm-verde-100 text-white p-4 rounded-xl shadow-lg animate-fade-in">
-          <div class="flex justify-between items-center mb-3">
-            <h4 id="detailTitle" class="font-bold text-sm uppercase tracking-widest text-emerald-100">Desglose</h4>
-            <button onclick="closeDetail()" class="text-white opacity-60 hover:opacity-100">✕</button>
-          </div>
-          <div id="detailBody" class="space-y-2">
-            <!-- Dynamic data here -->
-          </div>
-        </div>
       </div>
 
       <!-- Footer timestamp -->
@@ -100,6 +108,37 @@
   </div>
 </main>
 
+<!-- Modal de Desglose (Pop-up) -->
+<div id="infoModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+  <!-- Backdrop con efecto blur -->
+  <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onclick="closeDetail()"></div>
+  
+  <!-- Contenido del Modal -->
+  <div class="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border-t-8 border-inm-verde-100 translate-y-0" id="modalContainer">
+    <div class="p-8">
+      <div class="flex justify-between items-start mb-6">
+        <div>
+          <h3 id="modalStateName" class="text-[10px] font-bold uppercase tracking-widest text-inm-verde-100 mb-1">-</h3>
+          <h4 id="detailTitle" class="text-3xl font-bold text-gray-800">Desglose</h4>
+        </div>
+        <button onclick="closeDetail()" class="text-gray-400 hover:text-gray-600 transition-colors bg-gray-50 p-2 rounded-xl">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+
+      <div id="detailBody" class="space-y-6 text-gray-600 min-h-[150px] flex flex-col justify-center">
+        <!-- Contenido dinámico -->
+      </div>
+      
+      <div class="mt-10 pt-6 border-t border-gray-100">
+        <button onclick="closeDetail()" class="w-full py-4 bg-inm-verde-100 text-white rounded-2xl font-bold shadow-lg shadow-emerald-900/20 hover:scale-[1.02] transition-transform active:scale-[0.98]">
+          Entendido
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
   let currentPeriod = 'cs';
 
@@ -109,6 +148,10 @@
       main.classList.remove("opacity-0", "translate-y-10");
       main.classList.add("opacity-100", "translate-y-0");
     }
+
+    // Inicializar con Datos Nacionales del Backend
+    window.selectedStateData = {{ national_data_json|safe }};
+    updateInformationPanel();
   });
 
   window.updateInformationPanel = function() {
@@ -161,57 +204,129 @@
   window.showDetail = function(category) {
     if (!window.selectedStateData) return;
     
-    const detailCard = document.getElementById('detailCard');
+    const infoModal = document.getElementById('infoModal');
+    const modalContainer = document.getElementById('modalContainer');
+    const modalStateName = document.getElementById('modalStateName');
     const detailTitle = document.getElementById('detailTitle');
     const detailBody = document.getElementById('detailBody');
     
-    detailTitle.innerText = `Desglose: ${category}`;
-    detailCard.classList.remove('hidden');
+    modalStateName.innerText = window.selectedStateData.name;
+    detailTitle.innerText = category.charAt(0).toUpperCase() + category.slice(1);
+    
+    modalContainer.classList.remove('animate-fade-in');
+    void modalContainer.offsetWidth; // Trigger reflow
+    modalContainer.classList.add('animate-fade-in');
+    
+    infoModal.classList.remove('hidden');
     
     const data = window.selectedStateData[currentPeriod];
-    
-    if (category === 'repatriados') {
-        const total = data.repatriados;
-        const pm = ((data.repatriados_m / total) * 100).toFixed(1);
-        const ph = ((data.repatriados_h / total) * 100).toFixed(1);
+    let html = '';
+
+    // Mapeo de campos por categoría
+    const mapping = {
+        'repatriados': [
+            { k: 'rep_adultos', label: 'Adultos' },
+            { k: 'rep_menores', label: 'Menores' },
+            { k: 'rep_nna_solo', label: 'NNA No Acompañados' },
+            { k: 'rep_nna_acom', label: 'NNA Acompañados' },
+            { k: 'rep_terrestres', label: 'Vía Terrestre' },
+            { k: 'rep_vuelos', label: 'Vía Aérea (Vuelos)' }
+        ],
+        'retornados': [
+            { k: 'ret_deportado', label: 'Deportados' },
+            { k: 'ret_retornado', label: 'Retorno Voluntario' }
+        ],
+        'rescatados': [
+            { k: 'res_una_vez', label: 'Rescate Primera Vez' },
+            { k: 'res_reincidente', label: 'Reincidencias' },
+            { k: 'res_estacion', label: 'En Estación' },
+            { k: 'res_dif', label: 'Canalizados DIF' },
+            { k: 'res_conduccion', label: 'Conducción Directa' }
+        ],
+        'ingresos': [
+            { k: 'ing_aereos', label: 'Vía Aérea' },
+            { k: 'ing_maritimos', label: 'Vía Marítima' },
+            { k: 'ing_terrestres', label: 'Vía Terrestre' }
+        ],
+        'tramites': [
+            { k: 'tra_res_perm', label: 'Residencia Permanente' },
+            { k: 'tra_res_temp', label: 'Residencia Temporal' },
+            { k: 'tra_res_est', label: 'Estudios' },
+            { k: 'tra_vis_hum', label: 'Humanitarias' },
+            { k: 'tra_vis_adop', label: 'Adopción' },
+            { k: 'tra_vis_reg', label: 'Regional' },
+            { k: 'tra_vis_trab', label: 'Trabajador' }
+        ]
+    };
+
+    const fields = mapping[category] || [];
+    const total = data[category] || 1; // Evitar división por cero
+
+    html = `<div class="space-y-3">`;
+    fields.forEach(f => {
+        const val = data[f.k] || 0;
+        const pct = ((val / total) * 100).toFixed(1);
         
-        detailBody.innerHTML = `
-            <div class="flex justify-between text-[10px] font-bold uppercase tracking-widest opacity-80">
-                <span>Mujeres</span>
-                <span>${data.repatriados_m.toLocaleString()} (${pm}%)</span>
-            </div>
-            <div class="w-full bg-white/20 rounded-full h-1 overflow-hidden">
-                <div class="bg-white h-full" style="width: ${pm}%"></div>
-            </div>
-            <div class="flex justify-between text-[10px] font-bold uppercase tracking-widest opacity-80 mt-3">
-                <span>Hombres</span>
-                <span>${data.repatriados_h.toLocaleString()} (${ph}%)</span>
-            </div>
-            <div class="w-full bg-white/20 rounded-full h-1 overflow-hidden">
-                <div class="bg-white h-full" style="width: ${ph}%"></div>
-            </div>
-        `;
-    } else {
-        detailBody.innerHTML = `
-            <div class="text-[10px] leading-relaxed opacity-90">
-                Se registran <strong>${data[category].toLocaleString()}</strong> eventos de ${category} para el estado de <strong>${window.selectedStateData.name}</strong> durante este periodo.
-            </div>
-            <div class="mt-4 flex gap-2">
-                <div class="flex-1 bg-white/10 p-2 rounded-lg text-center">
-                    <div class="text-xs font-bold">Local</div>
-                    <div class="text-[9px] opacity-70">Sede</div>
+        html += `
+            <div class="p-3 bg-gray-50 rounded-xl border border-gray-100">
+                <div class="flex justify-between items-center mb-1">
+                    <span class="text-[11px] font-bold uppercase tracking-tight text-gray-400">${f.label}</span>
+                    <span class="text-xs font-bold text-inm-verde-100">${val.toLocaleString()}</span>
                 </div>
-                <div class="flex-1 bg-white/10 p-2 rounded-lg text-center">
-                    <div class="text-xs font-bold">Móvil</div>
-                    <div class="text-[9px] opacity-70">Punto</div>
+                <div class="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                    <div class="bg-inm-verde-100 h-full transition-all duration-700" style="width: ${pct}%"></div>
+                </div>
+                <div class="flex justify-end mt-1">
+                    <span class="text-[9px] text-gray-400 font-medium">${pct}% del total</span>
                 </div>
             </div>
         `;
+    });
+    
+    if (fields.length === 0) {
+        html += `<p class="text-center text-gray-500 py-4">Sin desglose disponible para esta categoría.</p>`;
     }
+    
+    html += `</div>`;
+    detailBody.innerHTML = html;
   };
 
   window.closeDetail = function() {
-    document.getElementById('detailCard').classList.add('hidden');
+    const infoModal = document.getElementById('infoModal');
+    infoModal.classList.add('hidden');
+  };
+
+  // Funciones para control de Zoom en Bokeh
+  window.zoomMap = function(factor) {
+    const views = Object.values(Bokeh.index);
+    if (views.length > 0) {
+      // Tomamos la primera gráfica encontrada
+      const plot = views[0].model;
+      const x_range = plot.x_range;
+      const y_range = plot.y_range;
+      
+      const x_mid = (x_range.start + x_range.end) / 2;
+      const y_mid = (y_range.start + y_range.end) / 2;
+      
+      const x_span = (x_range.end - x_range.start) * factor;
+      const y_span = (y_range.end - y_range.start) * factor;
+      
+      x_range.start = x_mid - x_span / 2;
+      x_range.end = x_mid + x_span / 2;
+      y_range.start = y_mid - y_span / 2;
+      y_range.end = y_mid + y_span / 2;
+    }
+  };
+
+  window.resetMap = function() {
+    const views = Object.values(Bokeh.index);
+    if (views.length > 0) {
+        // Disparar el reset de Bokeh (limpia visión y selección)
+        views[0].model.reset.emit();
+        // Forzar el regreso a datos nacionales
+        window.selectedStateData = {{ national_data_json|safe }};
+        updateInformationPanel();
+    }
   };
 </script>
 
