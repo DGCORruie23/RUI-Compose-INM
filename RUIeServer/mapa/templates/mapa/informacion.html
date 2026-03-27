@@ -29,12 +29,41 @@
 <main class="page p-8 bg-gray-50 rounded-2xl shadow-lg opacity-0 translate-y-10 transition-all duration-700 ease-out flex flex-col justify-center min-h-[calc(100vh-4rem)]" id="main-section">
   <div class="flex flex-col justify-center items-center mb-8">
     <h1 class="text-3xl font-bold text-gray-800">Monitoreo Migratorio</h1>
-    <h2 class="text-lg font-medium text-gray-600 mt-2">Seleccione un estado para ver las oficinas correspondientes</h2>
+    <h2 class="text-lg font-medium text-gray-600 mt-2">Seleccione un estado para ver la información correspondiente</h2>
   </div>
 
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 w-full max-w-7xl mx-auto">
     <!-- Panel Izquierdo: Mapa Bokeh -->
     <div class="col-span-1 lg:col-span-2 bg-white p-4 rounded-xl shadow-md border border-gray-200 flex justify-center items-center overflow-hidden h-[600px] relative">
+      <!-- Selector de Mapa de Calor -->
+      <div class="absolute bottom-6 left-6 z-10 bg-white/95 backdrop-blur-md rounded-2xl shadow-lg border border-gray-100 p-3 flex flex-col gap-1.5 w-40">
+        <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Métrica de Calor</h3>
+        <label class="flex items-center gap-2 cursor-pointer group">
+          <input type="radio" name="heatmap_metric" value="todos" checked onchange="updateHeatmap()" class="w-3.5 h-3.5 text-inm-verde-100 bg-gray-50 border-gray-300 focus:ring-inm-verde-100">
+          <span class="text-xs font-semibold text-gray-700 group-hover:text-inm-verde-100 transition-colors">Todos</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer group">
+          <input type="radio" name="heatmap_metric" value="repatriados" onchange="updateHeatmap()" class="w-3.5 h-3.5 text-inm-verde-100 bg-gray-50 border-gray-300 focus:ring-inm-verde-100">
+          <span class="text-xs font-semibold text-gray-700 group-hover:text-inm-verde-100 transition-colors">Repatriados</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer group">
+          <input type="radio" name="heatmap_metric" value="recibidos" onchange="updateHeatmap()" class="w-3.5 h-3.5 text-inm-verde-100 bg-gray-50 border-gray-300 focus:ring-inm-verde-100">
+          <span class="text-xs font-semibold text-gray-700 group-hover:text-inm-verde-100 transition-colors">Recibidos</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer group">
+          <input type="radio" name="heatmap_metric" value="rescatados" onchange="updateHeatmap()" class="w-3.5 h-3.5 text-inm-verde-100 bg-gray-50 border-gray-300 focus:ring-inm-verde-100">
+          <span class="text-xs font-semibold text-gray-700 group-hover:text-inm-verde-100 transition-colors">Rescatados</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer group">
+          <input type="radio" name="heatmap_metric" value="ingresos" onchange="updateHeatmap()" class="w-3.5 h-3.5 text-inm-verde-100 bg-gray-50 border-gray-300 focus:ring-inm-verde-100">
+          <span class="text-xs font-semibold text-gray-700 group-hover:text-inm-verde-100 transition-colors">Ingresos</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer group">
+          <input type="radio" name="heatmap_metric" value="tramites" onchange="updateHeatmap()" class="w-3.5 h-3.5 text-inm-verde-100 bg-gray-50 border-gray-300 focus:ring-inm-verde-100">
+          <span class="text-xs font-semibold text-gray-700 group-hover:text-inm-verde-100 transition-colors">Trámites</span>
+        </label>
+      </div>
+
       <!-- Controles de Zoom Personalizados (Abajo a la derecha) -->
       <div class="absolute bottom-6 right-6 flex flex-col gap-2 z-10 scale-90 md:scale-100">
         <button onclick="zoomMap(0.8)" title="Acercar" class="bg-white/90 backdrop-blur-md p-3 rounded-2xl shadow-xl border border-gray-100 hover:bg-white text-inm-verde-100 transition-all active:scale-95 group">
@@ -75,10 +104,10 @@
             <div id="card_repatriados_val" class="text-xl font-bold text-gray-700 group-hover:text-inm-verde-100">-</div>
             <div class="text-[10px] uppercase tracking-wider text-gray-400 font-semibold group-hover:text-inm-verde-100">Repatriados</div>
           </div>
-          <!-- Card Retornados -->
-          <div onclick="showDetail('retornados')" class="bg-gray-50 border border-gray-200 p-3 rounded-xl cursor-pointer hover:border-inm-verde-100 hover:shadow-sm transition-all group">
-            <div id="card_retornados_val" class="text-xl font-bold text-gray-700 group-hover:text-inm-verde-100">-</div>
-            <div class="text-[10px] uppercase tracking-wider text-gray-400 font-semibold group-hover:text-inm-verde-100">Retornados</div>
+          <!-- Card Recibidos -->
+          <div onclick="showDetail('recibidos')" class="bg-gray-50 border border-gray-200 p-3 rounded-xl cursor-pointer hover:border-inm-verde-100 hover:shadow-sm transition-all group">
+            <div id="card_recibidos_val" class="text-xl font-bold text-gray-700 group-hover:text-inm-verde-100">-</div>
+            <div class="text-[10px] uppercase tracking-wider text-gray-400 font-semibold group-hover:text-inm-verde-100">Recibidos</div>
           </div>
           <!-- Card Rescatados -->
           <div onclick="showDetail('rescatados')" class="bg-gray-50 border border-gray-200 p-3 rounded-xl cursor-pointer hover:border-inm-verde-100 hover:shadow-sm transition-all group">
@@ -173,7 +202,7 @@
     if (!window.selectedStateData) return;
     const data = window.selectedStateData[currentPeriod];
     
-    const categories = ['repatriados', 'retornados', 'rescatados', 'ingresos', 'tramites'];
+    const categories = ['repatriados', 'recibidos', 'rescatados', 'ingresos', 'tramites'];
     categories.forEach(cat => {
       const el = document.getElementById(`card_${cat}_val`);
       if (el) {
@@ -198,6 +227,7 @@
     }
     
     updateCards();
+    updateHeatmap();
     closeDetail();
   };
 
@@ -232,9 +262,9 @@
             { k: 'rep_terrestres', label: 'Vía Terrestre' },
             { k: 'rep_vuelos', label: 'Vía Aérea (Vuelos)' }
         ],
-        'retornados': [
-            { k: 'ret_deportado', label: 'Deportados' },
-            { k: 'ret_retornado', label: 'Retorno Voluntario' }
+        'recibidos': [
+            { k: 'rec_adultos', label: 'Adultos' },
+            { k: 'rec_menores', label: 'Menores' }
         ],
         'rescatados': [
             { k: 'res_una_vez', label: 'Rescate Primera Vez' },
@@ -321,11 +351,100 @@
   window.resetMap = function() {
     const views = Object.values(Bokeh.index);
     if (views.length > 0) {
-        // Disparar el reset de Bokeh (limpia visión y selección)
         views[0].model.reset.emit();
-        // Forzar el regreso a datos nacionales
         window.selectedStateData = {{ national_data_json|safe }};
         updateInformationPanel();
+    }
+  };
+
+  // Función para actualizar el Mapa de Calor Dinámicamente
+  window.updateHeatmap = function() {
+    const selectedRadio = document.querySelector('input[name="heatmap_metric"]:checked');
+    if (!selectedRadio) return;
+    
+    const metric = selectedRadio.value;
+    
+    let colorPrefix = "";
+    if (metric === "todos") colorPrefix = "t";
+    else if (metric === "repatriados") colorPrefix = "rep";
+    else if (metric === "recibidos") colorPrefix = "rec";
+    else if (metric === "rescatados") colorPrefix = "res";
+    else if (metric === "ingresos") colorPrefix = "ing";
+    else if (metric === "tramites") colorPrefix = "tra";
+    
+    const fieldName = currentPeriod + '_color_' + colorPrefix;
+    
+    // API Nativa de Bokeh en JavaScript
+    const views = Object.values(Bokeh.index);
+    if (views.length > 0) {
+      const plot = views[0].model;
+      
+      // Buscar el renderizador de tipo Patches (que es el que pinta los estados)
+      const patchRenderer = plot.renderers.find(r => r.type === 'GlyphRenderer' && r.glyph && r.glyph.type === 'Patches');
+      
+      if (patchRenderer && patchRenderer.glyph.fill_color) {
+        // Obtenemos el transformador (LinearColorMapper) existente
+        const cTransform = patchRenderer.glyph.fill_color.transform;
+        
+        // Asignamos un nuevo objeto a la propiedad para que BokehJS identifique el cambio reactivo
+        patchRenderer.glyph.fill_color = { field: fieldName, transform: cTransform };
+        patchRenderer.glyph.hover_fill_color = { field: fieldName, transform: cTransform };
+        patchRenderer.glyph.selection_fill_color = { field: fieldName, transform: cTransform };
+        
+        if (cTransform) {
+            cTransform.low = 1;
+            cTransform.high = 32;
+        }
+        
+        // Forzamos el request de repintado
+        patchRenderer.change.emit();
+        patchRenderer.data_source.change.emit();
+      }
+      
+      // Actualizar el HoverTool para mostrar solo la categoría actual o todas si es "todos"
+      // En BokehJS, las herramientas suelen estar en plot.toolbar.tools o plot.tools
+      let hover = plot.toolbar.tools.find(t => t.type === 'HoverTool');
+      if (!hover) hover = plot.tools.find(t => t.type === 'HoverTool');
+
+      if (hover) {
+          let html = `
+            <div style="padding: 8px; min-width: 170px; font-family: Arial, sans-serif;">
+                <div style="font-size: 16px; font-weight: 500; margin-bottom: 3px; color: #333;">@name</div>
+                <div style="border-bottom: 1px solid #ddd; margin-bottom: 5px;"></div>
+          `;
+
+          if (metric === "todos") {
+              const cats = [
+                  { label: 'Repatriados', key: 'repatriados' },
+                  { label: 'Recibidos', key: 'recibidos' },
+                  { label: 'Rescatados', key: 'rescatados' },
+                  { label: 'Ingresos', key: 'ingresos' },
+                  { label: 'Trámites', key: 'tramites' }
+              ];
+              cats.forEach(c => {
+                  html += `
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
+                        <span style="font-size: 12px; color: #333;">${c.label}</span>
+                        <span style="font-size: 12px; font-weight: 500; color: #333;">@${currentPeriod}_str_${c.key}</span>
+                    </div>
+                    <div style="border-bottom: 1px solid #eee; margin-bottom: 3px;"></div>
+                  `;
+              });
+          } else {
+              let catName = metric.charAt(0).toUpperCase() + metric.slice(1);
+              let fieldDisp = '@' + currentPeriod + '_str_' + metric;
+              html += `
+                <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+                    <span style="font-size: 12px; color: #333;">${catName}</span>
+                    <span style="font-size: 12px; font-weight: 500; color: #333;">${fieldDisp}</span>
+                </div>
+              `;
+          }
+          html += `</div>`;
+          hover.tooltips = html;
+          // Crucial: Avisar a Bokeh que las propiedades del tooltip han cambiado
+          hover.change.emit();
+      }
     }
   };
 </script>

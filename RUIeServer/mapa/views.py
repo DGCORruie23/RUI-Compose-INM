@@ -5,7 +5,7 @@ from django.apps import apps
 import openpyxl
 from datetime import datetime
 from bokeh.plotting import figure
-from bokeh.models import GeoJSONDataSource, HoverTool, TapTool, CustomJS
+from bokeh.models import GeoJSONDataSource, HoverTool, TapTool, CustomJS, LinearColorMapper
 from bokeh.embed import components
 import json
 import random
@@ -16,7 +16,7 @@ from django.db.models import Sum
 from datetime import date
 import unicodedata
 
-def normalize_nome(texto):
+def normalizar_nombre(texto):
     if not texto: return ""
     return ''.join(
         c for c in unicodedata.normalize('NFD', str(texto))
@@ -37,8 +37,16 @@ def mapa_informacion(request):
     def get_totals_by_period(start, end):
         data_by_state = {}
         estados = Estado.objects.all()
+
+        datos_t = {}
+        datos_rep = {}
+        datos_rec = {}
+        datos_res = {}
+        datos_ing = {}
+        datos_tra = {}
+
         for edo in estados:
-            key = normalize_nome(edo.nombre)
+            key = normalizar_nombre(edo.nombre)
             
             # Agregaciones por modelo
             rep = Repatriados.objects.filter(estado=edo, fecha__range=[start, end]).aggregate(
@@ -46,8 +54,8 @@ def mapa_informacion(request):
                 nna_solo=Sum('nna_solo'), nna_acom=Sum('nna_acom'),
                 terrestres=Sum('terrestres'), vuelos=Sum('vuelos')
             )
-            ret = Retornados.objects.filter(estado=edo, fecha__range=[start, end]).aggregate(
-                total=Sum('retornados_total'), deportado=Sum('deportado'), retornado=Sum('retornado')
+            rec = Recibidos.objects.filter(estado=edo, fecha__range=[start, end]).aggregate(
+                total=Sum('ext_rec'), adultos=Sum('adultos'), menores=Sum('menores')
             )
             res = ExtRescatados.objects.filter(estado=edo, fecha__range=[start, end]).aggregate(
                 total=Sum('rescatados'), una_vez=Sum('una_vez'), reincidente=Sum('reincidente'),
@@ -64,7 +72,21 @@ def mapa_informacion(request):
                 vis_trab=Sum('visitante_trabajador')
             )
 
+            # datos_t[key] = (rep['total'] or 0) + (rec['total'] or 0) + (res['total'] or 0) + (ing['total'] or 0) + (tra['total'] or 0)
+            datos_rep[key] = rep['total'] or 0
+            datos_rec[key] = rec['total'] or 0
+            datos_res[key] = res['total'] or 0
+            datos_ing[key] = ing['total'] or 0
+            datos_tra[key] = tra['total'] or 0
+
             data_by_state[key] = {
+                'todos': (rep['total'] or 0) + (rec['total'] or 0) + (res['total'] or 0) + (ing['total'] or 0) + (tra['total'] or 0),
+                'color_t': 0,
+                'color_rep': 0,
+                'color_rec': 0,
+                'color_res': 0,
+                'color_ing': 0,
+                'color_tra': 0,
                 'repatriados': rep['total'] or 0,
                 'rep_adultos': rep['adultos'] or 0,
                 'rep_menores': rep['menores'] or 0,
@@ -73,9 +95,9 @@ def mapa_informacion(request):
                 'rep_terrestres': rep['terrestres'] or 0,
                 'rep_vuelos': rep['vuelos'] or 0,
 
-                'retornados': ret['total'] or 0,
-                'ret_deportado': ret['deportado'] or 0,
-                'ret_retornado': ret['retornado'] or 0,
+                'recibidos': rec['total'] or 0,
+                'rec_adultos': rec['adultos'] or 0,
+                'rec_menores': rec['menores'] or 0,
 
                 'rescatados': res['total'] or 0,
                 'res_una_vez': res['una_vez'] or 0,
@@ -98,6 +120,47 @@ def mapa_informacion(request):
                 'tra_vis_reg': tra['vis_reg'] or 0,
                 'tra_vis_trab': tra['vis_trab'] or 0,
             }
+
+        ordenados_rep = sorted(datos_rep.items(), key=lambda x: x[1], reverse=True)
+        ordenados_rec = sorted(datos_rec.items(), key=lambda x: x[1], reverse=True)
+        ordenados_res = sorted(datos_res.items(), key=lambda x: x[1], reverse=True)
+        ordenados_ing = sorted(datos_ing.items(), key=lambda x: x[1], reverse=True)
+        ordenados_tra = sorted(datos_tra.items(), key=lambda x: x[1], reverse=True)
+
+        for rank, (k, value) in enumerate(ordenados_rep, start=1):
+            if value == 0:
+                data_by_state[k]['color_rep'] = 32
+            else:
+                data_by_state[k]['color_rep'] = rank
+        for rank, (k, value) in enumerate(ordenados_rec, start=1):
+            if value == 0:
+                data_by_state[k]['color_rec'] = 32
+            else:
+                data_by_state[k]['color_rec'] = rank
+        for rank, (k, value) in enumerate(ordenados_res, start=1):
+            if value == 0:
+                data_by_state[k]['color_res'] = 32
+            else:
+                data_by_state[k]['color_res'] = rank
+        for rank, (k, value) in enumerate(ordenados_ing, start=1):
+            if value == 0:
+                data_by_state[k]['color_ing'] = 32
+            else:
+                data_by_state[k]['color_ing'] = rank
+        for rank, (k, value) in enumerate(ordenados_tra, start=1):
+            if value == 0:
+                data_by_state[k]['color_tra'] = 32
+            else:
+                data_by_state[k]['color_tra'] = rank
+
+        for edo in estados:
+            k = normalizar_nombre(edo.nombre)
+            datos_t[k] = data_by_state[k]['color_rep'] + data_by_state[k]['color_rec'] + data_by_state[k]['color_res'] + data_by_state[k]['color_ing'] + data_by_state[k]['color_tra']
+        
+        ordenados_t = sorted(datos_t.items(), key=lambda x: x[1])  # 't' rank is sum of ranks, smallest is best
+        for rank, (k, value) in enumerate(ordenados_t, start=1):
+            data_by_state[k]['color_t'] = rank
+
         return data_by_state
 
     # Cargar datos para ambos periodos
@@ -111,12 +174,13 @@ def mapa_informacion(request):
         geo_data = json.load(f)
           # Inyectar datos reales en cada estado
     for feature in geo_data['features']:
-        name_normalized = normalize_nome(feature['properties']['name'])
+        name_normalized = normalizar_nombre(feature['properties']['name'])
         
         # Obtener datos de los diccionarios (usar default con ceros para todos los campos nuevos)
         default_vals = {
+            'todos': 0, 'color_t': 32, 'color_rep': 32, 'color_rec': 32, 'color_res': 32, 'color_ing': 32, 'color_tra': 32,
             'repatriados': 0, 'rep_adultos': 0, 'rep_menores': 0, 'rep_nna_solo': 0, 'rep_nna_acom': 0, 'rep_terrestres': 0, 'rep_vuelos': 0,
-            'retornados': 0, 'ret_deportado': 0, 'ret_retornado': 0,
+            'recibidos': 0, 'rec_adultos': 0, 'rec_menores': 0,
             'rescatados': 0, 'res_una_vez': 0, 'res_reincidente': 0, 'res_estacion': 0, 'res_dif': 0, 'res_conduccion': 0,
             'ingresos': 0, 'ing_aereos': 0, 'ing_maritimos': 0, 'ing_terrestres': 0,
             'tramites': 0, 'tra_res_perm': 0, 'tra_res_temp': 0, 'tra_res_est': 0, 'tra_vis_hum': 0, 'tra_vis_adop': 0, 'tra_vis_reg': 0, 'tra_vis_trab': 0,
@@ -130,12 +194,10 @@ def mapa_informacion(request):
             feature['properties'][f'cs_{k}'] = cs[k]
             feature['properties'][f'dt_{k}'] = dt[k]
         
-        # Compatibilidad con tooltips existentes (usar totales de CS)
-        feature['properties']['repatriados'] = f"{cs['repatriados']:,}"
-        feature['properties']['retornados'] = f"{cs['retornados']:,}"
-        feature['properties']['rescatados'] = f"{cs['rescatados']:,}"
-        feature['properties']['ingresos'] = f"{cs['ingresos']:,}"
-        feature['properties']['tramites'] = f"{cs['tramites']:,}"
+        # Cadenas formateadas para el Tooltip Dinámico
+        for k in ['todos', 'repatriados', 'recibidos', 'rescatados', 'ingresos', 'tramites']:
+            feature['properties'][f'cs_str_{k}'] = f"{cs[k]:,}"
+            feature['properties'][f'dt_str_{k}'] = f"{dt[k]:,}"
         
     geo_source = GeoJSONDataSource(geojson=json.dumps(geo_data))
     
@@ -153,54 +215,62 @@ def mapa_informacion(request):
     p.outline_line_color = None
     p.min_border = 0
     
+    # Configurar el mapa de calor inicial (Todos)
+    from bokeh.palettes import Greens256
+    custom_palette = list(Greens256[:205]) # Cortamos la paleta al 80% aprox
+    color_mapper = LinearColorMapper(palette=custom_palette, low=1, high=32)
+
     # Dibujar los estados
     states = p.patches(
         'xs', 'ys', 
         source=geo_source,
-        fill_color="#cbd5e1",
+        fill_color={'field': 'cs_todos', 'transform': color_mapper},
         line_color="#ffffff",
         line_width=1,
         fill_alpha=1.0,
-        hover_fill_color="#285C4D",
-        selection_fill_color="#285C4D",
+        hover_fill_color={'field': 'cs_todos', 'transform': color_mapper},
+        hover_line_color="#285C4D",
+        hover_line_width=2,
+        selection_fill_color={'field': 'cs_todos', 'transform': color_mapper},
+        selection_line_color="#285C4D",
+        selection_line_width=2,
         nonselection_fill_alpha=0.2,
-        nonselection_fill_color="#cbd5e1",
         nonselection_line_alpha=0.2
     )
     
-    # Añadir HoverTool con HTML personalizado según imagen (Compacto)
+    # Añadir HoverTool inicial configurado a 'Todos' (muestra todas las categorías)
     hover_html = """
-        <div style="padding: 8px; min-width: 160px; font-family: Arial, sans-serif;">
+        <div style="padding: 8px; min-width: 170px; font-family: Arial, sans-serif;">
             <div style="font-size: 16px; font-weight: 500; margin-bottom: 3px; color: #333;">@name</div>
             <div style="border-bottom: 1px solid #ddd; margin-bottom: 5px;"></div>
             
-            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
                 <span style="font-size: 12px; color: #333;">Repatriados</span>
-                <span style="font-size: 12px; font-weight: 500; color: #333;">@repatriados</span>
+                <span style="font-size: 12px; font-weight: 500; color: #333;">@cs_str_repatriados</span>
             </div>
-            <div style="border-bottom: 1px solid #eee; margin-bottom: 5px;"></div>
-            
-            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                <span style="font-size: 12px; color: #333;">Retornados</span>
-                <span style="font-size: 12px; font-weight: 500; color: #333;">@retornados</span>
+            <div style="border-bottom: 1px solid #eee; margin-bottom: 3px;"></div>
+
+            <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
+                <span style="font-size: 12px; color: #333;">Recibidos</span>
+                <span style="font-size: 12px; font-weight: 500; color: #333;">@cs_str_recibidos</span>
             </div>
-            <div style="border-bottom: 1px solid #eee; margin-bottom: 5px;"></div>
-            
-            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+            <div style="border-bottom: 1px solid #eee; margin-bottom: 3px;"></div>
+
+            <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
                 <span style="font-size: 12px; color: #333;">Rescatados</span>
-                <span style="font-size: 12px; font-weight: 500; color: #333;">@rescatados</span>
+                <span style="font-size: 12px; font-weight: 500; color: #333;">@cs_str_rescatados</span>
             </div>
-            <div style="border-bottom: 1px solid #eee; margin-bottom: 5px;"></div>
-            
-            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+            <div style="border-bottom: 1px solid #eee; margin-bottom: 3px;"></div>
+
+            <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
                 <span style="font-size: 12px; color: #333;">Ingresos</span>
-                <span style="font-size: 12px; font-weight: 500; color: #333;">@ingresos</span>
+                <span style="font-size: 12px; font-weight: 500; color: #333;">@cs_str_ingresos</span>
             </div>
-            <div style="border-bottom: 1px solid #eee; margin-bottom: 5px;"></div>
-            
+            <div style="border-bottom: 1px solid #eee; margin-bottom: 3px;"></div>
+
             <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
                 <span style="font-size: 12px; color: #333;">Trámites</span>
-                <span style="font-size: 12px; font-weight: 500; color: #333;">@tramites</span>
+                <span style="font-size: 12px; font-weight: 500; color: #333;">@cs_str_tramites</span>
             </div>
         </div>
     """
@@ -215,8 +285,9 @@ def mapa_informacion(request):
     def calc_national(totals_dict):
         # Usar las mismas claves que el diccionario por estado
         keys = [
+            'todos',
             'repatriados', 'rep_adultos', 'rep_menores', 'rep_nna_solo', 'rep_nna_acom', 'rep_terrestres', 'rep_vuelos',
-            'retornados', 'ret_deportado', 'ret_retornado',
+            'recibidos', 'rec_adultos', 'rec_menores',
             'rescatados', 'res_una_vez', 'res_reincidente', 'res_estacion', 'res_dif', 'res_conduccion',
             'ingresos', 'ing_aereos', 'ing_maritimos', 'ing_terrestres',
             'tramites', 'tra_res_perm', 'tra_res_temp', 'tra_res_est', 'tra_vis_hum', 'tra_vis_adop', 'tra_vis_reg', 'tra_vis_trab'
@@ -238,8 +309,9 @@ def mapa_informacion(request):
     tap_js = CustomJS(args=dict(source=geo_source, national=national_data), code="""
         const indices = source.selected.indices;
         const keys = [
+            'todos',
             'repatriados', 'rep_adultos', 'rep_menores', 'rep_nna_solo', 'rep_nna_acom', 'rep_terrestres', 'rep_vuelos',
-            'retornados', 'ret_deportado', 'ret_retornado',
+            'recibidos', 'rec_adultos', 'rec_menores',
             'rescatados', 'res_una_vez', 'res_reincidente', 'res_estacion', 'res_dif', 'res_conduccion',
             'ingresos', 'ing_aereos', 'ing_maritimos', 'ing_terrestres',
             'tramites', 'tra_res_perm', 'tra_res_temp', 'tra_res_est', 'tra_vis_hum', 'tra_vis_adop', 'tra_vis_reg', 'tra_vis_trab'
@@ -331,12 +403,12 @@ def carga_datos(request):
                     fecha_val = datetime.strptime(fecha_val, '%Y-%m-%d').date()
                 
                 # Normalizar el nombre del estado del Excel para buscarlo
-                estado_norm_busqueda = normalize_nome(estado_nombre)
+                estado_norm_busqueda = normalizar_nombre(estado_nombre)
                 
                 estado_obj = None
                 # Buscar entre todos los estados existentes normalizando sus nombres
                 for e in Estado.objects.all():
-                    if normalize_nome(e.nombre) == estado_norm_busqueda:
+                    if normalizar_nombre(e.nombre) == estado_norm_busqueda:
                         estado_obj = e
                         break
                 
