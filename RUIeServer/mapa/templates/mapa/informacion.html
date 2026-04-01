@@ -30,11 +30,55 @@
   <div class="flex flex-col justify-center items-center mb-8">
     <h1 class="text-3xl font-bold text-gray-800">Monitoreo Migratorio</h1>
     <h2 class="text-lg font-medium text-gray-600 mt-2">Seleccione un estado para ver la información correspondiente</h2>
+
+    <!-- NEW: Global Period Selector -->
+    <div class="bg-white/80 backdrop-blur-md border border-gray-100 p-1 px-4 rounded-2xl mt-6 shadow-sm flex items-center gap-6 animate-fade-in" style="animation-delay: 0.1s;">
+        <div class="flex flex-col border-r border-gray-100 pr-6">
+          <span class="text-[9px] font-bold uppercase tracking-[0.15em] text-inm-verde-100 opacity-80">Periodo de Consulta</span>
+          <h3 id="currentPeriodLabel" class="text-[10px] font-extrabold text-gray-700">01 OCT 2024 - 30 MAR 2026 (CS)</h3>
+        </div>
+        <div class="bg-gray-100 p-1 rounded-xl flex gap-1">
+          <button id="btnCS" onclick="switchPeriod('cs')" class="px-5 py-1.5 text-[11px] font-bold rounded-lg transition-all duration-300 bg-inm-verde-100 text-white shadow-md active:scale-95">CS</button>
+          <button id="btnDT" onclick="switchPeriod('dt')" class="px-5 py-1.5 text-[11px] font-bold rounded-lg transition-all duration-300 text-gray-400 hover:text-gray-600 active:scale-95">DT</button>
+          <button id="btnPE" onclick="switchPeriod('pe')" class="px-5 py-1.5 text-[11px] font-bold rounded-lg transition-all duration-300 text-gray-400 hover:text-gray-600 active:scale-95">PE</button>
+        </div>
+    </div>
   </div>
 
-  <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 w-full max-w-7xl mx-auto">
+  <!-- MODAL: Selección de Rango Personalizado -->
+  <div id="customDateModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" onclick="closeCustomModal()"></div>
+    <div class="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden border-t-8 border-inm-verde-100 animate-fade-in">
+      <div class="p-6">
+        <div class="flex justify-between items-center mb-6">
+          <h3 class="text-lg font-bold text-gray-800">Periodo Personalizado</h3>
+          <button onclick="closeCustomModal()" class="text-gray-400 p-1.5 hover:bg-gray-50 rounded-lg">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+        </div>
+
+        <div class="space-y-4">
+          <div>
+            <label class="block text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Fecha Inicial</label>
+            <input type="date" id="customStart" min="2024-10-01" class="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-inm-verde-100 outline-none">
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Fecha Final</label>
+            <input type="date" id="customEnd" class="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-inm-verde-100 outline-none">
+          </div>
+        </div>
+
+        <button id="btnApplyCustom" onclick="consultarPeriodoPersonalizado()" class="w-full mt-8 py-4 bg-inm-verde-100 text-white rounded-2xl font-bold shadow-lg shadow-emerald-900/10 hover:scale-[1.02] active:scale-[0.98] transition-all flex justify-center items-center gap-2">
+          <span>Consultar Periodo</span>
+          <div id="loaderPE" class="hidden w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-5 gap-8 w-full max-w-7xl mx-auto">
     <!-- Panel Izquierdo: Mapa Bokeh -->
-    <div class="col-span-1 lg:col-span-2 bg-white p-4 rounded-xl shadow-md border border-gray-200 flex justify-center items-center overflow-hidden h-[600px] relative">
+    <div class="col-span-1 lg:col-span-3 bg-white p-4 rounded-xl shadow-md border border-gray-200 flex justify-center items-center overflow-hidden h-[600px] relative">
       <!-- Selector de Mapa de Calor -->
       <div class="absolute bottom-6 left-6 z-10 bg-white/95 backdrop-blur-md rounded-2xl shadow-lg border border-gray-100 p-3 flex flex-col gap-1.5 w-40">
         <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Métrica de Calor</h3>
@@ -62,6 +106,14 @@
           <input type="radio" name="heatmap_metric" value="tramites" onchange="updateHeatmap()" class="w-3.5 h-3.5 text-inm-verde-100 bg-gray-50 border-gray-300 focus:ring-inm-verde-100">
           <span class="text-xs font-semibold text-gray-700 group-hover:text-inm-verde-100 transition-colors">Trámites</span>
         </label>
+        <label class="flex items-center gap-2 cursor-pointer group">
+          <input type="radio" name="heatmap_metric" value="retornados" onchange="updateHeatmap()" class="w-3.5 h-3.5 text-inm-verde-100 bg-gray-50 border-gray-300 focus:ring-inm-verde-100">
+          <span class="text-xs font-semibold text-gray-700 group-hover:text-inm-verde-100 transition-colors">Retornados</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer group">
+          <input type="radio" name="heatmap_metric" value="inadmitidos" onchange="updateHeatmap()" class="w-3.5 h-3.5 text-inm-verde-100 bg-gray-50 border-gray-300 focus:ring-inm-verde-100">
+          <span class="text-xs font-semibold text-gray-700 group-hover:text-inm-verde-100 transition-colors">Inadmitidos</span>
+        </label>
       </div>
 
       <!-- Controles de Zoom Personalizados (Abajo a la derecha) -->
@@ -82,47 +134,50 @@
     </div>
 
     <!-- Panel Derecho: Información del Estado (Rediseñado) -->
-    <div class="col-span-1 bg-white p-6 rounded-xl shadow-md border border-gray-200 flex flex-col h-full max-h-[600px] overflow-hidden">
-      <!-- Tabs -->
-      <div class="flex mb-6 border-b border-gray-100">
-        <button id="btnCS" onclick="switchPeriod('cs')" class="px-6 py-2 text-sm font-semibold transition-all duration-300 border-b-2 border-inm-verde-100 text-inm-verde-100">Periodo CS</button>
-        <button id="btnDT" onclick="switchPeriod('dt')" class="px-6 py-2 text-sm font-semibold transition-all duration-300 border-b-2 border-transparent text-gray-400 hover:text-gray-600">Periodo DT</button>
-      </div>
-
+    <div class="col-span-1 lg:col-span-2 bg-white p-6 rounded-xl shadow-md border border-gray-200 flex flex-col h-full max-h-[600px] overflow-hidden">
       <!-- Header Info -->
-      <div class="mb-6">
-        <h2 id="stateNameDisplay" class="text-2xl font-light text-gray-800">Seleccione un <span class="font-bold">Estado</span></h2>
-        <p class="text-gray-400 text-sm">Comportamiento Migratorio</p>
+      <div class="mb-4">
+        <h2 id="stateNameDisplay" class="text-2xl font-light text-gray-800 tracking-tight">Seleccione un <span class="font-bold">Estado</span></h2>
       </div>
 
       <!-- Main Content (Cards) -->
       <div class="flex-1 overflow-y-auto pr-2 custom-scrollbar">
         <!-- Cards Grid -->
-        <div class="grid grid-cols-2 gap-3" id="cardsContainer">
+        <div class="grid grid-cols-3 gap-2" id="cardsContainer">
           <!-- Card Repatriados -->
-          <div onclick="showDetail('repatriados')" class="bg-gray-50 border border-gray-200 p-3 rounded-xl cursor-pointer hover:border-inm-verde-100 hover:shadow-sm transition-all group">
-            <div id="card_repatriados_val" class="text-xl font-bold text-gray-700 group-hover:text-inm-verde-100">-</div>
-            <div class="text-[10px] uppercase tracking-wider text-gray-400 font-semibold group-hover:text-inm-verde-100">Repatriados</div>
+          <div onclick="showDetail('repatriados')" class="bg-gray-50 border border-gray-200 p-2 rounded-xl cursor-pointer hover:border-inm-verde-100 hover:shadow-sm transition-all group text-center">
+            <div id="card_repatriados_val" class="text-lg font-bold text-gray-700 group-hover:text-inm-verde-100">-</div>
+            <div class="text-[9px] uppercase tracking-wider text-gray-400 font-semibold group-hover:text-inm-verde-100 leading-tight">Repatriados</div>
           </div>
           <!-- Card Recibidos -->
-          <div onclick="showDetail('recibidos')" class="bg-gray-50 border border-gray-200 p-3 rounded-xl cursor-pointer hover:border-inm-verde-100 hover:shadow-sm transition-all group">
-            <div id="card_recibidos_val" class="text-xl font-bold text-gray-700 group-hover:text-inm-verde-100">-</div>
-            <div class="text-[10px] uppercase tracking-wider text-gray-400 font-semibold group-hover:text-inm-verde-100">Recibidos</div>
+          <div onclick="showDetail('recibidos')" class="bg-gray-50 border border-gray-200 p-2 rounded-xl cursor-pointer hover:border-inm-verde-100 hover:shadow-sm transition-all group text-center">
+            <div id="card_recibidos_val" class="text-lg font-bold text-gray-700 group-hover:text-inm-verde-100">-</div>
+            <div class="text-[9px] uppercase tracking-wider text-gray-400 font-semibold group-hover:text-inm-verde-100 leading-tight">Recibidos</div>
           </div>
           <!-- Card Rescatados -->
-          <div onclick="showDetail('rescatados')" class="bg-gray-50 border border-gray-200 p-3 rounded-xl cursor-pointer hover:border-inm-verde-100 hover:shadow-sm transition-all group">
-            <div id="card_rescatados_val" class="text-xl font-bold text-gray-700 group-hover:text-inm-verde-100">-</div>
-             <div class="text-[10px] uppercase tracking-wider text-gray-400 font-semibold group-hover:text-inm-verde-100">Rescatados</div>
+          <div onclick="showDetail('rescatados')" class="bg-gray-50 border border-gray-200 p-2 rounded-xl cursor-pointer hover:border-inm-verde-100 hover:shadow-sm transition-all group text-center">
+            <div id="card_rescatados_val" class="text-lg font-bold text-gray-700 group-hover:text-inm-verde-100">-</div>
+             <div class="text-[9px] uppercase tracking-wider text-gray-400 font-semibold group-hover:text-inm-verde-100 leading-tight">Rescatados</div>
           </div>
           <!-- Card Ingresos -->
-          <div onclick="showDetail('ingresos')" class="bg-gray-50 border border-gray-200 p-3 rounded-xl cursor-pointer hover:border-inm-verde-100 hover:shadow-sm transition-all group">
-            <div id="card_ingresos_val" class="text-xl font-bold text-gray-700 group-hover:text-inm-verde-100">-</div>
-            <div class="text-[10px] uppercase tracking-wider text-gray-400 font-semibold group-hover:text-inm-verde-100">Ingresos</div>
+          <div onclick="showDetail('ingresos')" class="bg-gray-50 border border-gray-200 p-2 rounded-xl cursor-pointer hover:border-inm-verde-100 hover:shadow-sm transition-all group text-center">
+            <div id="card_ingresos_val" class="text-lg font-bold text-gray-700 group-hover:text-inm-verde-100">-</div>
+            <div class="text-[9px] uppercase tracking-wider text-gray-400 font-semibold group-hover:text-inm-verde-100 leading-tight">Ingresos</div>
           </div>
           <!-- Card Trámites -->
-          <div onclick="showDetail('tramites')" class="bg-gray-50 border border-gray-200 p-3 rounded-xl cursor-pointer hover:border-inm-verde-100 hover:shadow-sm transition-all group">
-            <div id="card_tramites_val" class="text-xl font-bold text-gray-700 group-hover:text-inm-verde-100">-</div>
-            <div class="text-[10px] uppercase tracking-wider text-gray-400 font-semibold group-hover:text-inm-verde-100">Trámites</div>
+          <div onclick="showDetail('tramites')" class="bg-gray-50 border border-gray-200 p-2 rounded-xl cursor-pointer hover:border-inm-verde-100 hover:shadow-sm transition-all group text-center">
+            <div id="card_tramites_val" class="text-lg font-bold text-gray-700 group-hover:text-inm-verde-100">-</div>
+            <div class="text-[9px] uppercase tracking-wider text-gray-400 font-semibold group-hover:text-inm-verde-100 leading-tight">Trámites</div>
+          </div>
+          <!-- Card Retornados -->
+          <div onclick="showDetail('retornados')" class="bg-gray-50 border border-gray-200 p-2 rounded-xl cursor-pointer hover:border-inm-verde-100 hover:shadow-sm transition-all group text-center">
+            <div id="card_retornados_val" class="text-lg font-bold text-gray-700 group-hover:text-inm-verde-100">-</div>
+            <div class="text-[9px] uppercase tracking-wider text-gray-400 font-semibold group-hover:text-inm-verde-100 leading-tight">Retornados</div>
+          </div>
+          <!-- Card Inadmitidos -->
+          <div onclick="showDetail('inadmitidos')" class="bg-gray-50 border border-gray-200 p-2 rounded-xl cursor-pointer hover:border-inm-verde-100 hover:shadow-sm transition-all group text-center">
+            <div id="card_inadmitidos_val" class="text-lg font-bold text-gray-700 group-hover:text-inm-verde-100">-</div>
+            <div class="text-[9px] uppercase tracking-wider text-gray-400 font-semibold group-hover:text-inm-verde-100 leading-tight">Inadmitidos</div>
           </div>
         </div>
 
@@ -130,7 +185,7 @@
 
       <!-- Footer timestamp -->
       <div class="mt-4 pt-4 border-t border-gray-50 text-[10px] text-gray-400 flex justify-between items-center">
-        <span>Datos actualizados al 25 marzo 2026</span>
+        <span>Datos actualizados al 30 marzo 2026</span>
         <span class="font-bold">RUIE</span>
       </div>
     </div>
@@ -171,6 +226,11 @@
 <script>
   let currentPeriod = 'cs';
 
+  function normalizar_nombre(text) {
+    if (!text) return "";
+    return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+  }
+
   window.addEventListener("DOMContentLoaded", () => {
     const main = document.getElementById("main-section");
     if (main) {
@@ -178,9 +238,30 @@
       main.classList.add("opacity-100", "translate-y-0");
     }
 
-    // Inicializar con Datos Nacionales del Backend
-    window.selectedStateData = {{ national_data_json|safe }};
-    updateInformationPanel();
+    // Seteo de fechas máximas para el modal PE
+    const inputStart = document.getElementById('customStart');
+    const inputEnd = document.getElementById('customEnd');
+    if (inputStart && inputEnd) {
+        const todayStr = new Date().toISOString().split('T')[0];
+        inputEnd.max = todayStr;
+        inputStart.max = todayStr;
+        inputStart.value = "2024-10-01";
+        inputEnd.value = todayStr;
+    }
+
+    // Inicializar con Datos Nacionales del Backend (Restaurado)
+    try {
+        window.selectedStateData = {{ national_data_json|safe }};
+        console.log("Datos Nacionales cargados:", window.selectedStateData);
+    } catch (e) {
+        console.error("Error cargando national_data_json:", e);
+    }
+
+    if (window.updateInformationPanel) {
+        window.updateInformationPanel();
+    } else {
+        console.warn("updateInformationPanel no está definida aún.");
+    }
   });
 
   window.updateInformationPanel = function() {
@@ -202,7 +283,7 @@
     if (!window.selectedStateData) return;
     const data = window.selectedStateData[currentPeriod];
     
-    const categories = ['repatriados', 'recibidos', 'rescatados', 'ingresos', 'tramites'];
+    const categories = ['repatriados', 'recibidos', 'rescatados', 'ingresos', 'tramites', 'retornados', 'inadmitidos'];
     categories.forEach(cat => {
       const el = document.getElementById(`card_${cat}_val`);
       if (el) {
@@ -212,24 +293,139 @@
   }
 
   window.switchPeriod = function(period) {
+    if (period === 'pe') {
+        document.getElementById('customDateModal').classList.remove('hidden');
+        return;
+    }
+
     currentPeriod = period;
     
-    // Update UI Tabs
+    // Update UI Card Toggle
     const btnCS = document.getElementById('btnCS');
     const btnDT = document.getElementById('btnDT');
+    const btnPE = document.getElementById('btnPE');
+    const label = document.getElementById('currentPeriodLabel');
+
+    const cs_start = "01 OCT 2024";
+    const cs_end = "30 MAR 2026";
+    const dt_start = "20 ENE 2025";
+    const dt_end = "30 MAR 2026";
     
     if (period === 'cs') {
-      btnCS.className = "px-6 py-2 text-sm font-semibold transition-all duration-300 border-b-2 border-inm-verde-100 text-inm-verde-100";
-      btnDT.className = "px-6 py-2 text-sm font-semibold transition-all duration-300 border-b-2 border-transparent text-gray-400 hover:text-gray-600";
-    } else {
-      btnDT.className = "px-6 py-2 text-sm font-semibold transition-all duration-300 border-b-2 border-inm-verde-100 text-inm-verde-100";
-      btnCS.className = "px-6 py-2 text-sm font-semibold transition-all duration-300 border-b-2 border-transparent text-gray-400 hover:text-gray-600";
+      btnCS.className = "px-5 py-1.5 text-[11px] font-bold rounded-lg transition-all duration-300 bg-inm-verde-100 text-white shadow-md active:scale-95";
+      btnDT.className = "px-5 py-1.5 text-[11px] font-bold rounded-lg transition-all duration-300 text-gray-400 hover:text-gray-600 active:scale-95";
+      btnPE.className = "px-5 py-1.5 text-[11px] font-bold rounded-lg transition-all duration-300 text-gray-400 hover:text-gray-600 active:scale-95";
+      label.innerText = `${cs_start} - ${cs_end} (CS)`;
+    } else if (period === 'dt') {
+      btnDT.className = "px-5 py-1.5 text-[11px] font-bold rounded-lg transition-all duration-300 bg-inm-verde-100 text-white shadow-md active:scale-95";
+      btnCS.className = "px-5 py-1.5 text-[11px] font-bold rounded-lg transition-all duration-300 text-gray-400 hover:text-gray-600 active:scale-95";
+      btnPE.className = "px-5 py-1.5 text-[11px] font-bold rounded-lg transition-all duration-300 text-gray-400 hover:text-gray-600 active:scale-95";
+      label.innerText = `${dt_start} - ${dt_end} (DT)`;
     }
     
     updateCards();
     updateHeatmap();
     closeDetail();
   };
+
+  window.closeCustomModal = function() {
+    document.getElementById('customDateModal').classList.add('hidden');
+  };
+
+  window.consultarPeriodoPersonalizado = async function() {
+    const start = document.getElementById('customStart').value;
+    const end = document.getElementById('customEnd').value;
+    const loader = document.getElementById('loaderPE');
+    const btn = document.getElementById('btnApplyCustom');
+
+    if (!start || !end) {
+        alert("Por favor seleccione ambas fechas");
+        return;
+    }
+
+    loader.classList.remove('hidden');
+    btn.disabled = true;
+
+    try {
+        const response = await fetch(`/mapa/api/periodo-custom?start=${start}&end=${end}`);
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            // 1. Actualizar los datos del mapa (GeoJSONDataSource)
+            const views = Object.values(Bokeh.index);
+            if (views.length > 0) {
+                const source = views[0].model.renderers.find(r => r.data_source).data_source;
+                const newData = { ...source.data };
+
+                // Actualizar todas las columnas que empiezan con pe_
+                Object.keys(result.data).forEach(stateKey => {
+                    const idx = newData.name.map(n => normalizar_nombre(n)).indexOf(stateKey);
+                    if (idx !== -1) {
+                        const stateData = result.data[stateKey];
+                        Object.keys(stateData).forEach(k => {
+                            if (newData[`pe_${k}`]) {
+                                newData[`pe_${k}`][idx] = stateData[k];
+                            }
+                        });
+                        // Actualizar strings para tooltip
+                        ['todos', 'repatriados', 'recibidos', 'rescatados', 'ingresos', 'tramites', 'retornados', 'inadmitidos'].forEach(cat => {
+                            if (newData[`pe_str_${cat}`]) {
+                                newData[`pe_str_${cat}`][idx] = stateData[cat].toLocaleString();
+                            }
+                        });
+                    }
+                });
+
+                source.data = newData;
+                source.change.emit();
+            }
+
+            // 2. Actualizar selectedStateData para la vista actual (Nacional vs Estado)
+            // Si el nombre es Nacional, usamos el 'national' del result
+            if (window.selectedStateData.name === 'Nacional') {
+                window.selectedStateData.pe = result.national;
+            } else {
+                // Si es un estado, buscamos sus datos en result.data
+                const normalizedCurrent = normalizar_nombre(window.selectedStateData.name);
+                if (result.data[normalizedCurrent]) {
+                    window.selectedStateData.pe = result.data[normalizedCurrent];
+                }
+            }
+
+            // 3. Cambiar UI visualmente a PE
+            currentPeriod = 'pe';
+            const btnPE = document.getElementById('btnPE');
+            const btnCS = document.getElementById('btnCS');
+            const btnDT = document.getElementById('btnDT');
+            const label = document.getElementById('currentPeriodLabel');
+
+            btnPE.className = "px-5 py-1.5 text-[11px] font-bold rounded-lg transition-all duration-300 bg-inm-verde-100 text-white shadow-md active:scale-95";
+            btnCS.className = "px-5 py-1.5 text-[11px] font-bold rounded-lg transition-all duration-300 text-gray-400 hover:text-gray-600 active:scale-95";
+            btnDT.className = "px-5 py-1.5 text-[11px] font-bold rounded-lg transition-all duration-300 text-gray-400 hover:text-gray-600 active:scale-95";
+            
+            // Formatear fechas para el label
+            const fmt = d => {
+                const dateObj = new Date(d + "T12:00:00");
+                return dateObj.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase();
+            };
+            label.innerText = `${fmt(start)} - ${fmt(end)} (PE)`;
+
+            updateCards();
+            updateHeatmap();
+            closeCustomModal();
+            closeDetail();
+        } else {
+            alert("Error: " + result.message);
+        }
+    } catch (error) {
+        console.error(error);
+        alert("Ocurrió un error al consultar los datos.");
+    } finally {
+        loader.classList.add('hidden');
+        btn.disabled = false;
+    }
+  };
+
 
   window.showDetail = function(category) {
     if (!window.selectedStateData) return;
@@ -286,7 +482,12 @@
             { k: 'tra_vis_adop', label: 'Adopción' },
             { k: 'tra_vis_reg', label: 'Regional' },
             { k: 'tra_vis_trab', label: 'Trabajador' }
-        ]
+        ],
+        'retornados': [
+            { k: 'ret_deportado', label: 'Deportados' },
+            { k: 'ret_retornado', label: 'Retornos Asistidos' }
+        ],
+        'inadmitidos': []
     };
 
     const fields = mapping[category] || [];
@@ -371,6 +572,8 @@
     else if (metric === "rescatados") colorPrefix = "res";
     else if (metric === "ingresos") colorPrefix = "ing";
     else if (metric === "tramites") colorPrefix = "tra";
+    else if (metric === "retornados") colorPrefix = "ret";
+    else if (metric === "inadmitidos") colorPrefix = "ina";
     
     const fieldName = currentPeriod + '_color_' + colorPrefix;
     
@@ -419,7 +622,9 @@
                   { label: 'Recibidos', key: 'recibidos' },
                   { label: 'Rescatados', key: 'rescatados' },
                   { label: 'Ingresos', key: 'ingresos' },
-                  { label: 'Trámites', key: 'tramites' }
+                  { label: 'Trámites', key: 'tramites' },
+                  { label: 'Retornados', key: 'retornados' },
+                  { label: 'Inadmitidos', key: 'inadmitidos' }
               ];
               cats.forEach(c => {
                   html += `

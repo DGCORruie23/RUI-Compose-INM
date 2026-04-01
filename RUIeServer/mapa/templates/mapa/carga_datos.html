@@ -3,6 +3,180 @@
 
 {% block title %}Carga de Información - RUIE{% endblock title %}
 
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script>
+    function openUploadModal() {
+        const modal = document.getElementById('uploadModal');
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeUploadModal() {
+        const modal = document.getElementById('uploadModal');
+        modal.classList.add('hidden');
+        document.body.style.overflow = 'auto';
+    }
+
+    function openNacModal() {
+        const modal = document.getElementById('nacModal');
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeNacModal() {
+        const modal = document.getElementById('nacModal');
+        modal.classList.add('hidden');
+        document.body.style.overflow = 'auto';
+    }
+
+    function updateFileName(input, displayId) {
+        const display = document.getElementById(displayId);
+        if (input.files && input.files.length > 0) {
+            display.innerText = input.files[0].name;
+            display.classList.add('text-inm-verde-100');
+        } else {
+            display.innerText = "Haz clic para seleccionar o arrastra aquí";
+            display.classList.remove('text-inm-verde-100');
+        }
+    }
+
+    // --- LÓGICA DE CARGA POR LOTES (BATCH) ---
+    const CHUNK_SIZE = 2000;
+    const uploadForm = document.getElementById('uploadForm');
+    const submitBtn = document.getElementById('submit-btn');
+    const progressContainer = document.getElementById('progress-container');
+    const progressBar = document.getElementById('progress-bar');
+    const progressText = document.getElementById('progress-text');
+    const progressPercent = document.getElementById('progress-percent');
+    const resultsArea = document.getElementById('upload-results');
+    const loadingSpinner = document.getElementById('loading-spinner');
+    const btnText = document.getElementById('btn-text');
+
+    if (uploadForm) {
+        uploadForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const modelName = document.getElementById('model_name').value;
+            const fileInput = document.getElementById('excel_input');
+            
+            if (!modelName || !fileInput.files.length) {
+                alert('Por favor seleccione el modelo y el archivo.');
+                return;
+            }
+
+            // UI State
+            submitBtn.disabled = true;
+            btnText.innerText = 'Procesando archivo...';
+            loadingSpinner.classList.remove('hidden');
+            progressContainer.classList.remove('hidden');
+            resultsArea.classList.add('hidden');
+            resultsArea.innerHTML = '';
+            
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+
+            reader.onload = async (evt) => {
+                try {
+                    const data = new Uint8Array(evt.target.result);
+                    const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    
+                    const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                    
+                    if (rawData.length < 2) {
+                        throw new Error('El archivo está vacío o solo contiene la cabecera.');
+                    }
+
+                    const rows = rawData.slice(1).map(row => {
+                        const normalizedRow = [...row];
+                        if (normalizedRow[0] instanceof Date) {
+                            normalizedRow[0] = normalizedRow[0].toISOString().split('T')[0];
+                        }
+                        return normalizedRow;
+                    });
+
+                    const totalRows = rows.length;
+                    const totalChunks = Math.ceil(totalRows / CHUNK_SIZE);
+                    let createdCount = 0;
+                    let updatedCount = 0;
+                    let allErrors = [];
+
+                    for (let i = 0; i < totalChunks; i++) {
+                        const start = i * CHUNK_SIZE;
+                        const end = Math.min(start + CHUNK_SIZE, totalRows);
+                        const chunk = rows.slice(start, end);
+                        
+                        const percent = Math.round(((i) / totalChunks) * 100);
+                        progressText.innerText = `Enviando lote ${i + 1} de ${totalChunks}...`;
+                        progressPercent.innerText = `${percent}%`;
+                        progressBar.style.width = `${percent}%`;
+
+                        try {
+                            const response = await fetch('{% url "carga_datos_batch" %}', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                                },
+                                body: JSON.stringify({
+                                    model_name: modelName,
+                                    data: chunk
+                                })
+                            });
+
+                            const result = await response.json();
+                            
+                            if (result.status === 'success') {
+                                createdCount += result.created;
+                                updatedCount += result.updated;
+                                if (result.errors && result.errors.length) {
+                                    allErrors = allErrors.concat(result.errors);
+                                }
+                            } else {
+                                throw new Error(result.message || 'Error en el servidor');
+                            }
+                        } catch (err) {
+                            allErrors.push(`Error en lote ${i + 1}: ${err.message}`);
+                        }
+                    }
+
+                    progressText.innerText = 'Carga completada';
+                    progressPercent.innerText = '100%';
+                    progressBar.style.width = '100%';
+                    progressBar.classList.replace('bg-inm-verde-100', 'bg-blue-500');
+                    
+                    let summaryHtml = `<p class="font-bold text-gray-800 mb-2">Resumen de carga:</p>`;
+                    summaryHtml += `<p class="text-emerald-600">Creados: ${createdCount}</p>`;
+                    summaryHtml += `<p class="text-blue-600">Actualizados: ${updatedCount}</p>`;
+                    
+                    if (allErrors.length) {
+                        summaryHtml += `<p class="text-rose-600 mt-2 font-bold">Errores (${allErrors.length}):</p>`;
+                        summaryHtml += `<ul class="list-disc ml-4 mt-1">`;
+                        allErrors.slice(0, 50).forEach(e => summaryHtml += `<li>${e}</li>`);
+                        if (allErrors.length > 50) summaryHtml += `<li>...y ${allErrors.length - 50} más</li>`;
+                        summaryHtml += `</ul>`;
+                    }
+                    
+                    resultsArea.innerHTML = summaryHtml;
+                    resultsArea.classList.remove('hidden');
+                    
+                } catch (error) {
+                    alert('Error al procesar el archivo: ' + error.message);
+                } finally {
+                    submitBtn.disabled = false;
+                    btnText.innerText = 'Procesar y Cargar Datos';
+                    loadingSpinner.classList.add('hidden');
+                }
+            };
+
+            reader.readAsArrayBuffer(file);
+        });
+    }
+</script>
+{% endblock scripts %}
+
 {% block styles %}
 <style>
     .glass-card {
@@ -38,13 +212,20 @@
         <p class="mt-4 text-lg text-gray-600 max-w-2xl">Carga masiva de información migratoria mediante archivos Excel. Asegúrese de que el formato coincida con el modelo seleccionado.</p>
     </div>
 
-    <!-- Main Button -->
-    <div class="animate-slide-up" style="animation-delay: 0.1s;">
-        <button onclick="openUploadModal()" class="group relative inline-flex items-center justify-center px-8 py-4 font-bold text-white transition-all duration-200 bg-inm-verde-100 font-pj rounded-2xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 hover:bg-inm-verde-200 shadow-xl shadow-emerald-900/10">
+    <!-- Main Buttons -->
+    <div class="flex flex-col md:flex-row gap-4 animate-slide-up" style="animation-delay: 0.1s;">
+        <button onclick="openUploadModal()" class="group relative inline-flex items-center justify-center px-8 py-4 font-bold text-white transition-all duration-200 bg-inm-verde-100 font-pj rounded-2xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 hover:bg-inm-verde-200 shadow-xl shadow-emerald-900/10 w-full md:w-auto">
             <svg class="w-6 h-6 mr-3 transition-transform group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
             </svg>
             Cargar Información
+        </button>
+
+        <button onclick="openNacModal()" class="group relative inline-flex items-center justify-center px-8 py-4 font-bold text-inm-verde-100 transition-all duration-200 bg-white border-2 border-inm-verde-100 font-pj rounded-2xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 hover:bg-emerald-50 shadow-xl shadow-emerald-900/5 w-full md:w-auto">
+            <svg class="w-6 h-6 mr-3 transition-transform group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            Catálogo de Nacionalidades
         </button>
     </div>
 
@@ -86,13 +267,13 @@
                     </button>
                 </div>
 
-                <form action="{% url 'carga_datos' %}" method="POST" enctype="multipart/form-data" class="space-y-6">
+                <form id="uploadForm" class="space-y-6">
                     {% csrf_token %}
                     
                     <!-- Model Selection -->
                     <div>
                         <label class="block text-sm font-bold text-gray-700 mb-2 ml-1">Seleccionar Modelo</label>
-                        <select name="model_name" class="custom-select block w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all outline-none font-medium text-gray-700">
+                        <select name="model_name" id="model_name" required class="custom-select block w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all outline-none font-medium text-gray-700">
                             <option value="" disabled selected>Elija una opción...</option>
                             {% for model in models %}
                             <option value="{{ model }}">{{ model }}</option>
@@ -104,7 +285,7 @@
                     <div>
                         <label class="block text-sm font-bold text-gray-700 mb-2 ml-1">Archivo Excel (.xlsx)</label>
                         <div class="relative group">
-                            <input type="file" name="excel_file" accept=".xlsx" class="hidden" id="excel_input" onchange="updateFileName(this)">
+                            <input type="file" name="excel_file" id="excel_input" accept=".xlsx" required class="hidden" onchange="updateFileName(this, 'file-name-display')">
                             <label for="excel_input" class="flex flex-col items-center justify-center w-full h-32 px-4 transition bg-white border-2 border-gray-200 border-dashed rounded-2xl appearance-none cursor-pointer hover:border-inm-verde-100 hover:bg-emerald-50/30 group">
                                 <span class="flex items-center space-x-2">
                                     <svg class="w-8 h-8 text-gray-400 group-hover:text-inm-verde-100 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -116,10 +297,78 @@
                         </div>
                     </div>
 
+                    <!-- Progress Bar -->
+                    <div id="progress-container" class="hidden space-y-2 py-4">
+                        <div class="flex justify-between text-[11px] font-bold uppercase tracking-wider text-gray-500">
+                            <span id="progress-text">Preparando...</span>
+                            <span id="progress-percent">0%</span>
+                        </div>
+                        <div class="w-full bg-gray-100 rounded-full h-2 shadow-inner">
+                            <div id="progress-bar" class="bg-inm-verde-100 h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <!-- Results / Errors -->
+                    <div id="upload-results" class="hidden text-xs max-h-32 overflow-y-auto p-4 bg-gray-50 rounded-2xl border border-gray-100 font-mono"></div>
+
                     <!-- Submit Button -->
                     <div class="pt-4">
-                        <button type="submit" class="w-full py-5 bg-inm-verde-100 text-white rounded-[1.25rem] font-bold shadow-lg shadow-emerald-900/20 hover:bg-inm-verde-200 transition-all hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center">
-                            Procesar y Cargar Datos
+                        <button type="submit" id="submit-btn" class="w-full py-5 bg-inm-verde-100 text-white rounded-[1.25rem] font-bold shadow-lg shadow-emerald-900/20 hover:bg-inm-verde-200 transition-all hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed">
+                            <span id="btn-text">Procesar y Cargar Datos</span>
+                            <svg id="loading-spinner" class="hidden animate-spin ml-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Nacionalidad Modal -->
+    <div id="nacModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+        <!-- Backdrop -->
+        <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-md transition-opacity" onclick="closeNacModal()"></div>
+        
+        <!-- Modal Content -->
+        <div class="relative bg-white rounded-[2rem] shadow-2xl w-full max-w-lg overflow-hidden border border-gray-100 animate-slide-up">
+            <div class="p-10">
+                <div class="flex justify-between items-start mb-8">
+                    <div>
+                        <span class="text-[10px] font-bold uppercase tracking-widest text-inm-verde-100">Catálogo</span>
+                        <h2 class="text-3xl font-bold text-gray-900 mt-1">Cargar Nacionalidades</h2>
+                    </div>
+                    <button onclick="closeNacModal()" class="text-gray-400 hover:text-gray-600 transition-colors bg-gray-50 p-3 rounded-2xl hover:bg-gray-100">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+
+                <form action="{% url 'carga_nacionalidades' %}" method="POST" enctype="multipart/form-data" class="space-y-6">
+                    {% csrf_token %}
+                    
+                    <p class="text-sm text-gray-600">Suba un archivo Excel donde la primera columna contenga los nombres de las nacionalidades. Se normalizarán automáticamente (Mayúsculas y sin acentos).</p>
+
+                    <!-- File Input -->
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-2 ml-1">Archivo Excel (.xlsx)</label>
+                        <div class="relative group">
+                            <input type="file" name="excel_file" accept=".xlsx" class="hidden" id="nac_input" onchange="updateFileName(this, 'nac-file-name-display')">
+                            <label for="nac_input" class="flex flex-col items-center justify-center w-full h-32 px-4 transition bg-white border-2 border-gray-200 border-dashed rounded-2xl appearance-none cursor-pointer hover:border-inm-verde-100 hover:bg-emerald-50/30 group">
+                                <span class="flex items-center space-x-2">
+                                    <svg class="w-8 h-8 text-gray-400 group-hover:text-inm-verde-100 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                </span>
+                                <span id="nac-file-name-display" class="mt-2 text-sm font-medium text-gray-500 group-hover:text-inm-verde-100">Haz clic para seleccionar o arrastra aquí</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div class="pt-4">
+                        <button type="submit" class="w-full py-5 bg-stone-800 text-white rounded-[1.25rem] font-bold shadow-lg shadow-stone-900/20 hover:bg-stone-900 transition-all hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center">
+                            Actualizar Catálogo
                         </button>
                     </div>
                 </form>
@@ -127,29 +376,4 @@
         </div>
     </div>
 </main>
-
-<script>
-    function openUploadModal() {
-        const modal = document.getElementById('uploadModal');
-        modal.classList.remove('hidden');
-        document.body.style.overflow = 'hidden';
-    }
-
-    function closeUploadModal() {
-        const modal = document.getElementById('uploadModal');
-        modal.classList.add('hidden');
-        document.body.style.overflow = 'auto';
-    }
-
-    function updateFileName(input) {
-        const display = document.getElementById('file-name-display');
-        if (input.files && input.files.length > 0) {
-            display.innerText = input.files[0].name;
-            display.classList.add('text-inm-verde-100');
-        } else {
-            display.innerText = "Haz clic para seleccionar o arrastra aquí";
-            display.classList.remove('text-inm-verde-100');
-        }
-    }
-</script>
 {% endblock content %}
