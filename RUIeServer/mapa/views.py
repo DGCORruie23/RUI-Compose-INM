@@ -519,6 +519,77 @@ def api_periodo_custom(request):
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
 
+def api_nacionalidad_ranking(request):
+    """API para obtener el ranking de nacionalidades por estado y métrica."""
+    if not request.user.is_superuser:
+        return JsonResponse({'status': 'error', 'message': 'Acceso denegado'}, status=403)
+
+    estado_norm = request.GET.get('estado')
+    metric = request.GET.get('metric')
+    start_str = request.GET.get('start')
+    end_str = request.GET.get('end')
+
+    if not all([estado_norm, metric, start_str, end_str]):
+        return JsonResponse({'status': 'error', 'message': 'Faltan parámetros'}, status=400)
+
+    try:
+        start_date = datetime.strptime(start_str, '%Y-%m-%d').date()
+        end_date = datetime.strptime(end_str, '%Y-%m-%d').date()
+
+        # Mapeo de métricas a modelos y campos de total
+        metric_map = {
+            'repatriados': (Repatriados, 'mex_rep'),
+            'recibidos': (Recibidos, 'ext_rec'),
+            'rescatados': (ExtRescatados, 'rescatados'),
+            'ingresos': (Ingresos, 'ingresos_total'),
+            'tramites': (Tramites, 'total_documentos'),
+            'retornados': (Retornados, 'retornados_total'),
+            'inadmitidos': (Inadmitidos, 'inadmitidos_total'),
+        }
+
+        if metric not in metric_map:
+            return JsonResponse({'status': 'error', 'message': 'Métrica no válida'}, status=400)
+
+        model_class, total_field = metric_map[metric]
+        
+        # Buscar el estado por nombre normalizado
+        estados = Estado.objects.all()
+        target_estado = None
+        for edo in estados:
+            if normalizar_nombre(edo.nombre) == estado_norm:
+                target_estado = edo
+                break
+        
+        if not target_estado:
+            return JsonResponse({'status': 'error', 'message': 'Estado no encontrado'}, status=404)
+
+        # Agregación por Nacionalidad
+        ranking = model_class.objects.filter(
+            estado=target_estado,
+            fecha__range=[start_date, end_date]
+        ).values('nacionalidad__nombre').annotate(
+            total=Sum(total_field)
+        ).order_by('-total')[:12] # Top 12 nacionalidades
+
+        data = []
+        for item in ranking:
+            nombre_nac = item['nacionalidad__nombre']
+            if not nombre_nac: continue # Saltar si no hay nacionalidad
+
+            data.append({
+                'name': nombre_nac,
+                'value': int(item['total'] or 0)
+            })
+
+        return JsonResponse({
+            'status': 'success',
+            'data': data,
+            'state_name': target_estado.nombre
+        })
+
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
 def carga_datos_batch(request):
     # Restricción de acceso: Solo superusuarios
     if not request.user.is_superuser:

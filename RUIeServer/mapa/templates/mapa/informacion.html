@@ -180,7 +180,17 @@
             <div class="text-[9px] uppercase tracking-wider text-gray-400 font-semibold group-hover:text-inm-verde-100 leading-tight">Inadmitidos</div>
           </div>
         </div>
-
+        
+        <!-- CHART: Ranking de Estados (Visible solo al seleccionar métrica) -->
+        <div id="chartContainer" class="hidden mt-6 pt-6 border-t border-gray-100 animate-fade-in" style="animation-delay: 0.2s;">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Ranking por Oficina/Estado</h3>
+                <span id="chartMetricLabel" class="text-[10px] font-bold text-inm-verde-100 uppercase tracking-widest">Métrica</span>
+            </div>
+            <div class="h-[300px] w-full">
+                <canvas id="rankingChart"></canvas>
+            </div>
+        </div>
       </div>
 
       <!-- Footer timestamp -->
@@ -225,6 +235,7 @@
 
 <script>
   let currentPeriod = 'cs';
+  let myRankingChart = null;
 
   function normalizar_nombre(text) {
     if (!text) return "";
@@ -276,6 +287,7 @@
     document.getElementById('stateNameDisplay').innerHTML = nameHtml;
     
     updateCards();
+    updateRankingChart();
     closeDetail();
   };
 
@@ -325,6 +337,7 @@
     
     updateCards();
     updateHeatmap();
+    updateRankingChart();
     closeDetail();
   };
 
@@ -650,9 +663,151 @@
           // Crucial: Avisar a Bokeh que las propiedades del tooltip han cambiado
           hover.change.emit();
       }
+
+      // ACTUALIZAR GRÁFICA DE RANKING
+      updateRankingChart(metric);
     }
   };
+
+  /**
+   * Obtiene las fechas actuales según el periodo seleccionado (CS, DT, PE)
+   */
+  window.getCurrentDates = function() {
+    const today = new Date().toISOString().split('T')[0];
+    const startCS = "2024-10-01";
+    const startDT = "2025-01-20";
+    
+    if (currentPeriod === 'cs') return { start: startCS, end: today };
+    if (currentPeriod === 'dt') return { start: startDT, end: today };
+    if (currentPeriod === 'pe') {
+        const s = document.getElementById('customStart')?.value || startCS;
+        const e = document.getElementById('customEnd')?.value || today;
+        return { start: s, end: e };
+    }
+    return { start: startCS, end: today };
+  };
+
+  /**
+   * Actualiza la gráfica de barras de ranking (Estados o Nacionalidades)
+   */
+  window.updateRankingChart = async function(metricInput) {
+    const metric = metricInput || document.querySelector('input[name="heatmap_metric"]:checked')?.value;
+    const container = document.getElementById('chartContainer');
+    const label = document.getElementById('chartMetricLabel');
+    
+    if (!metric || metric === 'todos') {
+        container.classList.add('hidden');
+        return;
+    }
+    
+    const currentStateName = window.selectedStateData?.name || 'Nacional';
+    container.classList.remove('hidden');
+
+    // MODO NACIONAL: Ranking de Estados
+    if (currentStateName === 'Nacional') {
+        label.innerText = `Ranking Nacional: ${metric}`;
+        
+        // Obtener datos de Bokeh GeoJSONDataSource
+        const views = Object.values(Bokeh.index);
+        if (views.length === 0) return;
+        
+        const source = views[0].model.renderers.find(r => r.data_source).data_source;
+        const data = source.data;
+        const names = data['name'];
+        const values = data[`${currentPeriod}_${metric}`];
+        
+        if (!names || !values) return;
+
+        let combined = names.map((name, i) => ({ name, value: values[i] }));
+        combined.sort((a, b) => b.value - a.value);
+
+        const topData = combined.slice(0, 15);
+        renderRankingChart(
+            topData.map(d => d.name), 
+            topData.map(d => d.value), 
+            `Total ${metric}`
+        );
+    } 
+    // MODO ESTADO: Ranking de Nacionalidades
+    else {
+        label.innerText = `Nacionalidades en ${currentStateName}: ${metric}`;
+        
+        const { start, end } = window.getCurrentDates();
+        const normState = normalizar_nombre(currentStateName);
+
+        try {
+            const response = await fetch(`/mapa/api/nacionalidad-ranking?estado=${normState}&metric=${metric}&start=${start}&end=${end}`);
+            const result = await response.json();
+
+            if (result.status === 'success') {
+                renderRankingChart(
+                    result.data.map(d => d.name),
+                    result.data.map(d => d.value),
+                    `Total ${metric}`
+                );
+            }
+        } catch (e) {
+            console.error("Error fetching nationality ranking:", e);
+        }
+    }
+  };
+
+  /**
+   * Renderiza o actualiza la instancia de Chart.js
+   */
+  function renderRankingChart(labels, counts, datasetLabel) {
+    const ctx = document.getElementById('rankingChart').getContext('2d');
+    
+    if (myRankingChart) {
+        myRankingChart.data.labels = labels;
+        myRankingChart.data.datasets[0].data = counts;
+        myRankingChart.data.datasets[0].label = datasetLabel;
+        myRankingChart.update();
+    } else {
+        myRankingChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: datasetLabel,
+                    data: counts,
+                    backgroundColor: '#005743',
+                    borderRadius: 8,
+                    borderSkipped: false,
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return ` ${context.parsed.x.toLocaleString()}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { font: { size: 10 } }
+                    },
+                    y: {
+                        grid: { display: false },
+                        ticks: { font: { size: 10, weight: 'bold' } }
+                    }
+                }
+            }
+        });
+    }
+  }
 </script>
+
+<!-- Scripts de Gráficos (Chart.js) -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <!-- Scripts de Bokeh -->
 <script src="https://cdn.bokeh.org/bokeh/release/bokeh-3.6.2.min.js"></script>

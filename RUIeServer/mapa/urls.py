@@ -7,4 +7,5 @@ urlpatterns = [
     path('carga-nacionalidades', views.carga_nacionalidades, name="carga_nacionalidades"),
     path('carga-datos-batch', views.carga_datos_batch, name="carga_datos_batch"),
     path('api/periodo-custom', views.api_periodo_custom, name="api_periodo_custom"),
+    path('api/nacionalidad-ranking', views.api_nacionalidad_ranking, name="api_nacionalidad_ranking"),
 ]
