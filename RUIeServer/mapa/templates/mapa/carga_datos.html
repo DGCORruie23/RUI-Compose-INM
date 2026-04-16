@@ -30,6 +30,30 @@
         document.body.style.overflow = 'auto';
     }
 
+    function openOficinasModal() {
+        const modal = document.getElementById('oficinasModal');
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeOficinasModal() {
+        const modal = document.getElementById('oficinasModal');
+        modal.classList.add('hidden');
+        document.body.style.overflow = 'auto';
+    }
+
+    function toggleTipoSelector(modelSelect) {
+        const tipoContainer = document.getElementById('tipo-punto-container');
+        const tipoInput = document.getElementById('tipo_punto_select');
+        if (modelSelect.value === 'PuntosInternacionEstacion') {
+            tipoContainer.classList.remove('hidden');
+            tipoInput.required = true;
+        } else {
+            tipoContainer.classList.add('hidden');
+            tipoInput.required = false;
+        }
+    }
+
     function updateFileName(input, displayId) {
         const display = document.getElementById(displayId);
         if (input.files && input.files.length > 0) {
@@ -227,6 +251,25 @@
             </svg>
             Catálogo de Nacionalidades
         </button>
+
+        <button onclick="openOficinasModal()" class="group relative inline-flex items-center justify-center px-8 py-4 font-bold text-white transition-all duration-200 bg-stone-800 font-pj rounded-2xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 hover:bg-stone-900 shadow-xl shadow-stone-900/10 w-full md:w-auto">
+            <svg class="w-6 h-6 mr-3 transition-transform group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+            </svg>
+            Información Oficinas
+        </button>
+    </div>
+
+    <!-- Update Status Section (Moved below buttons) -->
+    <div class="mt-12 flex flex-wrap justify-center gap-3 animate-slide-up" style="animation-delay: 0.2s;">
+        {% for status in update_dates %}
+        <div class="px-4 py-2 bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col items-center hover:shadow-md transition-shadow">
+            <span class="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{{ status.name }}</span>
+            <span class="text-[11px] font-bold {% if status.date %}text-inm-verde-100{% else %}text-gray-300 italic{% endif %}">
+                {% if status.date %}{{ status.date|date:"d M Y" }}{% else %}Sin Datos{% endif %}
+            </span>
+        </div>
+        {% endfor %}
     </div>
 
     <!-- Feedback Messages -->
@@ -369,6 +412,76 @@
                     <div class="pt-4">
                         <button type="submit" class="w-full py-5 bg-stone-800 text-white rounded-[1.25rem] font-bold shadow-lg shadow-stone-900/20 hover:bg-stone-900 transition-all hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center">
                             Actualizar Catálogo
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Oficinas Modal -->
+    <div id="oficinasModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+        <!-- Backdrop -->
+        <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-md transition-opacity" onclick="closeOficinasModal()"></div>
+        
+        <!-- Modal Content -->
+        <div class="relative bg-white rounded-[2rem] shadow-2xl w-full max-w-lg overflow-hidden border border-gray-100 animate-slide-up">
+            <div class="p-10">
+                <div class="flex justify-between items-start mb-8">
+                    <div>
+                        <span class="text-[10px] font-bold uppercase tracking-widest text-inm-verde-100">Infraestructura</span>
+                        <h2 class="text-3xl font-bold text-gray-900 mt-1">Cargar Oficinas</h2>
+                    </div>
+                    <button onclick="closeOficinasModal()" class="text-gray-400 hover:text-gray-600 transition-colors bg-gray-50 p-3 rounded-2xl hover:bg-gray-100">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+
+                <form action="{% url 'carga_oficinas' %}" method="POST" enctype="multipart/form-data" class="space-y-6">
+                    {% csrf_token %}
+                    
+                    <!-- Model Selection -->
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-2 ml-1">Seleccionar Modelo</label>
+                        <select name="model_name" onchange="toggleTipoSelector(this)" required class="custom-select block w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all outline-none font-medium text-gray-700">
+                            <option value="" disabled selected>Elija una opción...</option>
+                            <option value="PuntosInternacionEstacion">Puntos de Internación / Estaciones</option>
+                            <option value="CatalogoOR">Catálogo OR</option>
+                        </select>
+                    </div>
+
+                    <!-- Tipo Selector (Conditional) -->
+                    <div id="tipo-punto-container" class="hidden">
+                        <label class="block text-sm font-bold text-gray-700 mb-2 ml-1">Tipo de Punto</label>
+                        <select name="tipo" id="tipo_punto_select" class="custom-select block w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all outline-none font-medium text-gray-700">
+                            <option value="" disabled selected>Elija una opción...</option>
+                            <option value="AEREO">AÉREO</option>
+                            <option value="MARITIMO">MARÍTIMO</option>
+                            <option value="TERRESTRE">TERRESTRE</option>
+                            <option value="ESTACION">ESTACIÓN</option>
+                        </select>
+                    </div>
+
+                    <!-- File Input -->
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-2 ml-1">Archivo Excel (.xlsx)</label>
+                        <div class="relative group">
+                            <input type="file" name="excel_file" accept=".xlsx" required class="hidden" id="oficinas_input" onchange="updateFileName(this, 'oficinas-file-name-display')">
+                            <label for="oficinas_input" class="flex flex-col items-center justify-center w-full h-32 px-4 transition bg-white border-2 border-gray-200 border-dashed rounded-2xl appearance-none cursor-pointer hover:border-inm-verde-100 hover:bg-emerald-50/30 group">
+                                <span class="flex items-center space-x-2">
+                                    <svg class="w-8 h-8 text-gray-400 group-hover:text-inm-verde-100 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                                    </svg>
+                                </span>
+                                <span id="oficinas-file-name-display" class="mt-2 text-sm font-medium text-gray-500 group-hover:text-inm-verde-100">Haz clic para seleccionar o arrastra aquí</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div class="pt-4">
+                        <button type="submit" class="w-full py-5 bg-inm-verde-100 text-white rounded-[1.25rem] font-bold shadow-lg shadow-emerald-900/20 hover:bg-inm-verde-200 transition-all hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center">
+                            Actualizar Información
                         </button>
                     </div>
                 </form>

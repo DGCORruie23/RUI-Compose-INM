@@ -22,28 +22,26 @@
   .flex.justify-center.mt-4.space-x-2 {
     display: none !important;
   }
+  /* Estilos para el Menú de Pulsación Larga */
+  #longPressMenu {
+    position: fixed;
+    z-index: 100;
+    pointer-events: none;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  }
+
+  .card-value, .card-label {
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: clip !important;
+    display: block !important;
+    width: 100%;
+  }
 </style>
 {% endblock styles %}
 
 {% block content %}
-<main class="page p-8 bg-gray-50 rounded-2xl shadow-lg opacity-0 translate-y-10 transition-all duration-700 ease-out flex flex-col justify-center min-h-[calc(100vh-4rem)]" id="main-section">
-  <div class="flex flex-col justify-center items-center mb-8">
-    <h1 class="text-3xl font-bold text-gray-800">Monitoreo Migratorio</h1>
-    <h2 class="text-lg font-medium text-gray-600 mt-2">Seleccione un estado para ver la información correspondiente</h2>
-
-    <!-- NEW: Global Period Selector -->
-    <div class="bg-white/80 backdrop-blur-md border border-gray-100 p-1 px-4 rounded-2xl mt-6 shadow-sm flex items-center gap-6 animate-fade-in" style="animation-delay: 0.1s;">
-        <div class="flex flex-col border-r border-gray-100 pr-6">
-          <span class="text-[9px] font-bold uppercase tracking-[0.15em] text-inm-verde-100 opacity-80">Periodo de Consulta</span>
-          <h3 id="currentPeriodLabel" class="text-[10px] font-extrabold text-gray-700">01 OCT 2024 - 30 MAR 2026 (CS)</h3>
-        </div>
-        <div class="bg-gray-100 p-1 rounded-xl flex gap-1">
-          <button id="btnCS" onclick="switchPeriod('cs')" class="px-5 py-1.5 text-[11px] font-bold rounded-lg transition-all duration-300 bg-inm-verde-100 text-white shadow-md active:scale-95">CS</button>
-          <button id="btnDT" onclick="switchPeriod('dt')" class="px-5 py-1.5 text-[11px] font-bold rounded-lg transition-all duration-300 text-gray-400 hover:text-gray-600 active:scale-95">DT</button>
-          <button id="btnPE" onclick="switchPeriod('pe')" class="px-5 py-1.5 text-[11px] font-bold rounded-lg transition-all duration-300 text-gray-400 hover:text-gray-600 active:scale-95">PE</button>
-        </div>
-    </div>
-  </div>
+<main class="page px-8 pt-4 pb-8 bg-gray-50 rounded-2xl shadow-lg opacity-0 translate-y-10 transition-all duration-700 ease-out flex flex-col justify-start min-h-[calc(100vh-4rem)]" id="main-section">
 
   <!-- MODAL: Selección de Rango Personalizado -->
   <div id="customDateModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4">
@@ -76,43 +74,43 @@
     </div>
   </div>
 
-  <div class="grid grid-cols-1 lg:grid-cols-5 gap-8 w-full max-w-7xl mx-auto">
+  <div class="grid grid-cols-1 lg:grid-cols-7 gap-8 w-full max-w-[1700px] mx-auto">
     <!-- Panel Izquierdo: Mapa Bokeh -->
-    <div class="col-span-1 lg:col-span-3 bg-white p-4 rounded-xl shadow-md border border-gray-200 flex justify-center items-center overflow-hidden h-[600px] relative">
+    <div class="col-span-1 lg:col-span-5 bg-white p-4 rounded-xl shadow-md border border-gray-200 flex justify-center items-center overflow-hidden h-[750px] relative">
       <!-- Selector de Mapa de Calor -->
       <div class="absolute bottom-6 left-6 z-10 bg-white/95 backdrop-blur-md rounded-2xl shadow-lg border border-gray-100 p-3 flex flex-col gap-1.5 w-40">
         <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Métrica de Calor</h3>
         <label class="flex items-center gap-2 cursor-pointer group">
           <input type="radio" name="heatmap_metric" value="todos" checked onchange="updateHeatmap()" class="w-3.5 h-3.5 text-inm-verde-100 bg-gray-50 border-gray-300 focus:ring-inm-verde-100">
-          <span class="text-xs font-semibold text-gray-700 group-hover:text-inm-verde-100 transition-colors">Todos</span>
+          <span class="text-xs font-semibold text-gray-700 group-hover:text-inm-verde-100 transition-colors">{{ metric_labels.todos }}</span>
         </label>
         <label class="flex items-center gap-2 cursor-pointer group">
           <input type="radio" name="heatmap_metric" value="repatriados" onchange="updateHeatmap()" class="w-3.5 h-3.5 text-inm-verde-100 bg-gray-50 border-gray-300 focus:ring-inm-verde-100">
-          <span class="text-xs font-semibold text-gray-700 group-hover:text-inm-verde-100 transition-colors">Repatriados</span>
+          <span class="text-xs font-semibold text-gray-700 group-hover:text-inm-verde-100 transition-colors">{{ metric_labels.repatriados }}</span>
         </label>
         <label class="flex items-center gap-2 cursor-pointer group">
           <input type="radio" name="heatmap_metric" value="recibidos" onchange="updateHeatmap()" class="w-3.5 h-3.5 text-inm-verde-100 bg-gray-50 border-gray-300 focus:ring-inm-verde-100">
-          <span class="text-xs font-semibold text-gray-700 group-hover:text-inm-verde-100 transition-colors">Recibidos</span>
+          <span class="text-xs font-semibold text-gray-700 group-hover:text-inm-verde-100 transition-colors">{{ metric_labels.recibidos }}</span>
         </label>
         <label class="flex items-center gap-2 cursor-pointer group">
           <input type="radio" name="heatmap_metric" value="rescatados" onchange="updateHeatmap()" class="w-3.5 h-3.5 text-inm-verde-100 bg-gray-50 border-gray-300 focus:ring-inm-verde-100">
-          <span class="text-xs font-semibold text-gray-700 group-hover:text-inm-verde-100 transition-colors">Rescatados</span>
+          <span class="text-xs font-semibold text-gray-700 group-hover:text-inm-verde-100 transition-colors">{{ metric_labels.rescatados }}</span>
         </label>
         <label class="flex items-center gap-2 cursor-pointer group">
           <input type="radio" name="heatmap_metric" value="ingresos" onchange="updateHeatmap()" class="w-3.5 h-3.5 text-inm-verde-100 bg-gray-50 border-gray-300 focus:ring-inm-verde-100">
-          <span class="text-xs font-semibold text-gray-700 group-hover:text-inm-verde-100 transition-colors">Ingresos</span>
+          <span class="text-xs font-semibold text-gray-700 group-hover:text-inm-verde-100 transition-colors">{{ metric_labels.ingresos }}</span>
         </label>
         <label class="flex items-center gap-2 cursor-pointer group">
           <input type="radio" name="heatmap_metric" value="tramites" onchange="updateHeatmap()" class="w-3.5 h-3.5 text-inm-verde-100 bg-gray-50 border-gray-300 focus:ring-inm-verde-100">
-          <span class="text-xs font-semibold text-gray-700 group-hover:text-inm-verde-100 transition-colors">Trámites</span>
+          <span class="text-xs font-semibold text-gray-700 group-hover:text-inm-verde-100 transition-colors">{{ metric_labels.tramites }}</span>
         </label>
         <label class="flex items-center gap-2 cursor-pointer group">
           <input type="radio" name="heatmap_metric" value="retornados" onchange="updateHeatmap()" class="w-3.5 h-3.5 text-inm-verde-100 bg-gray-50 border-gray-300 focus:ring-inm-verde-100">
-          <span class="text-xs font-semibold text-gray-700 group-hover:text-inm-verde-100 transition-colors">Retornados</span>
+          <span class="text-xs font-semibold text-gray-700 group-hover:text-inm-verde-100 transition-colors">{{ metric_labels.retornados }}</span>
         </label>
         <label class="flex items-center gap-2 cursor-pointer group">
           <input type="radio" name="heatmap_metric" value="inadmitidos" onchange="updateHeatmap()" class="w-3.5 h-3.5 text-inm-verde-100 bg-gray-50 border-gray-300 focus:ring-inm-verde-100">
-          <span class="text-xs font-semibold text-gray-700 group-hover:text-inm-verde-100 transition-colors">Inadmitidos</span>
+          <span class="text-xs font-semibold text-gray-700 group-hover:text-inm-verde-100 transition-colors">{{ metric_labels.inadmitidos }}</span>
         </label>
       </div>
 
@@ -134,51 +132,96 @@
     </div>
 
     <!-- Panel Derecho: Información del Estado (Rediseñado) -->
-    <div class="col-span-1 lg:col-span-2 bg-white p-6 rounded-xl shadow-md border border-gray-200 flex flex-col h-full max-h-[600px] overflow-hidden">
-      <!-- Header Info -->
-      <div class="mb-4">
-        <h2 id="stateNameDisplay" class="text-2xl font-light text-gray-800 tracking-tight">Seleccione un <span class="font-bold">Estado</span></h2>
+    <div class="col-span-1 lg:col-span-2 bg-white rounded-xl shadow-md border border-gray-200 flex flex-col h-full max-h-[750px] overflow-hidden">
+      
+      <!-- NUEVA CABECERA DEL PANEL: Título y Periodo -->
+      <div class="p-6 pb-4 border-b border-gray-50 bg-gray-50/30">
+          <h1 class="text-xl font-bold text-gray-800 tracking-tight text-center">Monitoreo Migratorio</h1>
+          
+          <div class="mt-4 bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
+            <div class="flex justify-between items-center mb-2">
+                <span class="text-[9px] font-bold uppercase tracking-[0.1em] text-inm-verde-100">Periodo de Consulta</span>
+                <div class="bg-gray-100 p-0.5 rounded-lg flex gap-0.5">
+                    <button id="btnCS" onclick="switchPeriod('cs')" class="px-3 py-1 text-[10px] font-bold rounded-md transition-all duration-300 bg-inm-verde-100 text-white shadow-sm active:scale-95">CS</button>
+                    <button id="btnDT" onclick="switchPeriod('dt')" class="px-3 py-1 text-[10px] font-bold rounded-md transition-all duration-300 text-gray-400 hover:text-gray-600 active:scale-95">DT</button>
+                    <button id="btnPE" onclick="switchPeriod('pe')" class="px-3 py-1 text-[10px] font-bold rounded-md transition-all duration-300 text-gray-400 hover:text-gray-600 active:scale-95">PE</button>
+                </div>
+            </div>
+            <h3 id="currentPeriodLabel" class="text-[11px] font-bold text-gray-700">01 OCT 2024 - ACTUAL (CS)</h3>
+          </div>
       </div>
 
-      <!-- Main Content (Cards) -->
-      <div class="flex-1 overflow-y-auto pr-2 custom-scrollbar">
+      <!-- Main Content (Scrollable Area) -->
+      <div class="flex-1 overflow-y-auto p-6 pt-4 custom-scrollbar">
+        <!-- Nombre del Estado (Debajo del periodo según solicitud) -->
+        <div class="mb-4 text-center">
+          <h2 id="stateNameDisplay" class="text-2xl font-bold text-gray-800 tracking-tight leading-tight">Seleccione un Estado</h2>
+        </div>
+
         <!-- Cards Grid -->
         <div class="grid grid-cols-3 gap-2" id="cardsContainer">
-          <!-- Card Repatriados -->
-          <div onclick="showDetail('repatriados')" class="bg-gray-50 border border-gray-200 p-2 rounded-xl cursor-pointer hover:border-inm-verde-100 hover:shadow-sm transition-all group text-center">
-            <div id="card_repatriados_val" class="text-lg font-bold text-gray-700 group-hover:text-inm-verde-100">-</div>
-            <div class="text-[9px] uppercase tracking-wider text-gray-400 font-semibold group-hover:text-inm-verde-100 leading-tight">Repatriados</div>
-          </div>
-          <!-- Card Recibidos -->
-          <div onclick="showDetail('recibidos')" class="bg-gray-50 border border-gray-200 p-2 rounded-xl cursor-pointer hover:border-inm-verde-100 hover:shadow-sm transition-all group text-center">
-            <div id="card_recibidos_val" class="text-lg font-bold text-gray-700 group-hover:text-inm-verde-100">-</div>
-            <div class="text-[9px] uppercase tracking-wider text-gray-400 font-semibold group-hover:text-inm-verde-100 leading-tight">Recibidos</div>
+          <!-- Card Recibidos Total (Consolidada) -->
+          <div onclick="showSelectionModal()" class="bg-gray-50 border-2 border-inm-verde-100/30 p-2 rounded-xl cursor-pointer hover:border-inm-verde-100 hover:shadow-md transition-all group text-center bg-gradient-to-br from-white to-gray-50">
+            <div id="card_recibidos_total_val" class="text-lg font-black text-inm-verde-100 card-value">-</div>
+            <div class="text-[9px] uppercase tracking-wider text-inm-verde-100 font-bold leading-tight card-label">{{ metric_labels.recibidos_total }}</div>
           </div>
           <!-- Card Rescatados -->
           <div onclick="showDetail('rescatados')" class="bg-gray-50 border border-gray-200 p-2 rounded-xl cursor-pointer hover:border-inm-verde-100 hover:shadow-sm transition-all group text-center">
-            <div id="card_rescatados_val" class="text-lg font-bold text-gray-700 group-hover:text-inm-verde-100">-</div>
-             <div class="text-[9px] uppercase tracking-wider text-gray-400 font-semibold group-hover:text-inm-verde-100 leading-tight">Rescatados</div>
+            <div id="card_rescatados_val" class="text-lg font-bold text-gray-700 group-hover:text-inm-verde-100 card-value">-</div>
+             <div id="card_rescatados_lbl" class="text-[9px] uppercase tracking-wider text-gray-400 font-semibold group-hover:text-inm-verde-100 leading-tight card-label">Rescatados</div>
           </div>
           <!-- Card Ingresos -->
           <div onclick="showDetail('ingresos')" class="bg-gray-50 border border-gray-200 p-2 rounded-xl cursor-pointer hover:border-inm-verde-100 hover:shadow-sm transition-all group text-center">
-            <div id="card_ingresos_val" class="text-lg font-bold text-gray-700 group-hover:text-inm-verde-100">-</div>
-            <div class="text-[9px] uppercase tracking-wider text-gray-400 font-semibold group-hover:text-inm-verde-100 leading-tight">Ingresos</div>
+            <div id="card_ingresos_val" class="text-lg font-bold text-gray-700 group-hover:text-inm-verde-100 card-value">-</div>
+            <div id="card_ingresos_lbl" class="text-[9px] uppercase tracking-wider text-gray-400 font-semibold group-hover:text-inm-verde-100 leading-tight card-label">Ingresos</div>
           </div>
           <!-- Card Trámites -->
           <div onclick="showDetail('tramites')" class="bg-gray-50 border border-gray-200 p-2 rounded-xl cursor-pointer hover:border-inm-verde-100 hover:shadow-sm transition-all group text-center">
-            <div id="card_tramites_val" class="text-lg font-bold text-gray-700 group-hover:text-inm-verde-100">-</div>
-            <div class="text-[9px] uppercase tracking-wider text-gray-400 font-semibold group-hover:text-inm-verde-100 leading-tight">Trámites</div>
+            <div id="card_tramites_val" class="text-lg font-bold text-gray-700 group-hover:text-inm-verde-100 card-value">-</div>
+            <div id="card_tramites_lbl" class="text-[9px] uppercase tracking-wider text-gray-400 font-semibold group-hover:text-inm-verde-100 leading-tight card-label">Trámites</div>
           </div>
           <!-- Card Retornados -->
           <div onclick="showDetail('retornados')" class="bg-gray-50 border border-gray-200 p-2 rounded-xl cursor-pointer hover:border-inm-verde-100 hover:shadow-sm transition-all group text-center">
-            <div id="card_retornados_val" class="text-lg font-bold text-gray-700 group-hover:text-inm-verde-100">-</div>
-            <div class="text-[9px] uppercase tracking-wider text-gray-400 font-semibold group-hover:text-inm-verde-100 leading-tight">Retornados</div>
+            <div id="card_retornados_val" class="text-lg font-bold text-gray-700 group-hover:text-inm-verde-100 card-value">-</div>
+            <div id="card_retornados_lbl" class="text-[9px] uppercase tracking-wider text-gray-400 font-semibold group-hover:text-inm-verde-100 leading-tight card-label">Retornados</div>
           </div>
-          <!-- Card Inadmitidos -->
-          <div onclick="showDetail('inadmitidos')" class="bg-gray-50 border border-gray-200 p-2 rounded-xl cursor-pointer hover:border-inm-verde-100 hover:shadow-sm transition-all group text-center">
-            <div id="card_inadmitidos_val" class="text-lg font-bold text-gray-700 group-hover:text-inm-verde-100">-</div>
-            <div class="text-[9px] uppercase tracking-wider text-gray-400 font-semibold group-hover:text-inm-verde-100 leading-tight">Inadmitidos</div>
           </div>
+
+        <!-- Nueva Sección: Infraestructura y Titularidad (Solo visible en métrica 'Todos') -->
+        <div id="infraSection" class="mt-5 animate-fade-in hidden">
+            <div class="mb-2">
+                <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Infraestructura y Titularidad</h3>
+                <div class="p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="bg-inm-verde-100/10 p-2 rounded-lg text-inm-verde-100">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                        </div>
+                        <div>
+                            <div class="text-[9px] font-bold text-gray-400 uppercase tracking-tight">Titular Responsable</div>
+                            <div id="titularName" class="text-sm font-bold text-gray-700">-</div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="bg-white p-3 rounded-xl border border-gray-100 flex items-center justify-between">
+                            <span class="text-[10px] font-semibold text-gray-500">Estaciones Migratorias</span>
+                            <span id="infra_estacion" class="text-xs font-bold text-inm-verde-100">0</span>
+                        </div>
+                        <div class="bg-white p-3 rounded-xl border border-gray-100 flex items-center justify-between">
+                            <span class="text-[10px] font-semibold text-gray-500">Internación Aérea</span>
+                            <span id="infra_aereo" class="text-xs font-bold text-inm-verde-100">0</span>
+                        </div>
+                        <div class="bg-white p-3 rounded-xl border border-gray-100 flex items-center justify-between">
+                            <span class="text-[10px] font-semibold text-gray-500">Internación Marítima</span>
+                            <span id="infra_maritimo" class="text-xs font-bold text-inm-verde-100">0</span>
+                        </div>
+                        <div class="bg-white p-3 rounded-xl border border-gray-100 flex items-center justify-between">
+                            <span class="text-[10px] font-semibold text-gray-500">Internación Terrestre</span>
+                            <span id="infra_terrestre" class="text-xs font-bold text-inm-verde-100">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
         
         <!-- CHART: Ranking de Estados (Visible solo al seleccionar métrica) -->
@@ -195,12 +238,53 @@
 
       <!-- Footer timestamp -->
       <div class="mt-4 pt-4 border-t border-gray-50 text-[10px] text-gray-400 flex justify-between items-center">
-        <span>Datos actualizados al 30 marzo 2026</span>
-        <span class="font-bold">RUIE</span>
+        <span class="px-4">Datos actualizados al {% if fecha_actualizacion %}{{ fecha_actualizacion|date:"d F Y" }}{% else %}S/D{% endif %}</span>
+        <span class="font-bold px-4">RUIE</span>
       </div>
     </div>
   </div>
 </main>
+
+<!-- Menú de Pulsación Larga (Persistente) -->
+<div id="longPressMenu" class="hidden bg-white/95 backdrop-blur-md border border-gray-100 rounded-2xl p-2 animate-fade-in">
+    <!-- El contenido se genera dinámicamente -->
+</div>
+
+<!-- Modal de Selección (Repatriados vs Recibidos) -->
+<div id="selectionModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4">
+  <div class="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" onclick="closeSelectionModal()"></div>
+  <div class="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden border border-gray-100 animate-fade-in">
+    <div class="p-6">
+      <div class="flex justify-between items-start mb-6">
+        <div>
+          {% comment %} <h3 class="text-xs font-bold uppercase tracking-widest text-gray-400 mb-1">Seleccione Categoría</h3> {% endcomment %}
+          <div class="flex items-baseline gap-2">
+            <span class="text-[9px] uppercase tracking-tighter text-gray-400 font-bold">Total de Recibidos</span>
+            <span id="sel_total_val" class="text-xl font-black text-inm-verde-100 leading-none">-</span>
+          </div>
+        </div>
+        <button onclick="closeSelectionModal()" class="text-gray-400 hover:text-gray-600 transition-colors bg-gray-50 p-2 rounded-xl">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+      
+      <div class="grid grid-cols-2 gap-4">
+          <!-- Card Repatriados -->
+          <div onclick="showDetailFromSelection('repatriados')" class="bg-gray-50 border border-gray-100 p-4 rounded-2xl cursor-pointer hover:border-inm-verde-100 hover:shadow-lg transition-all group text-center relative overflow-hidden">
+            <div id="sel_repatriados_val" class="text-2xl font-bold text-gray-700 group-hover:text-inm-verde-100">-</div>
+            <div class="text-[10px] uppercase tracking-widest text-gray-400 font-bold group-hover:text-inm-verde-100 mt-1">{{ metric_labels.repatriados }}</div>
+            <div id="sel_repatriados_pct" class="text-[9px] font-bold text-inm-verde-100/50 mt-1">0%</div>
+          </div>
+          <!-- Card Recibidos -->
+          <div onclick="showDetailFromSelection('recibidos')" class="bg-gray-50 border border-gray-100 p-4 rounded-2xl cursor-pointer hover:border-inm-verde-100 hover:shadow-lg transition-all group text-center relative overflow-hidden">
+            <div id="sel_recibidos_val" class="text-2xl font-bold text-gray-700 group-hover:text-inm-verde-100">-</div>
+            <div class="text-[10px] uppercase tracking-widest text-gray-400 font-bold group-hover:text-inm-verde-100 mt-1">{{ metric_labels.recibidos }}</div>
+            <div id="sel_recibidos_pct" class="text-[9px] font-bold text-inm-verde-100/50 mt-1">0%</div>
+          </div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- Modal de Desglose (Pop-up) -->
 <div id="infoModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -214,6 +298,10 @@
         <div>
           <h3 id="modalStateName" class="text-[10px] font-bold uppercase tracking-widest text-inm-verde-100 mb-1">-</h3>
           <h4 id="detailTitle" class="text-3xl font-bold text-gray-800">Desglose</h4>
+          <div class="mt-1 flex items-baseline gap-2">
+            <span class="text-[10px] uppercase tracking-widest text-gray-400 font-bold">Total: </span>
+            <span id="modalTotalValue" class="text-xl font-black text-inm-verde-100 leading-none">-</span>
+          </div>
         </div>
         <button onclick="closeDetail()" class="text-gray-400 hover:text-gray-600 transition-colors bg-gray-50 p-2 rounded-xl">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
@@ -236,6 +324,8 @@
 <script>
   let currentPeriod = 'cs';
   let myRankingChart = null;
+  const LABEL_NACIONAL = "{{ label_nacional }}";
+  const METRIC_LABELS = {{ metric_labels_json|safe }};
 
   function normalizar_nombre(text) {
     if (!text) return "";
@@ -249,20 +339,22 @@
       main.classList.add("opacity-100", "translate-y-0");
     }
 
-    // Seteo de fechas máximas para el modal PE
+    // Seteo de fechas máximas para el modal PE (Periodo Extraordinario)
     const inputStart = document.getElementById('customStart');
     const inputEnd = document.getElementById('customEnd');
     if (inputStart && inputEnd) {
-        const todayStr = new Date().toISOString().split('T')[0];
-        inputEnd.max = todayStr;
-        inputStart.max = todayStr;
+        // Usar la fecha de actualización global para limitar el calendario
+        const maxDateStr = "{% if fecha_actualizacion %}{{ fecha_actualizacion|date:'Y-m-d' }}{% else %}" + new Date().toISOString().split('T')[0] + "{% endif %}";
+        inputEnd.max = maxDateStr;
+        inputStart.max = maxDateStr;
         inputStart.value = "2024-10-01";
-        inputEnd.value = todayStr;
+        inputEnd.value = maxDateStr;
     }
 
     // Inicializar con Datos Nacionales del Backend (Restaurado)
     try {
         window.selectedStateData = {{ national_data_json|safe }};
+        window.infraData = {{ infra_data_json|safe }};
         console.log("Datos Nacionales cargados:", window.selectedStateData);
     } catch (e) {
         console.error("Error cargando national_data_json:", e);
@@ -288,20 +380,90 @@
     
     updateCards();
     updateRankingChart();
+    updateInfraSection();
     closeDetail();
   };
+
+  function updateInfraSection() {
+    const section = document.getElementById('infraSection');
+    const metric = window.currentMetric || 'todos';
+    
+    if (metric === 'todos') {
+      section.classList.remove('hidden');
+      const isNational = window.selectedStateData.name === LABEL_NACIONAL;
+      const key = isNational ? LABEL_NACIONAL : normalizar_nombre(window.selectedStateData.name);
+      const data = window.infraData[key] || { 'AEREO': 0, 'MARITIMO': 0, 'TERRESTRE': 0, 'ESTACION': 0, 'titular': 'No disponible' };
+      
+      document.getElementById('titularName').innerText = data.titular;
+      document.getElementById('infra_estacion').innerText = data.ESTACION;
+      document.getElementById('infra_aereo').innerText = data.AEREO;
+      document.getElementById('infra_maritimo').innerText = data.MARITIMO;
+      document.getElementById('infra_terrestre').innerText = data.TERRESTRE;
+    } else {
+      section.classList.add('hidden');
+    }
+  }
 
   function updateCards() {
     if (!window.selectedStateData) return;
     const data = window.selectedStateData[currentPeriod];
     
-    const categories = ['repatriados', 'recibidos', 'rescatados', 'ingresos', 'tramites', 'retornados', 'inadmitidos'];
+    const categories = ['rescatados', 'ingresos', 'tramites', 'retornados'];
     categories.forEach(cat => {
-      const el = document.getElementById(`card_${cat}_val`);
-      if (el) {
-        el.innerText = data[cat].toLocaleString();
+      const valEl = document.getElementById(`card_${cat}_val`);
+      const lblEl = document.getElementById(`card_${cat}_lbl`);
+      if (valEl) {
+        valEl.innerText = data[cat].toLocaleString();
+        adjustFontSize(valEl, 18);
+      }
+      if (lblEl) {
+        adjustFontSize(lblEl, 9);
       }
     });
+
+    // Actualizar Recibidos Total (Consolidado)
+    const totalConsolidado = (data['repatriados'] || 0) + (data['recibidos'] || 0);
+    const totalEl = document.getElementById('card_recibidos_total_val');
+    if (totalEl) {
+        totalEl.innerText = totalConsolidado.toLocaleString();
+        adjustFontSize(totalEl, 18);
+    }
+
+    // Actualizar valores en el Modal de Selección
+    const selRepVal = document.getElementById('sel_repatriados_val');
+    const selRecVal = document.getElementById('sel_recibidos_val');
+    const selTotalVal = document.getElementById('sel_total_val');
+    const selRepPct = document.getElementById('sel_repatriados_pct');
+    const selRecPct = document.getElementById('sel_recibidos_pct');
+
+    const repVal = data['repatriados'] || 0;
+    const recVal = data['recibidos'] || 0;
+
+    if (selRepVal) selRepVal.innerText = repVal.toLocaleString();
+    if (selRecVal) selRecVal.innerText = recVal.toLocaleString();
+    if (selTotalVal) selTotalVal.innerText = totalConsolidado.toLocaleString();
+
+    if (totalConsolidado > 0) {
+        if (selRepPct) selRepPct.innerText = ((repVal / totalConsolidado) * 100).toFixed(1) + '%';
+        if (selRecPct) selRecPct.innerText = ((recVal / totalConsolidado) * 100).toFixed(1) + '%';
+    } else {
+        if (selRepPct) selRepPct.innerText = '0%';
+        if (selRecPct) selRecPct.innerText = '0%';
+    }
+  }
+
+  /**
+   * Ajusta el tamaño de fuente de un elemento para que quepa en su contenedor
+   */
+  function adjustFontSize(el, maxFontSize) {
+    let size = maxFontSize;
+    el.style.fontSize = size + 'px';
+    
+    // Bucle para reducir el tamaño si hay desborde
+    while (el.scrollWidth > el.clientWidth && size > 10) {
+      size--;
+      el.style.fontSize = size + 'px';
+    }
   }
 
   window.switchPeriod = function(period) {
@@ -343,6 +505,22 @@
 
   window.closeCustomModal = function() {
     document.getElementById('customDateModal').classList.add('hidden');
+  };
+
+  // --- Funciones para el Modal de Selección ---
+  window.showSelectionModal = function() {
+    const modal = document.getElementById('selectionModal');
+    if (modal) modal.classList.remove('hidden');
+  };
+
+  window.closeSelectionModal = function() {
+    const modal = document.getElementById('selectionModal');
+    if (modal) modal.classList.add('hidden');
+  };
+
+  window.showDetailFromSelection = function(category) {
+    closeSelectionModal();
+    showDetail(category);
   };
 
   window.consultarPeriodoPersonalizado = async function() {
@@ -393,9 +571,9 @@
                 source.change.emit();
             }
 
-            // 2. Actualizar selectedStateData para la vista actual (Nacional vs Estado)
-            // Si el nombre es Nacional, usamos el 'national' del result
-            if (window.selectedStateData.name === 'Nacional') {
+            // 2. Actualizar selectedStateData para la vista actual (Centralizada vs Estado)
+            // Si el nombre coincide con la etiqueta global, usamos el 'national' del result
+            if (window.selectedStateData.name === LABEL_NACIONAL) {
                 window.selectedStateData.pe = result.national;
             } else {
                 // Si es un estado, buscamos sus datos en result.data
@@ -443,6 +621,9 @@
   window.showDetail = function(category) {
     if (!window.selectedStateData) return;
     
+    // Asegurar que si venimos del de selección, este se cierre
+    closeSelectionModal();
+    
     const infoModal = document.getElementById('infoModal');
     const modalContainer = document.getElementById('modalContainer');
     const modalStateName = document.getElementById('modalStateName');
@@ -450,7 +631,12 @@
     const detailBody = document.getElementById('detailBody');
     
     modalStateName.innerText = window.selectedStateData.name;
-    detailTitle.innerText = category.charAt(0).toUpperCase() + category.slice(1);
+    
+    detailTitle.innerText = METRIC_LABELS[category] || category;
+
+    const data = window.selectedStateData[currentPeriod];
+    const totalVal = data[category] || 0;
+    document.getElementById('modalTotalValue').innerText = totalVal.toLocaleString();
     
     modalContainer.classList.remove('animate-fade-in');
     void modalContainer.offsetWidth; // Trigger reflow
@@ -458,7 +644,6 @@
     
     infoModal.classList.remove('hidden');
     
-    const data = window.selectedStateData[currentPeriod];
     let html = '';
 
     // Mapeo de campos por categoría
@@ -476,11 +661,10 @@
             { k: 'rec_menores', label: 'Menores' }
         ],
         'rescatados': [
-            { k: 'res_una_vez', label: 'Rescate Primera Vez' },
-            { k: 'res_reincidente', label: 'Reincidencias' },
-            { k: 'res_estacion', label: 'En Estación' },
+            { k: 'res_una_vez', label: 'Rescate Primera Vez (Personas)' },
+            { k: 'res_estacion', label: 'En Estación Migratoria' },
             { k: 'res_dif', label: 'Canalizados DIF' },
-            { k: 'res_conduccion', label: 'Conducción Directa' }
+            { k: 'res_reincidente', label: 'Reincidencias (Eventos)' }
         ],
         'ingresos': [
             { k: 'ing_aereos', label: 'Vía Aérea' },
@@ -511,6 +695,11 @@
         const val = data[f.k] || 0;
         const pct = ((val / total) * 100).toFixed(1);
         
+        // Línea divisora específica para Repatriados antes de Vía Terrestre
+        if (category === 'repatriados' && f.k === 'rep_terrestres' || category === 'rescatados' && f.k === 'res_reincidente') {
+            html += `<div class="border-t-2 border-inm-verde-100 my-4 pt-4 border-dashed"></div>`;
+        }
+        
         html += `
             <div class="p-3 bg-gray-50 rounded-xl border border-gray-100">
                 <div class="flex justify-between items-center mb-1">
@@ -525,10 +714,36 @@
                 </div>
             </div>
         `;
+
+        // Nota de recibidos menores
+        if (category === 'recibidos' && f.k === 'rec_menores') {
+            html += `<p class="text-[10px] text-red-400 mt-2 font-medium text-center italic">* Todos los menores se encuentran en núcleos familiares</p>`;
+        }
     });
     
-    if (fields.length === 0) {
+    if (fields.length === 0 && category !== 'ingresos') {
         html += `<p class="text-center text-gray-500 py-4">Sin desglose disponible para esta categoría.</p>`;
+    }
+
+    // Integración especial RED para Inadmitidos dentro de Ingresos
+    if (category === 'ingresos') {
+        const inadVal = data['inadmitidos'] || 0;
+        html += `
+            <div class="mt-6 pt-6 border-t-2 border-dashed border-red-100">
+                <div class="p-4 bg-red-50 rounded-2xl border border-red-100 flex justify-between items-center group transition-all hover:border-red-200">
+                    <div>
+                        <div class="text-[10px] font-bold uppercase tracking-widest text-red-400 mb-0.5">Total Inadmitidos</div>
+                        <div class="text-2xl font-black text-red-600">${inadVal.toLocaleString()}</div>
+                    </div>
+                    <div class="bg-red-100/50 p-2.5 rounded-xl text-red-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path>
+                        </svg>
+                    </div>
+                </div>
+                <p class="text-[10px] text-red-400 mt-2 font-medium text-center italic">Cifra de inadmitidos correspondiente al periodo actual</p>
+            </div>
+        `;
     }
     
     html += `</div>`;
@@ -577,6 +792,7 @@
     if (!selectedRadio) return;
     
     const metric = selectedRadio.value;
+    window.currentMetric = metric; // Actualizar variable global
     
     let colorPrefix = "";
     if (metric === "todos") colorPrefix = "t";
@@ -631,13 +847,13 @@
 
           if (metric === "todos") {
               const cats = [
-                  { label: 'Repatriados', key: 'repatriados' },
-                  { label: 'Recibidos', key: 'recibidos' },
-                  { label: 'Rescatados', key: 'rescatados' },
-                  { label: 'Ingresos', key: 'ingresos' },
-                  { label: 'Trámites', key: 'tramites' },
-                  { label: 'Retornados', key: 'retornados' },
-                  { label: 'Inadmitidos', key: 'inadmitidos' }
+                  { label: METRIC_LABELS.repatriados, key: 'repatriados' },
+                  { label: METRIC_LABELS.recibidos, key: 'recibidos' },
+                  { label: METRIC_LABELS.rescatados, key: 'rescatados' },
+                  { label: METRIC_LABELS.ingresos, key: 'ingresos' },
+                  { label: METRIC_LABELS.tramites, key: 'tramites' },
+                  { label: METRIC_LABELS.retornados, key: 'retornados' },
+                  { label: METRIC_LABELS.inadmitidos, key: 'inadmitidos' }
               ];
               cats.forEach(c => {
                   html += `
@@ -649,11 +865,11 @@
                   `;
               });
           } else {
-              let catName = metric.charAt(0).toUpperCase() + metric.slice(1);
+              const label = METRIC_LABELS[metric] || metric;
               let fieldDisp = '@' + currentPeriod + '_str_' + metric;
               html += `
                 <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
-                    <span style="font-size: 12px; color: #333;">${catName}</span>
+                    <span style="font-size: 12px; color: #333;">${label}</span>
                     <span style="font-size: 12px; font-weight: 500; color: #333;">${fieldDisp}</span>
                 </div>
               `;
@@ -663,6 +879,9 @@
           // Crucial: Avisar a Bokeh que las propiedades del tooltip han cambiado
           hover.change.emit();
       }
+
+      // ACTUALIZAR SECCIÓN DE INFRAESTRUCTURA
+      updateInfraSection();
 
       // ACTUALIZAR GRÁFICA DE RANKING
       updateRankingChart(metric);
@@ -700,11 +919,11 @@
         return;
     }
     
-    const currentStateName = window.selectedStateData?.name || 'Nacional';
+    const currentStateName = window.selectedStateData?.name || LABEL_NACIONAL;
     container.classList.remove('hidden');
 
     // MODO NACIONAL: Ranking de Estados
-    if (currentStateName === 'Nacional') {
+    if (currentStateName === LABEL_NACIONAL) {
         label.innerText = `Ranking Nacional: ${metric}`;
         
         // Obtener datos de Bokeh GeoJSONDataSource
@@ -804,6 +1023,74 @@
         });
     }
   }
+
+  // Función para mostrar el menú persistente (Long Press)
+  window.showLongPressMenu = function(data, x, y) {
+      const menu = document.getElementById('longPressMenu');
+      const prefix = window.currentPeriod || 'cs';
+      
+      let html = `
+          <div style="padding: 12px; min-width: 200px; font-family: Inter, system-ui, sans-serif;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                  <span style="font-size: 15px; font-weight: 700; color: #1f2937;">${data.name}</span>
+                  <span style="font-size: 9px; font-weight: 800; color: #059669; background: #ecfdf5; padding: 2px 6px; border-radius: 6px; text-transform: uppercase;">${prefix.toUpperCase()}</span>
+              </div>
+              <div style="height: 1px; background: #f3f4f6; margin-bottom: 10px;"></div>
+      `;
+      
+      const config = [
+          { key: 'repatriados', label: 'Repatriados' },
+          { key: 'recibidos', label: 'Recibidos' },
+          { key: 'rescatados', label: 'Rescatados' },
+          { key: 'ingresos', label: 'Ingresos' },
+          { key: 'tramites', label: 'Trámites' },
+          { key: 'retornados', label: 'Retornados' },
+          { key: 'inadmitidos', label: 'Inadmitidos' }
+      ];
+      
+      config.forEach(item => {
+          const val = data[`${prefix}_str_${item.key}`] || '0';
+          html += `
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                  <span style="font-size: 11px; font-weight: 500; color: #6b7280;">${item.label}</span>
+                  <span style="font-size: 11px; font-weight: 700; color: #374151;">${val}</span>
+              </div>
+          `;
+      });
+      
+      html += `
+              <div style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed #e5e7eb; font-size: 9px; color: #9ca3af; text-align: center;">
+                  Toque en el mapa para cerrar
+              </div>
+          </div>
+      `;
+      
+      menu.innerHTML = html;
+      
+      // Ajustar posición
+      menu.style.left = '-1000px'; 
+      menu.classList.remove('hidden');
+      
+      const menuRect = menu.getBoundingClientRect();
+      let left = x + 20;
+      let top = y - (menuRect.height / 2);
+      
+      if (left + 220 > window.innerWidth) left = x - 230;
+      if (top + menuRect.height > window.innerHeight) top = window.innerHeight - menuRect.height - 20;
+      if (top < 20) top = 20;
+
+      menu.style.left = left + 'px';
+      menu.style.top = top + 'px';
+      
+      // Cerrar al hacer clic en cualquier parte después de un pequeño delay
+      setTimeout(() => {
+          const closeHandler = () => {
+              menu.classList.add('hidden');
+              document.removeEventListener('mousedown', closeHandler);
+          };
+          document.addEventListener('mousedown', closeHandler);
+      }, 100);
+  };
 </script>
 
 <!-- Scripts de Gráficos (Chart.js) -->

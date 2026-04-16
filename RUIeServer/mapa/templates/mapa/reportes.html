@@ -1,0 +1,363 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}Reportes Migratorios{% endblock title %}
+
+{% block styles %}
+<!-- Inclusión de los estilos de Bokeh -->
+<link href="https://cdn.bokeh.org/bokeh/release/bokeh-3.6.2.min.css" rel="stylesheet" type="text/css">
+<style>
+    :root {
+        --color-semana: #7E8D85;
+        --color-csp: #B56B6B;
+        --color-trump: #B0AF91;
+    }
+
+    @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;700&display=swap');
+
+    .report-card {
+        border-radius: 1.2rem;
+        padding: 0.8rem 1.5rem;
+        margin-bottom: 0.75rem;
+        display: flex;
+        align-items: center;
+        color: white;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        font-family: 'Oswald', sans-serif;
+        text-transform: uppercase;
+    }
+
+    .card-period {
+        flex: 0 0 15%;
+        border-right: 2px solid rgba(255,255,255,0.4);
+        padding-right: 1rem;
+        text-align: right;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+
+    .card-period .title {
+        font-size: 1.1rem;
+        font-weight: 700;
+        line-height: 1;
+        margin-bottom: 0.2rem;
+    }
+
+    .card-period .dates {
+        font-size: 0.8rem;
+        font-weight: 300;
+        line-height: 1.1;
+        opacity: 0.9;
+    }
+
+    .card-main {
+        flex: 1;
+        padding: 0 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .card-main .total {
+        font-size: 3.8rem;
+        font-weight: 700;
+        line-height: 0.8;
+    }
+
+    .card-main .label-plus-avg {
+        display: flex;
+        align-items: baseline;
+        gap: 0.5rem;
+    }
+
+    .card-main .label {
+        font-size: 2.2rem;
+        font-weight: 700;
+    }
+
+    .card-main .average {
+        font-size: 0.9rem;
+        font-weight: 300;
+        opacity: 0.8;
+        font-style: italic;
+        text-transform: none;
+    }
+
+    .card-breakdown {
+        flex: 0 0 32%;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 0.8rem;
+    }
+
+    .breakdown-group {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
+
+    .breakdown-text {
+        font-size: 0.9rem;
+        font-weight: 400;
+        white-space: nowrap;
+    }
+
+    .value-box {
+        background: rgba(0, 0, 0, 0.6);
+        padding: 0.2rem 0.6rem;
+        border-radius: 0.3rem;
+        font-weight: 700;
+        font-size: 1.1rem;
+        min-width: 60px;
+        text-align: center;
+    }
+
+    .arrow-icon {
+        font-size: 1.2rem;
+        color: rgba(255,255,255,0.6);
+    }
+
+    .pie-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        border: 2px solid rgba(255,255,255,0.3);
+        position: relative;
+    }
+
+    .rubro-btn {
+        padding: 0.75rem 2rem;
+        border-radius: 1rem;
+        font-weight: 700;
+        transition: all 0.3s;
+        border: 2px solid transparent;
+    }
+
+    .rubro-btn.active {
+        background-color: #285C4D;
+        color: white;
+        box-shadow: 0 10px 15px -3px rgba(40, 92, 77, 0.3);
+    }
+
+    .rubro-btn:not(.active) {
+        background-color: white;
+        color: #4b5563;
+        border-color: #e5e7eb;
+    }
+
+    .rubro-btn:not(.active):hover {
+        background-color: #f9fafb;
+        border-color: #d1d5db;
+    }
+
+    .chart-box {
+        background: white;
+        border-radius: 1.5rem;
+        padding: 1.5rem;
+        border: 1px solid #f3f4f6;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+
+    @keyframes slideIn {
+        from { opacity: 0; transform: translateX(-20px); }
+        to { opacity: 1; transform: translateX(0); }
+    }
+
+    .animate-slide {
+        animation: slideIn 0.5s ease-out forwards;
+    }
+
+    /* Ocultar elementos heredados de base.html en esta vista */
+    header.header-style, 
+    footer.main-footer,
+    .flex.justify-center.mt-4.space-x-2 {
+        display: none !important;
+    }
+</style>
+{% endblock styles %}
+
+{% block content %}
+<main class="max-w-[1400px] mx-auto px-6 py-8 min-h-screen">
+    
+    <!-- Header & Rubros Selector -->
+    <div class="flex flex-col md:flex-row justify-between items-center mb-10 gap-6">
+        <div>
+            <h1 class="text-3xl font-black text-gray-800 tracking-tight">Reporte de Operatividad</h1>
+            <p class="text-gray-500 font-medium">Visualización de indicadores estratégicos</p>
+        </div>
+        
+        <div class="flex bg-gray-100 p-1.5 rounded-2xl gap-1">
+            <a href="?rubro=Encuentros" class="rubro-btn {% if rubro == 'Encuentros' %}active{% endif %}">Encuentros</a>
+            <a href="?rubro=Recibidos" class="rubro-btn {% if rubro == 'Recibidos' %}active{% endif %}">Recibidos</a>
+            <a href="?rubro=Rescatados" class="rubro-btn {% if rubro == 'Rescatados' %}active{% endif %}">Rescatados</a>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-10">
+        
+        <!-- Tarjetas de Resumen (Layout Extendido) -->
+        <div class="lg:col-span-12 space-y-3">
+
+            <!-- Tajeta Semana -->
+            <div class="report-card animate-slide" style="background-color: var(--color-semana); animation-delay: 0.1s;">
+                <div class="card-period">
+                    <div class="title">Semana</div>
+                    <div class="dates">{{ card_semana.periodo }}</div>
+                </div>
+                <div class="card-main">
+                    <div class="total">{{ card_semana.total }}</div>
+                    <div class="label-plus-avg">
+                        <div class="label">{{ card_semana.subtitulo }}</div>
+                        <div class="average">(promedio diario {{ card_semana.promedio }})</div>
+                    </div>
+                </div>
+                {% if rubro == 'Encuentros' or rubro == 'Recibidos' %}
+                <div class="card-breakdown">
+                    <div class="breakdown-group">
+                        {% if rubro == 'Encuentros' %}<span class="arrow-icon">»</span>{% endif %}
+                        <span class="breakdown-text">MEX {{ card_semana.p_mex }}%</span>
+                        <div class="value-box" style="background: {% if rubro == 'Recibidos' %}rgba(215, 222, 196, 0.4){% else %}rgba(0,0,0,0.6){% endif %}; color: {% if rubro == 'Recibidos' %}rgba(0,0,0,0.8){% else %}white{% endif %};">{{ card_semana.mex }}</div>
+                    </div>
+                    {% if rubro == 'Encuentros' %}
+                    <div class="pie-icon" style="background: conic-gradient(#285C4D {{ card_semana.p_mex }}%, #611232 0);"></div>
+                    {% endif %}
+                    <div class="breakdown-group">
+                        <span class="breakdown-text">EXT {{ card_semana.p_ext }}%</span>
+                        <div class="value-box" style="background: {% if rubro == 'Recibidos' %}rgba(97, 18, 50, 0.4){% else %}rgba(0,0,0,0.6){% endif %};">{{ card_semana.ext }}</div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Tajeta CSP -->
+            <div class="report-card animate-slide" style="background-color: var(--color-csp); animation-delay: 0.2s;">
+                <div class="card-period">
+                    <div class="title">Periodo CSP</div>
+                    <div class="dates">{{ card_csp.periodo }}</div>
+                </div>
+                <div class="card-main">
+                    <div class="total">{{ card_csp.total }}</div>
+                    <div class="label-plus-avg">
+                        <div class="label">{{ card_csp.subtitulo }}</div>
+                        <div class="average">(promedio diario {{ card_csp.promedio }})</div>
+                    </div>
+                </div>
+                {% if rubro == 'Encuentros' or rubro == 'Recibidos' %}
+                <div class="card-breakdown">
+                    <div class="breakdown-group">
+                        {% if rubro == 'Encuentros' %}<span class="arrow-icon">»</span>{% endif %}
+                        <span class="breakdown-text">MEX {{ card_csp.p_mex }}%</span>
+                        <div class="value-box" style="background: {% if rubro == 'Recibidos' %}rgba(215, 222, 196, 0.4){% else %}rgba(0,0,0,0.6){% endif %}; color: {% if rubro == 'Recibidos' %}rgba(0,0,0,0.8){% else %}white{% endif %};">{{ card_csp.mex }}</div>
+                    </div>
+                    {% if rubro == 'Encuentros' %}
+                    <div class="pie-icon" style="background: conic-gradient(#285C4D {{ card_csp.p_mex }}%, #611232 0);"></div>
+                    {% endif %}
+                    <div class="breakdown-group">
+                        <span class="breakdown-text">EXT {{ card_csp.p_ext }}%</span>
+                        <div class="value-box" style="background: {% if rubro == 'Recibidos' %}rgba(97, 18, 50, 0.6){% else %}rgba(0, 0, 0, 0.6){% endif %};">{{ card_csp.ext }}</div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Tajeta Trump -->
+            <div class="report-card animate-slide" style="background-color: var(--color-trump); animation-delay: 0.3s;">
+                <div class="card-period">
+                    <div class="title">Periodo Trump</div>
+                    <div class="dates">{{ card_trump.periodo }}</div>
+                </div>
+                <div class="card-main">
+                    <div class="total">{{ card_trump.total }}</div>
+                    <div class="label-plus-avg">
+                        <div class="label">{{ card_trump.subtitulo }}</div>
+                        <div class="average">(promedio diario {{ card_trump.promedio }})</div>
+                    </div>
+                </div>
+                {% if rubro == 'Encuentros' or rubro == 'Recibidos' %}
+                <div class="card-breakdown">
+                    <div class="breakdown-group">
+                        {% if rubro == 'Encuentros' %}<span class="arrow-icon">»</span>{% endif %}
+                        <span class="breakdown-text">MEX {{ card_trump.p_mex }}%</span>
+                        <div class="value-box" style="background: {% if rubro == 'Recibidos' %}rgba(215, 222, 196, 0.4){% else %}rgba(0,0,0,0.6){% endif %}; color: {% if rubro == 'Recibidos' %}rgba(0,0,0,0.8){% else %}white{% endif %};">{{ card_trump.mex }}</div>
+                    </div>
+                    {% if rubro == 'Encuentros' %}
+                    <div class="pie-icon" style="background: conic-gradient(#285C4D {{ card_trump.p_mex }}%, #611232 0);"></div>
+                    {% endif %}
+                    <div class="breakdown-group">
+                        <span class="breakdown-text">EXT {{ card_trump.p_ext }}%</span>
+                        <div class="value-box" style="background: {% if rubro == 'Recibidos' %}rgba(97, 18, 50, 0.4){% else %}rgba(0, 0, 0, 0.3){% endif %};">{{ card_trump.ext }}</div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Gráficas (Vertical) -->
+        <div class="lg:col-span-12 animate-slide" style="animation-delay: 0.4s;">
+            <div class="chart-box">
+                <h3 class="text-sm font-bold text-gray-400 uppercase tracking-widest mb-6 px-2">Evolución {{ rubro }} (Histórico)</h3>
+                <div class="w-full">
+                    {{ plot_bar_div|safe }}
+                </div>
+            </div>
+        </div>
+
+        <div class="lg:col-span-12 animate-slide" style="animation-delay: 0.5s;">
+            <div class="chart-box overflow-hidden relative">
+                <div class="absolute top-4 right-6 bg-gray-50 px-3 py-1 rounded-full border border-gray-100">
+                    <span class="text-[10px] font-bold text-gray-400 uppercase">{{ rubro }} 2026</span>
+                </div>
+                <h3 class="text-sm font-bold text-gray-400 uppercase tracking-widest mb-6 px-2">Agregación por Semana (2026)</h3>
+                <div class="w-full">
+                    {{ plot_line_div|safe }}
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer Info -->
+        <div class="lg:col-span-12 mt-4 text-center pb-8 border-b md:border-none border-gray-100">
+            <p class="text-red-800 font-black text-xl italic">
+                En 2026 se han {% if rubro == 'Encuentros' %}encontrado a{% elif rubro == 'Recibidos' %}recibido a{% else %}rescatado a{% endif %} {{ total_2026 }} extranjeros
+            </p>
+        </div>
+
+    </div>
+</main>
+
+<!-- Touch Toast para uso en Móviles (Pulsación de gráfica) -->
+<div id="touchToast" class="fixed bottom-10 left-1/2 transform -translate-x-1/2 bg-gray-900/95 backdrop-blur-md text-white px-8 py-5 rounded-3xl shadow-2xl z-50 transition-all duration-500 translate-y-40 opacity-0 flex flex-col items-center min-w-[250px] pointer-events-none border border-gray-700">
+    <span id="toastLabel" class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1"></span>
+    <span id="toastValue" class="text-3xl font-black text-inm-verde-100"></span>
+</div>
+
+<!-- Inclusión de Scripts de Bokeh -->
+<script src="https://cdn.bokeh.org/bokeh/release/bokeh-3.6.2.min.js"></script>
+{{ plot_bar_script|safe }}
+{{ plot_line_script|safe }}
+
+<script>
+    // Función para mostrar el popup Toast desde Python (Bokeh)
+    window.showTouchToast = function(label, value) {
+        const toast = document.getElementById('touchToast');
+        document.getElementById('toastLabel').innerText = label;
+        document.getElementById('toastValue').innerText = value;
+        
+        toast.classList.remove('translate-y-40', 'opacity-0');
+        toast.classList.add('translate-y-0', 'opacity-100');
+        
+        // Auto ocultar tras 4 segundos
+        if (window.toastTimer) clearTimeout(window.toastTimer);
+        window.toastTimer = setTimeout(() => {
+            toast.classList.remove('translate-y-0', 'opacity-100');
+            toast.classList.add('translate-y-40', 'opacity-0');
+        }, 4000); 
+    };
+
+    // Ajuste dinámico de Bokeh al contenedor
+    window.addEventListener('resize', function() {
+        // Bokeh sizing_mode "stretch_width" se encarga de esto usualmente.
+    });
+</script>
+{% endblock content %}
