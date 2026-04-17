@@ -294,6 +294,13 @@
             </div>
         </div>
 
+        <!-- Información Resumen Anual -->
+        <div class="lg:col-span-12 text-center my-2">
+            <p class="text-red-800 font-black text-xl italic tracking-tight">
+                En 2026 se han {% if rubro == 'Encuentros' %}encontrado a{% elif rubro == 'Recibidos' %}recibido a{% else %}rescatado a{% endif %} <span class="text-2xl">{{ total_2026 }}</span> extranjeros
+            </p>
+        </div>
+
         <!-- Gráficas (Vertical) -->
         <div class="lg:col-span-12 animate-slide" style="animation-delay: 0.4s;">
             <div class="chart-box">
@@ -316,11 +323,14 @@
             </div>
         </div>
 
-        <!-- Footer Info -->
-        <div class="lg:col-span-12 mt-4 text-center pb-8 border-b md:border-none border-gray-100">
-            <p class="text-red-800 font-black text-xl italic">
-                En 2026 se han {% if rubro == 'Encuentros' %}encontrado a{% elif rubro == 'Recibidos' %}recibido a{% else %}rescatado a{% endif %} {{ total_2026 }} extranjeros
-            </p>
+
+        <div class="lg:col-span-12 animate-slide" style="animation-delay: 0.6s;">
+            <div class="chart-box">
+                <h3 class="text-sm font-bold text-gray-400 uppercase tracking-widest mb-6 px-2">Top 10 Nacionalidades (Periodo Seleccionado)</h3>
+                <div class="w-full">
+                    {{ plot_top_div|safe }}
+                </div>
+            </div>
         </div>
 
     </div>
@@ -334,8 +344,7 @@
 
 <!-- Inclusión de Scripts de Bokeh -->
 <script src="https://cdn.bokeh.org/bokeh/release/bokeh-3.6.2.min.js"></script>
-{{ plot_bar_script|safe }}
-{{ plot_line_script|safe }}
+{{ plot_script|safe }}
 
 <script>
     // Función para mostrar el popup Toast desde Python (Bokeh)

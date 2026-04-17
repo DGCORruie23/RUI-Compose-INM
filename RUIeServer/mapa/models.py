@@ -35,6 +35,32 @@ class PuntosInternacionEstacion(models.Model):
         verbose_name_plural = "Puntos de Internacion"
         unique_together = ['nombre', 'tipo']
 
+class TipoPRH(models.Model):
+    nombre = models.CharField(max_length=100)
+    
+    def __str__(self):
+        return self.nombre
+
+    class Meta:
+        verbose_name = "Tipo PRH"
+        verbose_name_plural = "Tipos de PRHs"
+
+class PRHs(models.Model):
+    estado = models.ForeignKey(Estado, on_delete=models.CASCADE, db_index=True)
+    nombre = models.CharField(max_length=100)
+    modalidad = models.ForeignKey(TipoPRH, on_delete=models.CASCADE, db_index=True)
+    activo = models.BooleanField(default=False)
+    coordenadasTexto = models.CharField(max_length=100)
+    latitud = models.FloatField()
+    longitud = models.FloatField()
+    
+    def __str__(self):
+        return f"{self.estado.nombre} - {self.activo} -{self.nombre} ({self.modalidad})"
+
+    class Meta:
+        verbose_name = "Punto de Rescate"
+        verbose_name_plural = "Puntos de Rescates"
+
 class CatalogoOR(models.Model):
     titular = models.CharField(max_length=100, unique=True)
     estado = models.ForeignKey(Estado, on_delete=models.CASCADE, db_index=True)

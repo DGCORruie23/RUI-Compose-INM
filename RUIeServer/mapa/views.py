@@ -1,6 +1,6 @@
 from django.shortcuts import render, redirect
 from django.contrib import messages
-from .models import Estado, Nacionalidad, Repatriados, Recibidos, ExtRescatados, Ingresos, Tramites, Retornados, Inadmitidos, PuntosInternacionEstacion, CatalogoOR, Encuentros
+from .models import Estado, Nacionalidad, Repatriados, Recibidos, ExtRescatados, Ingresos, Tramites, Retornados, Inadmitidos, PuntosInternacionEstacion, CatalogoOR, Encuentros, TipoPRH, PRHs
 from django.apps import apps
 import openpyxl
 from datetime import datetime
@@ -257,6 +257,7 @@ def mapa_informacion(request):
     for edo in Estado.objects.all():
         infra_data[normalizar_nombre(edo.nombre)] = {
             'AEREO': 0, 'MARITIMO': 0, 'TERRESTRE': 0, 'ESTACION': 0,
+            'PRH': 0,
             'titular': 'Sin titular asignado'
         }
     
@@ -271,12 +272,20 @@ def mapa_informacion(request):
         if edo_name in infra_data:
             infra_data[edo_name]['titular'] = t.titular
 
+    # PRHs por estado
+    prh_raw = PRHs.objects.values('estado__nombre').annotate(total=Count('id'))
+    for item in prh_raw:
+        edo_name = normalizar_nombre(item['estado__nombre'])
+        if edo_name in infra_data:
+            infra_data[edo_name]['PRH'] = item['total']
+
     # Totales Nacionales
     infra_data[LABEL_NACIONAL] = {
         'AEREO': PuntosInternacionEstacion.objects.filter(tipo='AEREO').count(),
         'MARITIMO': PuntosInternacionEstacion.objects.filter(tipo='MARITIMO').count(),
         'TERRESTRE': PuntosInternacionEstacion.objects.filter(tipo='TERRESTRE').count(),
         'ESTACION': PuntosInternacionEstacion.objects.filter(tipo='ESTACION').count(),
+        'PRH': PRHs.objects.count(),
         'titular': 'Datos Nacionales'
     }
 
@@ -318,7 +327,7 @@ def mapa_informacion(request):
         
     geo_source = GeoJSONDataSource(geojson=json.dumps(geo_data))
     
-    # Crear figura de Bokeh
+    # Crear figura de Bokeh restaurando Auto-Range Dinámico para proporciones perfectas
     p = figure(
         title="",
         sizing_mode="scale_both",
@@ -353,8 +362,79 @@ def mapa_informacion(request):
         nonselection_fill_alpha=0.2,
         nonselection_line_alpha=0.2
     )
+
+    # --- Capa de Infraestructura (Iconos SVG) ---
+    infra_points_objs = PuntosInternacionEstacion.objects.all()
+    infra_pts_data = {
+        'x': [pt.longitud for pt in infra_points_objs],
+        'y': [pt.latitud for pt in infra_points_objs],
+        'nombre': [pt.nombre for pt in infra_points_objs],
+        'estado': [normalizar_nombre(pt.estado.nombre) for pt in infra_points_objs],
+        'tipo': [pt.tipo for pt in infra_points_objs],
+        'url': []
+    }
     
-    # Añadir HoverTool inicial configurado a 'Todos' (muestra todas las categorías dinámicamente)
+    for pt in infra_points_objs:
+        icon_file = 'terrestre.svg' # Default
+        if pt.tipo == 'AEREO': icon_file = 'aereo.svg'
+        elif pt.tipo == 'MARITIMO': icon_file = 'maritimo.svg'
+        elif pt.tipo == 'ESTACION': icon_file = 'estacion.svg'
+        
+        # Construir la URL del icono
+        icon_url = f"{settings.STATIC_URL}mapa/icons/{icon_file}"
+        infra_pts_data['url'].append(icon_url)
+
+    infra_source = ColumnDataSource(infra_pts_data)
+    infra_layer = p.image_url(url='url', x='x', y='y', w=0.25, h=0.25, source=infra_source, 
+                              anchor="center", name="infra_layer")
+    
+    # Hover específico para puntos de infraestructura
+    infra_hover = HoverTool(
+        renderers=[infra_layer],
+        name="infra_hover",
+        tooltips="""
+            <div style="padding: 8px; border-radius: 5px; font-family: Arial, sans-serif;">
+                <div style="font-size: 13px; font-weight: bold; color: #333;">@nombre</div>
+                <div style="font-size: 11px; color: #666; margin-top: 2px;">Tipo: @tipo</div>
+            </div>
+        """
+    )
+    p.add_tools(infra_hover)
+
+    # --- Capa de Puntos de Rescate Humano (PRH) ---
+    prh_points = PRHs.objects.all().select_related('modalidad')
+    prh_pts_data = {
+        'x': [pt.longitud for pt in prh_points],
+        'y': [pt.latitud for pt in prh_points],
+        'nombre': [pt.nombre for pt in prh_points],
+        'estado': [normalizar_nombre(pt.estado.nombre) for pt in prh_points],
+        'modalidad': [pt.modalidad.nombre for pt in prh_points],
+        'status': ['Activo' if pt.activo else 'Inactivo' for pt in prh_points],
+        'url': []
+    }
+    for pt in prh_points:
+        icon = 'agente_activo.svg' if pt.activo else 'agente_inactivo.svg'
+        prh_pts_data['url'].append(f"{settings.STATIC_URL}mapa/icons/{icon}")
+
+    prh_source = ColumnDataSource(prh_pts_data)
+    prh_layer = p.image_url(url='url', x='x', y='y', w=0.25, h=0.25, source=prh_source, 
+                              anchor="center", name="prh_layer")
+    
+    # Hover específico para PRHs
+    prh_hover = HoverTool(
+        renderers=[prh_layer],
+        name="prh_hover",
+        tooltips="""
+            <div style="padding: 8px; border-radius: 5px; font-family: Arial, sans-serif;">
+                <div style="font-size: 13px; font-weight: bold; color: #7E1D36;">@nombre</div>
+                <div style="font-size: 11px; color: #666; margin-top: 2px;"><b>Modalidad:</b> @modalidad</div>
+                <div style="font-size: 11px; color: #666;"><b>Estado:</b> @status</div>
+            </div>
+        """
+    )
+    p.add_tools(prh_hover)
+    
+    # Actualizar HoverTool inicial configurado a 'Todos' (muestra todas las categorías dinámicamente)
     hover_items = []
     keys_to_show = ['repatriados', 'recibidos', 'rescatados', 'ingresos', 'tramites', 'retornados', 'inadmitidos']
     
@@ -378,6 +458,7 @@ def mapa_informacion(request):
     
     hover = HoverTool(
         renderers=[states],
+        name="states_hover",
         tooltips=hover_html
     )
     p.add_tools(hover)
@@ -420,8 +501,18 @@ def mapa_informacion(request):
             });
 
             window.selectedStateData = newStateData;
+            
+            // Disparar animación de zoom si la función existe
+            if (window.animateToSelectedState) {
+                window.animateToSelectedState(index);
+            }
         } else {
             window.selectedStateData = national;
+            
+            // Disparar regreso a vista nacional
+            if (window.animateToNationalView) {
+                window.animateToNationalView();
+            }
         }
         
         if (window.updateInformationPanel) {
@@ -746,6 +837,69 @@ def api_nacionalidad_ranking(request):
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
 
+def api_reporte_nacionalidades(request):
+    """API para obtener el ranking de nacionalidades por rubro en un periodo."""
+    rubro = request.GET.get('rubro', 'Encuentros')
+    start_str = request.GET.get('start')
+    end_str = request.GET.get('end')
+
+    if not all([start_str, end_str]):
+        return JsonResponse({'status': 'error', 'message': 'Faltan fechas'}, status=400)
+
+    try:
+        # Convertir timestamps de JS (ms) o strings ISO a date
+        if start_str.isdigit():
+            start_date = datetime.fromtimestamp(int(start_str)/1000.0).date()
+            end_date = datetime.fromtimestamp(int(end_str)/1000.0).date()
+        else:
+            start_date = datetime.strptime(start_str, '%Y-%m-%d').date()
+            end_date = datetime.strptime(end_str, '%Y-%m-%d').date()
+
+        data = []
+        if rubro == 'Encuentros':
+            ranking = Encuentros.objects.filter(
+                fecha__range=[start_date, end_date]
+            ).values('nacionalidad__nombre').annotate(
+                total=Sum('encuentros_total')
+            ).order_by('-total')[:10]
+        elif rubro == 'Rescatados':
+            ranking = ExtRescatados.objects.filter(
+                fecha__range=[start_date, end_date]
+            ).values('nacionalidad__nombre').annotate(
+                total=Sum('rescatados')
+            ).order_by('-total')[:10]
+        else: # Recibidos
+            # Combinar total de Repatriados (México) con el ranking de Recibidos
+            res_rec = Recibidos.objects.filter(
+                fecha__range=[start_date, end_date]
+            ).values('nacionalidad__nombre').annotate(
+                total=Sum('ext_rec')
+            ).order_by('-total')[:10]
+            
+            # Obtener total de mexicanos
+            mex_total = Repatriados.objects.filter(
+                fecha__range=[start_date, end_date]
+            ).aggregate(total=Sum('mex_rep'))['total'] or 0
+            
+            data.append({'name': 'MÉXICO', 'value': int(mex_total)})
+            for item in res_rec:
+                data.append({'name': item['nacionalidad__nombre'], 'value': int(item['total'] or 0)})
+            
+            # Ordenar de nuevo por si algún país superó a México (poco probable pero posible)
+            data = sorted(data, key=lambda x: x['value'], reverse=True)[:10]
+            return JsonResponse({'status': 'success', 'data': data})
+
+        for item in ranking:
+            data.append({
+                'name': item['nacionalidad__nombre'] or 'DESCONOCIDA',
+                'value': int(item['total'] or 0)
+            })
+
+        return JsonResponse({'status': 'success', 'data': data})
+
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
 def carga_datos_batch(request):
     # Restricción de acceso: Solo superusuarios
     if not request.user.is_superuser:
@@ -925,8 +1079,9 @@ def carga_oficinas(request):
             wb = openpyxl.load_workbook(excel_file)
             sheet = wb.active
             
-            # Pre-cargar estados para eficiencia
+            # Pre-cargar catálogos para eficiencia
             estados_dict = {normalizar_nombre(e.nombre): e for e in Estado.objects.all()}
+            tipos_prh_dict = {normalizar_nombre(t.nombre): t for t in TipoPRH.objects.all()}
             
             created_count = 0
             updated_count = 0
@@ -988,6 +1143,50 @@ def carga_oficinas(request):
                                 'estado': estado_obj,
                                 'domicilio': domicilio_norm,
                                 'correo': correo_norm
+                            }
+                        )
+                        if created: 
+                            created_count += 1
+                        else: 
+                            updated_count += 1
+                            updated_rows.append(str(row_idx))
+
+                    elif model_name == 'PRHs':
+                        # Formato: Estado(0), Nombre(1), Modalidad(2), Activo(3), Coordenadas(4), Lat(5), Lon(6)
+                        if len(row) < 7:
+                            errors.append(f"Fila {row_idx}: Faltan columnas (se requieren 7).")
+                            continue
+
+                        nombre_raw = row[1]
+                        modalidad_raw = row[2]
+                        activo_raw = str(row[3]).strip().upper()
+                        coordenadas_raw = row[4]
+                        lat = row[5]
+                        lon = row[6]
+
+                        # Normalizar campos
+                        nombre_norm = normalizar_nombre(nombre_raw)
+                        modalidad_norm = normalizar_nombre(modalidad_raw)
+                        coordenadas_norm = normalizar_nombre(coordenadas_raw)
+
+                        # Validar Modalidad
+                        tipo_obj = tipos_prh_dict.get(modalidad_norm)
+                        if not tipo_obj:
+                            errors.append(f"Fila {row_idx}: Modalidad '{modalidad_raw}' no existe en el catálogo.")
+                            continue
+
+                        # Convertir Activo a Boolean
+                        activo_bool = True if activo_raw == "ACTIVO" else False
+
+                        obj, created = PRHs.objects.update_or_create(
+                            nombre=nombre_norm,
+                            estado=estado_obj,
+                            modalidad=tipo_obj,
+                            defaults={
+                                'activo': activo_bool,
+                                'coordenadasTexto': coordenadas_norm,
+                                'latitud': float(lat) if lat is not None else 0.0,
+                                'longitud': float(lon) if lon is not None else 0.0
                             }
                         )
                         if created: 
@@ -1283,18 +1482,75 @@ def reportes(request):
     # Total 2026 para el footer
     total_2026 = sum(y_line)
 
-    script1, div1 = components(layout_p1)
-    script2, div2 = components(p2)
+    # === GRÁFICA TOP 10 NACIONALIDADES DINÁMICA ===
+    start_init = initial_range_start.date() if isinstance(initial_range_start, datetime) else initial_range_start
+    end_init = fecha_max
+    
+    if rubro == 'Encuentros':
+        ranking = Encuentros.objects.filter(fecha__range=[start_init, end_init]).values('nacionalidad__nombre').annotate(total=Sum('encuentros_total')).order_by('-total')[:10]
+        top_names = [item['nacionalidad__nombre'] or 'OTRO' for item in ranking][::-1]
+        top_values = [int(item['total'] or 0) for item in ranking][::-1]
+    elif rubro == 'Rescatados':
+        ranking = ExtRescatados.objects.filter(fecha__range=[start_init, end_init]).values('nacionalidad__nombre').annotate(total=Sum('rescatados')).order_by('-total')[:10]
+        top_names = [item['nacionalidad__nombre'] or 'OTRO' for item in ranking][::-1]
+        top_values = [int(item['total'] or 0) for item in ranking][::-1]
+    else: # Recibidos
+        res_rec = Recibidos.objects.filter(fecha__range=[start_init, end_init]).values('nacionalidad__nombre').annotate(total=Sum('ext_rec')).order_by('-total')[:10]
+        mex_total = Repatriados.objects.filter(fecha__range=[start_init, end_init]).aggregate(total=Sum('mex_rep'))['total'] or 0
+        r_list = [{'n': 'MÉXICO', 'v': int(mex_total)}]
+        for item in res_rec:
+            r_list.append({'n': item['nacionalidad__nombre'], 'v': int(item['total'] or 0)})
+        r_sorted = sorted(r_list, key=lambda x: x['v'], reverse=True)[:10]
+        top_names = [item['n'] for item in r_sorted][::-1]
+        top_values = [item['v'] for item in r_sorted][::-1]
+
+    source_top = ColumnDataSource(data=dict(names=top_names, values=top_values))
+    p_top = figure(y_range=top_names, height=450, title=None,
+                   toolbar_location=None, tools="", sizing_mode="stretch_width")
+    p_top.hbar(y='names', right='values', height=0.7, color="#285C4D", source=source_top)
+    p_top.x_range.start = 0
+    p_top.xaxis.formatter = NumeralTickFormatter(format="0a")
+    p_top.outline_line_color = None
+    p_top.grid.grid_line_color = None
+    p_top.yaxis.major_label_text_font_size = "9pt"
+    p_top.yaxis.major_label_text_font_style = "bold"
+    
+    h_top = HoverTool(tooltips=[("País", "@names"), ("Total", "@values{0,0}")])
+    p_top.add_tools(h_top)
+
+    # Callback JS para actualizar Top 10 cuando cambia el rango de p1
+    update_top10_js = CustomJS(args=dict(source=source_top, y_range=p_top.y_range, rubro=rubro), code="""
+        const start = cb_obj.start;
+        const end = cb_obj.end;
+        if (window.top10Timeout) clearTimeout(window.top10Timeout);
+        window.top10Timeout = setTimeout(() => {
+            fetch(`/mapa/api/reporte-nacionalidades?rubro=${rubro}&start=${Math.round(start)}&end=${Math.round(end)}`)
+                .then(response => response.json())
+                .then(res => {
+                    if (res.status === 'success') {
+                        const new_names = res.data.map(d => d.name).reverse();
+                        const new_values = res.data.map(d => d.value).reverse();
+                        source.data = { names: new_names, values: new_values };
+                        y_range.factors = new_names;
+                        source.change.emit();
+                    }
+                });
+        }, 400);
+    """)
+    p1.x_range.js_on_change('start', update_top10_js)
+
+    plot_script, plot_divs = components((layout_p1, p2, p_top))
+    plot_bar_div, plot_line_div, plot_top_div = plot_divs
 
     context = {
         'rubro': rubro,
         'card_semana': card_semana,
         'card_csp': card_csp,
         'card_trump': card_trump,
-        'plot_bar_script': script1,
-        'plot_bar_div': div1,
-        'plot_line_script': script2,
-        'plot_line_div': div2,
+        'plot_script': plot_script,
+        'plot_bar_div': plot_bar_div,
+        'plot_line_div': plot_line_div,
+        'plot_top_div': plot_top_div,
         'total_2026': f"{total_2026:,}",
     }
 

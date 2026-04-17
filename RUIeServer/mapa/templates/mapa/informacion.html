@@ -114,16 +114,17 @@
         </label>
       </div>
 
-      <!-- Controles de Zoom Personalizados (Abajo a la derecha) -->
-      <div class="absolute bottom-6 right-6 flex flex-col gap-2 z-10 scale-90 md:scale-100">
+      <!-- Controles de Zoom Personalizados (Flotantes) -->
+      <div class="absolute top-6 right-6 flex flex-col gap-2 z-10 transition-all duration-500">
         <button onclick="zoomMap(0.8)" title="Acercar" class="bg-white/90 backdrop-blur-md p-3 rounded-2xl shadow-xl border border-gray-100 hover:bg-white text-inm-verde-100 transition-all active:scale-95 group">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
         </button>
         <button onclick="zoomMap(1.2)" title="Alejar" class="bg-white/90 backdrop-blur-md p-3 rounded-2xl shadow-xl border border-gray-100 hover:bg-white text-inm-verde-100 transition-all active:scale-95 group">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M20 12H4"></path></svg>
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M20 12H4"></path></svg>
         </button>
-        <button onclick="resetMap()" title="Reiniciar Vista" class="bg-inm-verde-100 p-3 rounded-2xl shadow-xl border border-emerald-800/10 hover:bg-inm-verde-200 text-white transition-all active:scale-95 mt-1">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+        <div class="h-px bg-gray-200/50 my-1"></div>
+        <button onclick="resetMap()" title="Vista Nacional (Reiniciar)" class="bg-white/90 backdrop-blur-md p-3 rounded-2xl shadow-xl border border-gray-100 hover:bg-inm-verde-100 hover:text-white text-inm-verde-100 transition-all active:scale-95">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
         </button>
       </div>
 
@@ -203,21 +204,25 @@
                     </div>
 
                     <div class="grid grid-cols-2 gap-3">
-                        <div class="bg-white p-3 rounded-xl border border-gray-100 flex items-center justify-between">
-                            <span class="text-[10px] font-semibold text-gray-500">Estaciones Migratorias</span>
+                        <div id="btn_infra_estacion" onclick="filterInfraPoints('ESTACION')" class="bg-white p-3 rounded-xl border border-gray-100 flex items-center justify-between cursor-pointer hover:border-inm-verde-100 hover:shadow-sm transition-all group">
+                            <span class="text-[10px] font-semibold text-gray-500 group-hover:text-inm-verde-100">Estaciones Migratorias</span>
                             <span id="infra_estacion" class="text-xs font-bold text-inm-verde-100">0</span>
                         </div>
-                        <div class="bg-white p-3 rounded-xl border border-gray-100 flex items-center justify-between">
-                            <span class="text-[10px] font-semibold text-gray-500">Internación Aérea</span>
+                        <div id="btn_infra_aereo" onclick="filterInfraPoints('AEREO')" class="bg-white p-3 rounded-xl border border-gray-100 flex items-center justify-between cursor-pointer hover:border-inm-verde-100 hover:shadow-sm transition-all group">
+                            <span class="text-[10px] font-semibold text-gray-500 group-hover:text-inm-verde-100">Internación Aérea</span>
                             <span id="infra_aereo" class="text-xs font-bold text-inm-verde-100">0</span>
                         </div>
-                        <div class="bg-white p-3 rounded-xl border border-gray-100 flex items-center justify-between">
-                            <span class="text-[10px] font-semibold text-gray-500">Internación Marítima</span>
+                        <div id="btn_infra_maritimo" onclick="filterInfraPoints('MARITIMO')" class="bg-white p-3 rounded-xl border border-gray-100 flex items-center justify-between cursor-pointer hover:border-inm-verde-100 hover:shadow-sm transition-all group">
+                            <span class="text-[10px] font-semibold text-gray-500 group-hover:text-inm-verde-100">Internación Marítima</span>
                             <span id="infra_maritimo" class="text-xs font-bold text-inm-verde-100">0</span>
                         </div>
-                        <div class="bg-white p-3 rounded-xl border border-gray-100 flex items-center justify-between">
-                            <span class="text-[10px] font-semibold text-gray-500">Internación Terrestre</span>
+                        <div id="btn_infra_terrestre" onclick="filterInfraPoints('TERRESTRE')" class="bg-white p-3 rounded-xl border border-gray-100 flex items-center justify-between cursor-pointer hover:border-inm-verde-100 hover:shadow-sm transition-all group">
+                            <span class="text-[10px] font-semibold text-gray-500 group-hover:text-inm-verde-100">Internación Terrestre</span>
                             <span id="infra_terrestre" class="text-xs font-bold text-inm-verde-100">0</span>
+                        </div>
+                        <div id="btn_infra_prh" onclick="filterInfraPoints('PRH')" class="bg-white p-3 rounded-xl border border-gray-100 flex items-center justify-between cursor-pointer hover:border-inm-verde-100 hover:shadow-sm transition-all group col-span-2">
+                            <span class="text-[10px] font-semibold text-gray-500 group-hover:text-inm-verde-100">Puntos de Rescate (PRH)</span>
+                            <span id="infra_prh" class="text-xs font-bold text-inm-verde-100 text-[#7E1D36]">0</span>
                         </div>
                     </div>
                 </div>
@@ -362,8 +367,6 @@
 
     if (window.updateInformationPanel) {
         window.updateInformationPanel();
-    } else {
-        console.warn("updateInformationPanel no está definida aún.");
     }
   });
 
@@ -381,6 +384,7 @@
     updateCards();
     updateRankingChart();
     updateInfraSection();
+    applyMapFilters(); // Sincronizar iconos con el estado seleccionado
     closeDetail();
   };
 
@@ -399,6 +403,7 @@
       document.getElementById('infra_aereo').innerText = data.AEREO;
       document.getElementById('infra_maritimo').innerText = data.MARITIMO;
       document.getElementById('infra_terrestre').innerText = data.TERRESTRE;
+      document.getElementById('infra_prh').innerText = data.PRH || 0;
     } else {
       section.classList.add('hidden');
     }
@@ -774,17 +779,177 @@
       x_range.end = x_mid + x_span / 2;
       y_range.start = y_mid - y_span / 2;
       y_range.end = y_mid + y_span / 2;
+      
+      // CRÍTICO: Avisar a Bokeh que hemos modificado el zoom intencionalmente
+      // para evitar que sus funciones de auto-encuadre borren esta posición.
+      if (x_range) x_range.have_updated_interactively = true;
+      if (y_range) y_range.have_updated_interactively = true;
     }
   };
 
   window.resetMap = function() {
     const views = Object.values(Bokeh.index);
     if (views.length > 0) {
-        views[0].model.reset.emit();
-        window.selectedStateData = {{ national_data_json|safe }};
+        const plot = views[0].model;
+        plot.reset.emit(); // Bokeh reset nativo (zoom)
+        
+        // Limpiar selección de datos
+        const statesRenderer = plot.renderers.find(r => r.glyph && r.glyph.type === 'Patches');
+        if (statesRenderer) {
+            statesRenderer.data_source.selected.indices = [];
+            statesRenderer.data_source.change.emit();
+        }
+        
+        // Quitar la bandera para permitir auto-encuadre otra vez si es necesario
+        if (plot.x_range) plot.x_range.have_updated_interactively = false;
+        if (plot.y_range) plot.y_range.have_updated_interactively = false;
+        
+        window.selectedStateData = JSON.parse('{{ national_data_json|safe }}');
+        window.currentInfraFilter = null; // Resetear filtros de iconos
+        
         updateInformationPanel();
+        animateToNationalView(); // Regresar animadamente por seguridad
     }
   };
+
+  /**
+   * ANIMACIÓN DE ZOOM Y CENTRADO
+   */
+  let zoomAnimationId = null;
+
+  function animateToSelectedState(index) {
+    const views = Object.values(Bokeh.index);
+    if (views.length === 0) return;
+    const plot = views[0].model;
+    const source = plot.renderers.find(r => r.name === 'states_hover' || (r.glyph && r.glyph.type === 'Patches')).data_source;
+    
+    // Calcular Bounding Box del estado seleccionado
+    const xs = source.data.xs[index];
+    const ys = source.data.ys[index];
+    
+    // Función segura para aplanar estructuras de arrays anidados (Polygon vs MultiPolygon)
+    function getMinMax(arr) {
+        let min = Infinity, max = -Infinity;
+        function recurse(data) {
+            if (typeof data === 'number') {
+                if (data < min) min = data;
+                if (data > max) max = data;
+            } else if (data && data.length !== undefined) {
+                for (let i = 0; i < data.length; i++) {
+                    recurse(data[i]);
+                }
+            }
+        }
+        recurse(arr);
+        return {min, max};
+    }
+    
+    const xBounds = getMinMax(xs);
+    const yBounds = getMinMax(ys);
+    
+    const minX = xBounds.min;
+    const maxX = xBounds.max;
+    const minY = yBounds.min;
+    const maxY = yBounds.max;
+
+    const rawWidth = (maxX - minX);
+    const rawHeight = (maxY - minY);
+    
+    // Configurar padding del 40%
+    let targetWidth = rawWidth * 1.4;
+    let targetHeight = rawHeight * 1.4;
+
+    // Obtener la relación de aspecto actual del mapa para no deformarlo
+    const currentAspect = (plot.x_range.end - plot.x_range.start) / (plot.y_range.end - plot.y_range.start);
+    const targetAspect = targetWidth / targetHeight;
+
+    // Ajustar el alto o el ancho para que coincida con la proporción de la pantalla
+    if (targetAspect > currentAspect) {
+        // El estado es más "ancho" en proporción a la pantalla -> Aumentamos el alto
+        targetHeight = targetWidth / currentAspect;
+    } else {
+        // El estado es más "alto" en proporción a la pantalla -> Aumentamos el ancho
+        targetWidth = targetHeight * currentAspect;
+    }
+
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+
+    performSmoothZoom(
+        centerX - targetWidth / 2, 
+        centerX + targetWidth / 2, 
+        centerY - targetHeight / 2, 
+        centerY + targetHeight / 2
+    );
+  }
+
+  // Guardar límites nacionales iniciales
+  window.nationalBounds = null;
+
+  function animateToNationalView() {
+    if (!window.nationalBounds) {
+        // Si no los tenemos, usamos el reset de Bokeh
+        const views = Object.values(Bokeh.index);
+        if (views.length > 0) views[0].model.reset.emit();
+        return;
+    }
+    performSmoothZoom(
+        window.nationalBounds.x_start, 
+        window.nationalBounds.x_end, 
+        window.nationalBounds.y_start, 
+        window.nationalBounds.y_end
+    );
+  }
+
+  function performSmoothZoom(targetXStart, targetXEnd, targetYStart, targetYEnd) {
+    const views = Object.values(Bokeh.index);
+    if (views.length === 0) return;
+    const plot = views[0].model;
+    const x_range = plot.x_range;
+    const y_range = plot.y_range;
+
+    // Guardar límites nacionales la primera vez que se hace zoom
+    if (!window.nationalBounds) {
+        window.nationalBounds = {
+            x_start: x_range.start,
+            x_end: x_range.end,
+            y_start: y_range.start,
+            y_end: y_range.end
+        };
+    }
+
+    if (zoomAnimationId) cancelAnimationFrame(zoomAnimationId);
+
+    const duration = 600; // ms
+    const startTime = performance.now();
+    
+    const startXStart = x_range.start;
+    const startXEnd = x_range.end;
+    const startYStart = y_range.start;
+    const startYEnd = y_range.end;
+
+    function frame(now) {
+        const elapsed = now - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        
+        // Función de easing (easeInOutCubic)
+        const t = progress < 0.5 ? 4 * progress * progress * progress : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+
+        x_range.start = startXStart + (targetXStart - startXStart) * t;
+        x_range.end = startXEnd + (targetXEnd - startXEnd) * t;
+        y_range.start = startYStart + (targetYStart - startYStart) * t;
+        y_range.end = startYEnd + (targetYEnd - startYEnd) * t;
+
+        if (progress < 1) {
+            zoomAnimationId = requestAnimationFrame(frame);
+        } else {
+            // CRÍTICO: Al finalizar la animación, decirle a Bokeh que este es un zoom de usuario.
+            if (x_range) x_range.have_updated_interactively = true;
+            if (y_range) y_range.have_updated_interactively = true;
+        }
+    }
+    zoomAnimationId = requestAnimationFrame(frame);
+  }
 
   // Función para actualizar el Mapa de Calor Dinámicamente
   window.updateHeatmap = function() {
@@ -828,15 +993,31 @@
             cTransform.high = 32;
         }
         
-        // Forzamos el request de repintado
+        // Forzamos el request de repintado visual (ligero)
         patchRenderer.change.emit();
-        patchRenderer.data_source.change.emit();
+      }
+
+      // Controlar la visibilidad de las capas de infraestructura y PRH
+      // Solo visibles cuando la métrica es 'todos'
+      const infraLayer = plot.renderers.find(r => r.name === 'infra_layer');
+      const prhLayer = plot.renderers.find(r => r.name === 'prh_layer');
+      
+      const isVisible = (metric === "todos");
+      
+      if (infraLayer) infraLayer.visible = isVisible;
+      if (prhLayer) prhLayer.visible = isVisible;
+
+      if (isVisible) {
+          // Resetear cualquier filtro activo al cambiar de métrica principal
+          if (window.currentInfraFilter) {
+              filterInfraPoints(null);
+          }
       }
       
-      // Actualizar el HoverTool para mostrar solo la categoría actual o todas si es "todos"
-      // En BokehJS, las herramientas suelen estar en plot.toolbar.tools o plot.tools
-      let hover = plot.toolbar.tools.find(t => t.type === 'HoverTool');
-      if (!hover) hover = plot.tools.find(t => t.type === 'HoverTool');
+      // Actualizar el HoverTool de los estados para mostrar solo la categoría actual o todas si es "todos"
+      // Buscamos específicamente el que tiene el nombre 'states_hover' para evitar colisiones con infraestructura
+      let hover = plot.toolbar.tools.find(t => t.name === 'states_hover');
+      if (!hover) hover = plot.tools.find(t => t.name === 'states_hover');
 
       if (hover) {
           let html = `
@@ -1099,5 +1280,104 @@
 <!-- Scripts de Bokeh -->
 <script src="https://cdn.bokeh.org/bokeh/release/bokeh-3.6.2.min.js"></script>
 {{ map_script|safe }}
+
+<script>
+  /**
+   * Filtra los iconos de infraestructura y PRH en el mapa Bokeh por Categoría
+   * @param {string|null} type - El tipo a filtrar (AEREO, MARITIMO, TERRESTRE, ESTACION, PRH) o null para resetear
+   */
+  window.filterInfraPoints = function(type) {
+    if (type === window.currentInfraFilter) {
+        window.currentInfraFilter = null;
+    } else {
+        window.currentInfraFilter = type;
+    }
+    
+    // Aplicar filtros unificados (Categoría + Geografía)
+    applyMapFilters();
+
+    // Actualizar Estilos de las tarjetas
+    const types = ['ESTACION', 'AEREO', 'MARITIMO', 'TERRESTRE', 'PRH'];
+    const ids = {
+        'ESTACION': 'btn_infra_estacion',
+        'AEREO': 'btn_infra_aereo',
+        'MARITIMO': 'btn_infra_maritimo',
+        'TERRESTRE': 'btn_infra_terrestre',
+        'PRH': 'btn_infra_prh'
+    };
+
+    types.forEach(t => {
+        const el = document.getElementById(ids[t]);
+        if (!el) return;
+        
+        if (t === window.currentInfraFilter) {
+            el.classList.add('border-inm-verde-100', 'bg-inm-verde-100/5', 'shadow-sm', 'scale-[1.02]');
+            el.classList.remove('border-gray-100', 'bg-white');
+        } else {
+            el.classList.remove('border-inm-verde-100', 'bg-inm-verde-100/5', 'shadow-sm', 'scale-[1.02]');
+            el.classList.add('border-gray-100', 'bg-white');
+        }
+    });
+  };
+
+  /**
+   * FUNCIÓN CENTRAL DE FILTRADO: Combina Filtro de Categoría y Filtro Geográfico
+   */
+  window.applyMapFilters = function() {
+    const views = Object.values(Bokeh.index);
+    if (views.length === 0) return;
+    
+    const plot = views[0].model;
+    const infraLayer = plot.renderers.find(r => r.name === 'infra_layer');
+    const prhLayer = plot.renderers.find(r => r.name === 'prh_layer');
+    
+    if (!infraLayer || !prhLayer) return;
+
+    const infraSource = infraLayer.data_source;
+    const prhSource = prhLayer.data_source;
+    
+    // Inicializar Datos Maestros si no existen
+    if (!window.fullInfraData) window.fullInfraData = JSON.parse(JSON.stringify(infraSource.data));
+    if (!window.fullPrhData) window.fullPrhData = JSON.parse(JSON.stringify(prhSource.data));
+
+    const selectedState = window.selectedStateData ? window.selectedStateData.name : LABEL_NACIONAL;
+    const activeCategory = window.currentInfraFilter; // null, 'ESTACION', 'PRH', etc.
+    const isNational = (selectedState === LABEL_NACIONAL);
+
+    // 1. Filtrar Infraestructura
+    const newInfra = {};
+    Object.keys(window.fullInfraData).forEach(k => newInfra[k] = []);
+    
+    for (let i = 0; i < window.fullInfraData.estado.length; i++) {
+        const belongsToState = isNational || window.fullInfraData.estado[i] === normalizar_nombre(selectedState);
+        const matchesCategory = !activeCategory || activeCategory === 'PRH' || window.fullInfraData.tipo[i] === activeCategory;
+        
+        if (belongsToState && matchesCategory && activeCategory !== 'PRH') {
+            Object.keys(window.fullInfraData).forEach(k => newInfra[k].push(window.fullInfraData[k][i]));
+        }
+    }
+    infraSource.data = newInfra;
+    infraLayer.visible = (activeCategory !== 'PRH');
+
+    // 2. Filtrar PRHs
+    const newPrh = {};
+    Object.keys(window.fullPrhData).forEach(k => newPrh[k] = []);
+
+    for (let i = 0; i < window.fullPrhData.estado.length; i++) {
+        const belongsToState = isNational || window.fullPrhData.estado[i] === normalizar_nombre(selectedState);
+        const matchesCategory = !activeCategory || activeCategory === 'PRH';
+
+        if (belongsToState && matchesCategory) {
+            Object.keys(window.fullPrhData).forEach(k => newPrh[k].push(window.fullPrhData[k][i]));
+        }
+    }
+    prhSource.data = newPrh;
+    prhLayer.visible = (!activeCategory || activeCategory === 'PRH');
+
+    // Emitir cambios
+    infraSource.change.emit();
+    prhSource.change.emit();
+  };
+</script>
 
 {% endblock content %}

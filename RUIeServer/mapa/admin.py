@@ -2,7 +2,8 @@ from django.contrib import admin
 from .models import (
     Estado, Nacionalidad, Repatriados, Recibidos, ExtRescatados, 
     Ingresos, Tramites, Retornados, Inadmitidos,
-    PuntosInternacionEstacion, CatalogoOR, Encuentros
+    PuntosInternacionEstacion, CatalogoOR, Encuentros,
+    TipoPRH, PRHs
 )
 
 @admin.register(Estado)
@@ -74,3 +75,14 @@ class EncuentrosAdmin(admin.ModelAdmin):
     list_display = ('fecha', 'agencia', 'estadoEU', 'estado', 'nacionalidad', 'encuentros_total')
     list_filter = ('fecha', 'estadoEU', 'estado', 'nacionalidad')
     search_fields = ('agencia', 'ciudadEU', 'estadoEU', 'estado__nombre', 'nacionalidad__nombre')
+
+@admin.register(TipoPRH)
+class TipoPRHAdmin(admin.ModelAdmin):
+    list_display = ('nombre',)
+    search_fields = ('nombre',)
+
+@admin.register(PRHs)
+class PRHsAdmin(admin.ModelAdmin):
+    list_display = ('nombre', 'estado', 'modalidad', 'activo')
+    list_filter = ('estado', 'modalidad', 'activo')
+    search_fields = ('nombre', 'estado__nombre', 'modalidad__nombre')
