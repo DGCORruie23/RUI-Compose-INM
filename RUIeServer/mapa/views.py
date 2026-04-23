@@ -342,6 +342,10 @@ def mapa_informacion(request):
     p.outline_line_color = None
     p.min_border = 0
     
+    # Asegurar desplazamiento libre sin límites de borde
+    p.x_range.bounds = None
+    p.y_range.bounds = None
+    
     # Configurar el mapa de calor inicial (Todos)
     custom_palette = list(Greens256[:205]) # Cortamos la paleta al 80% aprox
     color_mapper = LinearColorMapper(palette=custom_palette, low=1, high=32)
@@ -575,8 +579,8 @@ def mapa_informacion(request):
         const range_width = Math.abs(x_range.end - x_range.start);
         
         // --- PARÁMETROS DE ESCALA ---
-        // Escala Inicial (Vista Nacional): el icono ocupará ~1.2 grados de ancho
-        // Escala Final (Zoom Máximo): el icono se reducirá hasta ~0.01 grados
+        // Escala Inicial (Vista Nacional): el icono ocupará ~0.35 grados de ancho
+        // Escala Final (Zoom Máximo): el icono se reducirá hasta ~0.001 grados
         const factor = 0.0332; 
         const min_size = 0.001;  // Límite inferior (Zoom máximo)
         const max_size = 0.35;   // Límite superior (Vista Nacional)

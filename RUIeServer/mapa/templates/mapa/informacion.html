@@ -111,11 +111,11 @@
         <div class="space-y-4">
           <div>
             <label class="block text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Fecha Inicial</label>
-            <input type="date" id="customStart" min="2024-10-01" class="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-inm-verde-100 outline-none">
+            <input type="date" id="customStart" min="2024-10-01" max="{{ fecha_actualizacion|date:'Y-m-d' }}" class="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-inm-verde-100 outline-none">
           </div>
           <div>
             <label class="block text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Fecha Final</label>
-            <input type="date" id="customEnd" class="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-inm-verde-100 outline-none">
+            <input type="date" id="customEnd" max="{{ fecha_actualizacion|date:'Y-m-d' }}" class="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-inm-verde-100 outline-none">
           </div>
         </div>
 
@@ -567,9 +567,9 @@
     const label = document.getElementById('currentPeriodLabel');
 
     const cs_start = "01 OCT 2024";
-    const cs_end = "30 MAR 2026";
+    const cs_end = "{{ fecha_actualizacion|date:'d M Y'|upper }}";
     const dt_start = "20 ENE 2025";
-    const dt_end = "30 MAR 2026";
+    const dt_end = "{{ fecha_actualizacion|date:'d M Y'|upper }}";
     
     if (period === 'cs') {
       btnCS.className = "px-5 py-1.5 text-[11px] font-bold rounded-lg transition-all duration-300 bg-inm-verde-100 text-white shadow-md active:scale-95";
