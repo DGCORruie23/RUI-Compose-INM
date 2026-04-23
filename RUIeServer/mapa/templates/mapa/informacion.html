@@ -620,6 +620,12 @@
         return;
     }
 
+    const maxDate = "{{ fecha_actualizacion|date:'Y-m-d' }}";
+    if (end > maxDate || start > maxDate) {
+        alert("La fecha seleccionada no puede ser superior a la fecha de actualización: " + maxDate);
+        return;
+    }
+
     loader.classList.remove('hidden');
     btn.disabled = true;
 

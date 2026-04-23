@@ -780,10 +780,16 @@ def api_periodo_custom(request):
         start_date = datetime.strptime(start_str, '%Y-%m-%d').date()
         end_date = datetime.strptime(end_str, '%Y-%m-%d').date()
 
-        # Restricción: No anterior al 1 de Octubre de 2024
+        # Restricciones de Rango
         MIN_DATE = date(2024, 10, 1)
+        MAX_DATE = get_global_update_date() or date.today()
+
         if start_date < MIN_DATE:
             start_date = MIN_DATE
+        if end_date > MAX_DATE:
+            end_date = MAX_DATE
+        if start_date > end_date:
+            start_date = end_date
 
         # Obtener datos
         totals_custom = get_totals_by_period(start_date, end_date)
