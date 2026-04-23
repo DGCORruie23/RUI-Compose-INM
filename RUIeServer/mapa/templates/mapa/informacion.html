@@ -37,6 +37,59 @@
     display: block !important;
     width: 100%;
   }
+
+  /* Estilos para el Modo Enfoque (Pantalla Completa) */
+  body.focus-mode {
+    overflow: hidden !important;
+  }
+  
+  #main-section.focus-mode {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    z-index: 2000 !important;
+    margin: 0 !important;
+    padding: 0.75rem !important; /* Reducido de 1.5rem */
+    border-radius: 0 !important;
+    background: #f9fafb !important;
+  }
+
+  /* Asegurar que la cuadrícula ocupe todo el espacio en modo enfoque */
+  #main-section.focus-mode > div.grid {
+    height: 100% !important;
+    gap: 0.75rem !important; /* Reducir gap entre mapa y panel */
+  }
+
+  /* Ajustar el panel derecho para que no se corte */
+  #main-section.focus-mode #right-panel {
+    max-height: none !important;
+    height: 100% !important;
+  }
+
+  /* Optimizaciones para resoluciones bajas (como 1024x768) */
+  @media (max-height: 800px) {
+    #main-section.focus-mode .p-6 { padding: 0.75rem !important; }
+    #main-section.focus-mode .space-y-6 > * + * { margin-top: 0.75rem !important; }
+    #main-section.focus-mode .text-2xl { font-size: 1.25rem !important; line-height: 1.75rem !important; }
+    #main-section.focus-mode .text-3xl { font-size: 1.5rem !important; line-height: 2rem !important; }
+    
+    /* Hacer la leyenda del mapa más compacta */
+    #main-section.focus-mode .absolute.bottom-6.left-6 {
+      bottom: 1rem !important;
+      left: 1rem !important;
+      padding: 0.5rem !important;
+      width: 130px !important;
+    }
+    #main-section.focus-mode .absolute.bottom-6.left-6 span { font-size: 0.65rem !important; }
+    
+    /* Compactar controles de zoom */
+    #main-section.focus-mode .absolute.top-6.right-6 {
+      top: 1rem !important;
+      right: 1rem !important;
+    }
+  }
 </style>
 {% endblock styles %}
 
@@ -126,6 +179,12 @@
         <button onclick="resetMap()" title="Vista Nacional (Reiniciar)" class="bg-white/90 backdrop-blur-md p-3 rounded-2xl shadow-xl border border-gray-100 hover:bg-inm-verde-100 hover:text-white text-inm-verde-100 transition-all active:scale-95">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
         </button>
+        <div class="h-px bg-gray-200/50 my-1"></div>
+        <button onclick="toggleFocusMode()" title="Modo Enfoque (Pantalla Completa)" class="bg-white/90 backdrop-blur-md p-3 rounded-2xl shadow-xl border border-gray-100 hover:bg-gray-800 hover:text-white text-gray-600 transition-all active:scale-95">
+          <svg id="focusIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>
+          </svg>
+        </button>
       </div>
 
       <!-- Contenedor del Div Generado por Bokeh -->
@@ -133,7 +192,7 @@
     </div>
 
     <!-- Panel Derecho: Información del Estado (Rediseñado) -->
-    <div class="col-span-1 lg:col-span-2 bg-white rounded-xl shadow-md border border-gray-200 flex flex-col h-full max-h-[750px] overflow-hidden">
+    <div id="right-panel" class="col-span-1 lg:col-span-2 bg-white rounded-xl shadow-md border border-gray-200 flex flex-col h-full max-h-[750px] overflow-hidden">
       
       <!-- NUEVA CABECERA DEL PANEL: Título y Periodo -->
       <div class="p-6 pb-4 border-b border-gray-50 bg-gray-50/30">
@@ -169,12 +228,12 @@
           <!-- Card Rescatados -->
           <div onclick="showDetail('rescatados')" class="bg-gray-50 border border-gray-200 p-2 rounded-xl cursor-pointer hover:border-inm-verde-100 hover:shadow-sm transition-all group text-center">
             <div id="card_rescatados_val" class="text-lg font-bold text-gray-700 group-hover:text-inm-verde-100 card-value">-</div>
-             <div id="card_rescatados_lbl" class="text-[9px] uppercase tracking-wider text-gray-400 font-semibold group-hover:text-inm-verde-100 leading-tight card-label">Rescatados</div>
+             <div id="card_rescatados_lbl" class="text-[9px] uppercase tracking-wider text-gray-400 font-semibold group-hover:text-inm-verde-100 leading-tight card-label">Rescates</div>
           </div>
           <!-- Card Ingresos -->
           <div onclick="showDetail('ingresos')" class="bg-gray-50 border border-gray-200 p-2 rounded-xl cursor-pointer hover:border-inm-verde-100 hover:shadow-sm transition-all group text-center">
             <div id="card_ingresos_val" class="text-lg font-bold text-gray-700 group-hover:text-inm-verde-100 card-value">-</div>
-            <div id="card_ingresos_lbl" class="text-[9px] uppercase tracking-wider text-gray-400 font-semibold group-hover:text-inm-verde-100 leading-tight card-label">Ingresos</div>
+            <div id="card_ingresos_lbl" class="text-[9px] uppercase tracking-wider text-gray-400 font-semibold group-hover:text-inm-verde-100 leading-tight card-label">Internaciones</div>
           </div>
           <!-- Card Trámites -->
           <div onclick="showDetail('tramites')" class="bg-gray-50 border border-gray-200 p-2 rounded-xl cursor-pointer hover:border-inm-verde-100 hover:shadow-sm transition-all group text-center">
@@ -262,7 +321,6 @@
     <div class="p-6">
       <div class="flex justify-between items-start mb-6">
         <div>
-          {% comment %} <h3 class="text-xs font-bold uppercase tracking-widest text-gray-400 mb-1">Seleccione Categoría</h3> {% endcomment %}
           <div class="flex items-baseline gap-2">
             <span class="text-[9px] uppercase tracking-tighter text-gray-400 font-bold">Total de Recibidos</span>
             <span id="sel_total_val" class="text-xl font-black text-inm-verde-100 leading-none">-</span>
@@ -303,9 +361,12 @@
         <div>
           <h3 id="modalStateName" class="text-[10px] font-bold uppercase tracking-widest text-inm-verde-100 mb-1">-</h3>
           <h4 id="detailTitle" class="text-3xl font-bold text-gray-800">Desglose</h4>
-          <div class="mt-1 flex items-baseline gap-2">
-            <span class="text-[10px] uppercase tracking-widest text-gray-400 font-bold">Total: </span>
-            <span id="modalTotalValue" class="text-xl font-black text-inm-verde-100 leading-none">-</span>
+          <div class="mt-1 flex flex-col gap-1">
+            <div class="flex items-baseline gap-2">
+              <span class="text-[10px] uppercase tracking-widest text-gray-400 font-bold">Total: </span>
+              <span id="modalTotalValue" class="text-xl font-black text-inm-verde-100 leading-none">-</span>
+            </div>
+            <div id="modalPeriodDisplay" class="text-[10px] py-2 uppercase tracking-wider font-bold text-inm-verde-100/50"></div>
           </div>
         </div>
         <button onclick="closeDetail()" class="text-gray-400 hover:text-gray-600 transition-colors bg-gray-50 p-2 rounded-xl">
@@ -369,6 +430,26 @@
         window.updateInformationPanel();
     }
   });
+
+  window.toggleFocusMode = function() {
+    const mainSection = document.getElementById('main-section');
+    const icon = document.getElementById('focusIcon');
+    const body = document.body;
+    
+    mainSection.classList.toggle('focus-mode');
+    body.classList.toggle('focus-mode');
+    
+    if (mainSection.classList.contains('focus-mode')) {
+      icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>';
+    } else {
+      icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>';
+    }
+    
+    // Forzar a Bokeh a re-dimensionar
+    setTimeout(() => {
+        window.dispatchEvent(new Event('resize'));
+    }, 100);
+  };
 
   window.updateInformationPanel = function() {
     if (!window.selectedStateData) return;
@@ -643,6 +724,10 @@
     const totalVal = data[category] || 0;
     document.getElementById('modalTotalValue').innerText = totalVal.toLocaleString();
     
+    // Asignar el texto del periodo actual
+    const currentPeriodText = document.getElementById('currentPeriodLabel').innerText;
+    document.getElementById('modalPeriodDisplay').innerText = "Periodo de consulta: " + currentPeriodText;
+    
     modalContainer.classList.remove('animate-fade-in');
     void modalContainer.offsetWidth; // Trigger reflow
     modalContainer.classList.add('animate-fade-in');
@@ -655,18 +740,18 @@
     const mapping = {
         'repatriados': [
             { k: 'rep_adultos', label: 'Adultos' },
-            { k: 'rep_menores', label: 'Menores' },
+            { k: 'rep_menores', label: 'NNA Total' },
             { k: 'rep_nna_solo', label: 'NNA No Acompañados' },
             { k: 'rep_nna_acom', label: 'NNA Acompañados' },
             { k: 'rep_terrestres', label: 'Vía Terrestre' },
-            { k: 'rep_vuelos', label: 'Vía Aérea (Vuelos)' }
+            { k: 'rep_vuelos', label: 'Vía Aérea (Vuelos PRIM)' }
         ],
         'recibidos': [
             { k: 'rec_adultos', label: 'Adultos' },
-            { k: 'rec_menores', label: 'Menores' }
+            { k: 'rec_menores', label: 'NNA' }
         ],
         'rescatados': [
-            { k: 'res_una_vez', label: 'Rescate Primera Vez (Personas)' },
+            { k: 'res_una_vez', label: 'Rescatados Primera Vez (Personas)' },
             { k: 'res_estacion', label: 'En Estación Migratoria' },
             { k: 'res_dif', label: 'Canalizados DIF' },
             { k: 'res_reincidente', label: 'Reincidencias (Eventos)' }
@@ -679,11 +764,11 @@
         'tramites': [
             { k: 'tra_res_perm', label: 'Residencia Permanente' },
             { k: 'tra_res_temp', label: 'Residencia Temporal' },
-            { k: 'tra_res_est', label: 'Estudios' },
-            { k: 'tra_vis_hum', label: 'Humanitarias' },
-            { k: 'tra_vis_adop', label: 'Adopción' },
-            { k: 'tra_vis_reg', label: 'Regional' },
-            { k: 'tra_vis_trab', label: 'Trabajador' }
+            { k: 'tra_res_est', label: 'Residente Temporal Estudiante' },
+            { k: 'tra_vis_hum', label: 'Visitante por Razones Humanitarias' },
+            { k: 'tra_vis_adop', label: 'Visitante con fines de Adopción' },
+            { k: 'tra_vis_reg', label: 'Visitante Regional' },
+            { k: 'tra_vis_trab', label: 'Visitante Trabajador Fronterizo' }
         ],
         'retornados': [
             { k: 'ret_deportado', label: 'Deportados' },
@@ -746,7 +831,7 @@
                         </svg>
                     </div>
                 </div>
-                <p class="text-[10px] text-red-400 mt-2 font-medium text-center italic">Cifra de inadmitidos correspondiente al periodo actual</p>
+                <p class="text-[10px] text-red-400 mt-2 font-medium text-center italic">*Persona(s) extranjera(s) a la que se le niega la entrada a territorio nacional en cualquier punto de internación (aéreo, terrestre o marítimo), por ubicarse en alguno de los supuestos previstos en la Ley de Migración</p>
             </div>
         `;
     }

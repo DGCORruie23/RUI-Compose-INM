@@ -225,12 +225,13 @@ def mapa_informacion(request):
     if not request.user.is_superuser:
         return render(request, 'base/error404.html')
 
+    fecha_act = get_global_update_date() or date.today()
+
     CS_START = date(2024, 10, 1)
     DT_START = date(2025, 1, 20)
-    TODAY = date.today()
 
-    totals_cs = get_totals_by_period(CS_START, TODAY)
-    totals_dt = get_totals_by_period(DT_START, TODAY)
+    totals_cs = get_totals_by_period(CS_START, fecha_act)
+    totals_dt = get_totals_by_period(DT_START, fecha_act)
     
     # Etiqueta centralizada para la escala global
     LABEL_NACIONAL = "Total Nacional"
@@ -240,8 +241,8 @@ def mapa_informacion(request):
         'todos': 'Todos',
         'repatriados': 'Mexicanos Recibidos',
         'recibidos': 'Extranjeros Recibidos',
-        'rescatados': 'Rescatados',
-        'ingresos': 'Ingresos',
+        'rescatados': 'Rescates',
+        'ingresos': 'Internaciones',
         'tramites': 'Trámites',
         'retornados': 'Retornados',
         'inadmitidos': 'Inadmitidos',
@@ -387,6 +388,7 @@ def mapa_informacion(request):
     infra_source = ColumnDataSource(infra_pts_data)
     infra_layer = p.image_url(url='url', x='x', y='y', w=0.25, h=0.25, source=infra_source, 
                               anchor="center", name="infra_layer")
+    infra_layer.nonselection_glyph = None  # Evitar 404 al intentar renderizar estado "no seleccionado"
     
     # Hover específico para puntos de infraestructura
     infra_hover = HoverTool(
@@ -419,6 +421,7 @@ def mapa_informacion(request):
     prh_source = ColumnDataSource(prh_pts_data)
     prh_layer = p.image_url(url='url', x='x', y='y', w=0.25, h=0.25, source=prh_source, 
                               anchor="center", name="prh_layer")
+    prh_layer.nonselection_glyph = None  # Evitar 404 al intentar renderizar estado "no seleccionado"
     
     # Hover específico para PRHs
     prh_hover = HoverTool(
@@ -563,9 +566,34 @@ def mapa_informacion(request):
     p.js_on_event('panstart', long_press_callback)
     p.js_on_event('tap', long_press_callback)
 
+    # --- ESCALADO DINÁMICO DE ICONOS SEGÚN EL ZOOM ---
+    scale_icons_js = CustomJS(args=dict(
+        x_range=p.x_range,
+        infra_glyph=infra_layer.glyph,
+        prh_glyph=prh_layer.glyph
+    ), code="""
+        const range_width = Math.abs(x_range.end - x_range.start);
+        
+        // --- PARÁMETROS DE ESCALA ---
+        // Escala Inicial (Vista Nacional): el icono ocupará ~1.2 grados de ancho
+        // Escala Final (Zoom Máximo): el icono se reducirá hasta ~0.01 grados
+        const factor = 0.0332; 
+        const min_size = 0.001;  // Límite inferior (Zoom máximo)
+        const max_size = 0.35;   // Límite superior (Vista Nacional)
+        
+        let new_size = range_width * factor; 
+        
+        if (new_size < min_size) new_size = min_size;
+        if (new_size > max_size) new_size = max_size;
+        
+        infra_glyph.w = new_size;
+        infra_glyph.h = new_size;
+        prh_glyph.w = new_size;
+        prh_glyph.h = new_size;
+    """)
+    p.x_range.js_on_change('start', scale_icons_js)
+
     script, div = components(p)
-    
-    fecha_act = get_global_update_date()
     
     context = {
         'map_script': script,
