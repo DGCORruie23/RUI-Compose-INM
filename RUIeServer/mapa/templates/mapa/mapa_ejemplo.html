@@ -1,0 +1,215 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}Mapa de Ejemplo MapLibre{% endblock title %}
+
+{% block styles %}
+<!-- Estilos de MapLibre GL JS -->
+<link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
+<style>
+  .map-wrapper {
+    padding: 1.5rem;
+    background: #ffffff;
+    border-radius: 1rem;
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+    margin-top: 1rem;
+  }
+  #map { 
+    height: 650px; 
+    width: 100%; 
+    border-radius: 0.75rem; 
+  }
+</style>
+{% endblock styles %}
+
+{% block content %}
+<main class="page px-8 pt-4 pb-8 bg-gray-50 rounded-2xl shadow-lg flex flex-col justify-start min-h-[calc(100vh-4rem)]">
+  <div class="max-w-7xl mx-auto w-full">
+    <div class="flex items-center justify-between mb-4">
+        <h1 class="text-3xl font-bold text-gray-800">Mapa de Calor Interactivo</h1>
+        <span class="px-4 py-1.5 bg-inm-verde-100 text-white text-xs font-bold rounded-full shadow-md">MapLibre GL JS</span>
+    </div>
+    <p class="text-gray-600 mb-2 text-sm">Este es un ejemplo de un mapa interactivo cargando el GeoJSON de México. A cada estado se le asigna un color aleatorio dinámicamente y se posicionan 3 marcadores aleatorios.</p>
+    
+    <div class="map-wrapper border border-gray-200">
+      <div id="map"></div>
+    </div>
+  </div>
+</main>
+
+<!-- Scripts de MapLibre GL JS y Turf.js -->
+<script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    // 1. Inicializar el mapa con Esri World Imagery
+    const map = new maplibregl.Map({
+      container: 'map',
+      style: {
+        'version': 8,
+        'sources': {
+          'esri-imagery': {
+            'type': 'raster',
+            'tiles': [
+              'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}'
+            ],
+            'tileSize': 256,
+            'attribution': 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+          }
+        },
+        'layers': [
+          {
+            'id': 'esri-imagery-layer',
+            'type': 'raster',
+            'source': 'esri-imagery',
+            'minzoom': 0,
+            'maxzoom': 24
+          }
+        ]
+      },
+      center: [-102.5528, 23.6345], // Coordenadas centrales de México
+      zoom: 4.5,
+      minZoom: 3,
+      maxZoom: 12
+    });
+
+    // Control de navegación (zoom, rotación)
+    map.addControl(new maplibregl.NavigationControl(), 'top-right');
+
+    map.on('load', () => {
+      // 2. Cargar el GeoJSON de México de manera asíncrona
+      fetch('https://raw.githubusercontent.com/codeforamerica/click_that_hood/master/public/data/mexico.geojson')
+        .then(res => res.json())
+        .then(data => {
+            
+          // 3. Asignar colores aleatorios a cada estado
+          data.features.forEach(feature => {
+            // Generar un color Hex aleatorio, e.g. #3A7F5C
+            const randomColor = '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
+            feature.properties.color = randomColor;
+          });
+
+          // 4. Agregar la fuente de datos al mapa
+          map.addSource('mexico-states', {
+            type: 'geojson',
+            data: data
+          });
+
+          // Crear una máscara del resto del mundo usando Turf.js para ocultarlo
+          const worldMask = turf.mask(data);
+          map.addSource('world-mask', {
+            type: 'geojson',
+            data: worldMask
+          });
+
+          // Capa de la máscara para ocultar los demás países
+          map.addLayer({
+            id: 'world-mask-fill',
+            type: 'fill',
+            source: 'world-mask',
+            paint: {
+              'fill-color': '#f9fafb', // Mismo color del fondo de la página
+              'fill-opacity': 1
+            }
+          });
+
+          // 5. Agregar la capa de polígonos (relleno)
+          map.addLayer({
+            id: 'mexico-states-fill',
+            type: 'fill',
+            source: 'mexico-states',
+            paint: {
+              // Obtenemos el color directamente de las propiedades del Feature
+              'fill-color': ['get', 'color'],
+              'fill-opacity': 0.4 // Más transparente para ver el relieve de Esri
+            }
+          });
+          
+          // 6. Agregar bordes (líneas) a los estados
+          map.addLayer({
+            id: 'mexico-states-line',
+            type: 'line',
+            source: 'mexico-states',
+            paint: {
+              'line-color': '#ffffff',
+              'line-width': 1.5
+            }
+          });
+
+          // Agregar efecto hover simple (cambia la opacidad al pasar el cursor)
+          map.addLayer({
+            id: 'mexico-states-fill-hover',
+            type: 'fill',
+            source: 'mexico-states',
+            paint: {
+              'fill-color': ['get', 'color'],
+              'fill-opacity': 0.7
+            },
+            filter: ['==', 'name', ''] // Filtro vacío inicialmente
+          });
+
+          // Crear un popup para mostrar el nombre del estado al hacer hover
+          const statePopup = new maplibregl.Popup({
+            closeButton: false,
+            closeOnClick: false
+          });
+
+          map.on('mousemove', 'mexico-states-fill', (e) => {
+            if (e.features.length > 0) {
+              // Obtener el nombre del estado (depende del GeoJSON, aquí se asume 'name')
+              const stateName = e.features[0].properties.name;
+              map.setFilter('mexico-states-fill-hover', ['==', 'name', stateName]);
+              map.getCanvas().style.cursor = 'pointer';
+              
+              // Mostrar el popup con el nombre del estado
+              statePopup
+                .setLngLat(e.lngLat)
+                .setHTML(`<div class="px-2 py-1 font-bold text-gray-800 text-sm tracking-wide uppercase">${stateName}</div>`)
+                .addTo(map);
+            }
+          });
+
+          map.on('mouseleave', 'mexico-states-fill', () => {
+            map.setFilter('mexico-states-fill-hover', ['==', 'name', '']);
+            map.getCanvas().style.cursor = '';
+            
+            // Ocultar el popup
+            statePopup.remove();
+          });
+
+          // 7. Generar y agregar 3 marcadores aleatorios
+          // Límites aproximados de México para generar coordenadas:
+          const minLng = -116.0;
+          const maxLng = -87.0;
+          const minLat = 15.0;
+          const maxLat = 32.0;
+
+          for (let i = 0; i < 3; i++) {
+              const lng = minLng + Math.random() * (maxLng - minLng);
+              const lat = minLat + Math.random() * (maxLat - minLat);
+              
+              // Crear un popup para el marcador
+              const popup = new maplibregl.Popup({ offset: 25 })
+                  .setText(`Marcador Aleatorio ${i+1}`);
+
+              // Crear elemento de imagen para el icono personalizado
+              const el = document.createElement('img');
+              el.src = "{% static 'mapa/icons/agente_activo.svg' %}";
+              el.style.width = '36px';
+              el.style.height = '36px';
+              el.style.cursor = 'pointer';
+
+              new maplibregl.Marker({ element: el })
+                  .setLngLat([lng, lat])
+                  .setPopup(popup)
+                  .addTo(map);
+          }
+        })
+        .catch(err => {
+            console.error("Error al cargar el GeoJSON:", err);
+            alert("No se pudo cargar el archivo GeoJSON de México.");
+        });
+    });
+  });
+</script>
+{% endblock %}

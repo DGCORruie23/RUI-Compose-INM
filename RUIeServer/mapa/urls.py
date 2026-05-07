@@ -3,6 +3,7 @@ from mapa import views
 
 urlpatterns = [
     path('informacion', views.mapa_informacion, name="mostrar_mapa"),
+    path('mapa-ejemplo', views.mapa_ejemplo, name="mapa_ejemplo"),
     path('carga-datos', views.carga_datos, name="carga_datos"),
     path('carga-nacionalidades', views.carga_nacionalidades, name="carga_nacionalidades"),
     path('carga-oficinas', views.carga_oficinas, name="carga_oficinas"),

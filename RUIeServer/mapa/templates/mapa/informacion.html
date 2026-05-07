@@ -4,8 +4,8 @@
 {% block title %}Mapa de Oficinas{% endblock title %}
 
 {% block styles %}
-<!-- Inclusión de los estilos de Bokeh -->
-<link href="https://cdn.bokeh.org/bokeh/release/bokeh-3.6.2.min.css" rel="stylesheet" type="text/css">
+<!-- Inclusión de los estilos de MapLibre GL JS -->
+<link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
 <style>
   .custom-scrollbar::-webkit-scrollbar { width: 4px; }
   .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
@@ -54,6 +54,12 @@
     padding: 0.75rem !important; /* Reducido de 1.5rem */
     border-radius: 0 !important;
     background: #f9fafb !important;
+  }
+
+  /* Asegurar que los modales estén por encima del modo enfoque */
+  body.focus-mode #infoModal,
+  body.focus-mode #selectionModal {
+    z-index: 3000 !important;
   }
 
   /* Asegurar que la cuadrícula ocupe todo el espacio en modo enfoque */
@@ -168,14 +174,7 @@
       </div>
 
       <!-- Controles de Zoom Personalizados (Flotantes) -->
-      <div class="absolute top-6 right-6 flex flex-col gap-2 z-10 transition-all duration-500">
-        <button onclick="zoomMap(0.8)" title="Acercar" class="bg-white/90 backdrop-blur-md p-3 rounded-2xl shadow-xl border border-gray-100 hover:bg-white text-inm-verde-100 transition-all active:scale-95 group">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
-        </button>
-        <button onclick="zoomMap(1.2)" title="Alejar" class="bg-white/90 backdrop-blur-md p-3 rounded-2xl shadow-xl border border-gray-100 hover:bg-white text-inm-verde-100 transition-all active:scale-95 group">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M20 12H4"></path></svg>
-        </button>
-        <div class="h-px bg-gray-200/50 my-1"></div>
+      <div class="absolute bottom-8 right-6 flex flex-col gap-2 z-10 transition-all duration-500">
         <button onclick="resetMap()" title="Vista Nacional (Reiniciar)" class="bg-white/90 backdrop-blur-md p-3 rounded-2xl shadow-xl border border-gray-100 hover:bg-inm-verde-100 hover:text-white text-inm-verde-100 transition-all active:scale-95">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
         </button>
@@ -187,8 +186,8 @@
         </button>
       </div>
 
-      <!-- Contenedor del Div Generado por Bokeh -->
-      {{ map_div|safe }}
+      <!-- Contenedor del Mapa MapLibre -->
+      <div id="map" class="w-full h-full rounded-xl"></div>
     </div>
 
     <!-- Panel Derecho: Información del Estado (Rediseñado) -->
@@ -420,6 +419,7 @@
     // Inicializar con Datos Nacionales del Backend (Restaurado)
     try {
         window.selectedStateData = {{ national_data_json|safe }};
+        window.nationalData = {{ national_data_json|safe }};
         window.infraData = {{ infra_data_json|safe }};
         console.log("Datos Nacionales cargados:", window.selectedStateData);
     } catch (e) {
@@ -445,8 +445,9 @@
       icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>';
     }
     
-    // Forzar a Bokeh a re-dimensionar
+    // Forzar a MapLibre a re-dimensionar
     setTimeout(() => {
+        if(map) map.resize();
         window.dispatchEvent(new Event('resize'));
     }, 100);
   };
@@ -470,6 +471,7 @@
   };
 
   function updateInfraSection() {
+    if (!window.selectedStateData) return;
     const section = document.getElementById('infraSection');
     const metric = window.currentMetric || 'todos';
     
@@ -634,41 +636,33 @@
         const result = await response.json();
 
         if (result.status === 'success') {
-            // 1. Actualizar los datos del mapa (GeoJSONDataSource)
-            const views = Object.values(Bokeh.index);
-            if (views.length > 0) {
-                const source = views[0].model.renderers.find(r => r.data_source).data_source;
-                const newData = { ...source.data };
+            // 1. Actualizar los datos del mapa (GeoJSON)
+            Object.keys(result.data).forEach(stateKey => {
+                const feature = geoDataJSON.features.find(f => normalizar_nombre(f.properties.name) === stateKey);
+                if (feature) {
+                    const stateData = result.data[stateKey];
+                    Object.keys(stateData).forEach(k => {
+                        feature.properties[`pe_${k}`] = stateData[k];
+                        feature.properties[`pe_str_${k}`] = stateData[k].toLocaleString();
+                    });
+                }
+            });
 
-                // Actualizar todas las columnas que empiezan con pe_
-                Object.keys(result.data).forEach(stateKey => {
-                    const idx = newData.name.map(n => normalizar_nombre(n)).indexOf(stateKey);
-                    if (idx !== -1) {
-                        const stateData = result.data[stateKey];
-                        Object.keys(stateData).forEach(k => {
-                            if (newData[`pe_${k}`]) {
-                                newData[`pe_${k}`][idx] = stateData[k];
-                            }
-                        });
-                        // Actualizar strings para tooltip
-                        ['todos', 'repatriados', 'recibidos', 'rescatados', 'ingresos', 'tramites', 'retornados', 'inadmitidos'].forEach(cat => {
-                            if (newData[`pe_str_${cat}`]) {
-                                newData[`pe_str_${cat}`][idx] = stateData[cat].toLocaleString();
-                            }
-                        });
-                    }
-                });
-
-                source.data = newData;
-                source.change.emit();
+            // Forzar actualización del mapa
+            if (map && map.getSource('mexico-states')) {
+                map.getSource('mexico-states').setData(geoDataJSON);
             }
 
-            // 2. Actualizar selectedStateData para la vista actual (Centralizada vs Estado)
-            // Si el nombre coincide con la etiqueta global, usamos el 'national' del result
+            // 2. Actualizar Datos Nacionales
+            const nat = window.nationalData;
+            Object.keys(result.national).forEach(k => {
+                nat.pe[k] = result.national[k];
+            });
+
+            // 2.5 Actualizar selectedStateData para la vista actual (Centralizada vs Estado)
             if (window.selectedStateData.name === LABEL_NACIONAL) {
                 window.selectedStateData.pe = result.national;
             } else {
-                // Si es un estado, buscamos sus datos en result.data
                 const normalizedCurrent = normalizar_nombre(window.selectedStateData.name);
                 if (result.data[normalizedCurrent]) {
                     window.selectedStateData.pe = result.data[normalizedCurrent];
@@ -851,312 +845,160 @@
     infoModal.classList.add('hidden');
   };
 
-  // Funciones para control de Zoom en Bokeh
+  // Funciones para control del Mapa (MapLibre)
   window.zoomMap = function(factor) {
-    const views = Object.values(Bokeh.index);
-    if (views.length > 0) {
-      // Tomamos la primera gráfica encontrada
-      const plot = views[0].model;
-      const x_range = plot.x_range;
-      const y_range = plot.y_range;
-      
-      const x_mid = (x_range.start + x_range.end) / 2;
-      const y_mid = (y_range.start + y_range.end) / 2;
-      
-      const x_span = (x_range.end - x_range.start) * factor;
-      const y_span = (y_range.end - y_range.start) * factor;
-      
-      x_range.start = x_mid - x_span / 2;
-      x_range.end = x_mid + x_span / 2;
-      y_range.start = y_mid - y_span / 2;
-      y_range.end = y_mid + y_span / 2;
-      
-      // CRÍTICO: Avisar a Bokeh que hemos modificado el zoom intencionalmente
-      // para evitar que sus funciones de auto-encuadre borren esta posición.
-      if (x_range) x_range.have_updated_interactively = true;
-      if (y_range) y_range.have_updated_interactively = true;
-    }
+      if (!map) return;
+      if (factor < 1) map.zoomIn();
+      else map.zoomOut();
   };
 
   window.resetMap = function() {
-    const views = Object.values(Bokeh.index);
-    if (views.length > 0) {
-        const plot = views[0].model;
-        plot.reset.emit(); // Bokeh reset nativo (zoom)
-        
-        // Limpiar selección de datos
-        const statesRenderer = plot.renderers.find(r => r.glyph && r.glyph.type === 'Patches');
-        if (statesRenderer) {
-            statesRenderer.data_source.selected.indices = [];
-            statesRenderer.data_source.change.emit();
-        }
-        
-        // Quitar la bandera para permitir auto-encuadre otra vez si es necesario
-        if (plot.x_range) plot.x_range.have_updated_interactively = false;
-        if (plot.y_range) plot.y_range.have_updated_interactively = false;
-        
-        window.selectedStateData = JSON.parse('{{ national_data_json|safe }}');
-        window.currentInfraFilter = null; // Resetear filtros de iconos
-        
-        updateInformationPanel();
-        animateToNationalView(); // Regresar animadamente por seguridad
-    }
+      if (!map) return;
+      
+      // Limpiar selección de datos
+      window.selectedStateData = window.nationalData;
+      window.currentInfraFilter = null; // Resetear filtros de iconos
+      
+      updateInformationPanel();
+      animateToNationalView(); 
+      updateStateOpacity();
   };
 
-  /**
-   * ANIMACIÓN DE ZOOM Y CENTRADO
-   */
-  let zoomAnimationId = null;
+  window.animateToSelectedState = function(stateName) {
+      if (!map || !geoDataJSON) return;
+      const feature = geoDataJSON.features.find(f => normalizar_nombre(f.properties.name) === normalizar_nombre(stateName) || f.properties.name === stateName);
+      if (feature) {
+          const bbox = turf.bbox(feature);
+          map.fitBounds(bbox, { padding: 50, duration: 800 });
+      }
+  };
 
-  function animateToSelectedState(index) {
-    const views = Object.values(Bokeh.index);
-    if (views.length === 0) return;
-    const plot = views[0].model;
-    const source = plot.renderers.find(r => r.name === 'states_hover' || (r.glyph && r.glyph.type === 'Patches')).data_source;
-    
-    // Calcular Bounding Box del estado seleccionado
-    const xs = source.data.xs[index];
-    const ys = source.data.ys[index];
-    
-    // Función segura para aplanar estructuras de arrays anidados (Polygon vs MultiPolygon)
-    function getMinMax(arr) {
-        let min = Infinity, max = -Infinity;
-        function recurse(data) {
-            if (typeof data === 'number') {
-                if (data < min) min = data;
-                if (data > max) max = data;
-            } else if (data && data.length !== undefined) {
-                for (let i = 0; i < data.length; i++) {
-                    recurse(data[i]);
-                }
-            }
-        }
-        recurse(arr);
-        return {min, max};
-    }
-    
-    const xBounds = getMinMax(xs);
-    const yBounds = getMinMax(ys);
-    
-    const minX = xBounds.min;
-    const maxX = xBounds.max;
-    const minY = yBounds.min;
-    const maxY = yBounds.max;
-
-    const rawWidth = (maxX - minX);
-    const rawHeight = (maxY - minY);
-    
-    // Configurar padding del 40%
-    let targetWidth = rawWidth * 1.4;
-    let targetHeight = rawHeight * 1.4;
-
-    // Obtener la relación de aspecto actual del mapa para no deformarlo
-    const currentAspect = (plot.x_range.end - plot.x_range.start) / (plot.y_range.end - plot.y_range.start);
-    const targetAspect = targetWidth / targetHeight;
-
-    // Ajustar el alto o el ancho para que coincida con la proporción de la pantalla
-    if (targetAspect > currentAspect) {
-        // El estado es más "ancho" en proporción a la pantalla -> Aumentamos el alto
-        targetHeight = targetWidth / currentAspect;
-    } else {
-        // El estado es más "alto" en proporción a la pantalla -> Aumentamos el ancho
-        targetWidth = targetHeight * currentAspect;
-    }
-
-    const centerX = (minX + maxX) / 2;
-    const centerY = (minY + maxY) / 2;
-
-    performSmoothZoom(
-        centerX - targetWidth / 2, 
-        centerX + targetWidth / 2, 
-        centerY - targetHeight / 2, 
-        centerY + targetHeight / 2
-    );
-  }
-
-  // Guardar límites nacionales iniciales
-  window.nationalBounds = null;
-
-  function animateToNationalView() {
-    if (!window.nationalBounds) {
-        // Si no los tenemos, usamos el reset de Bokeh
-        const views = Object.values(Bokeh.index);
-        if (views.length > 0) views[0].model.reset.emit();
-        return;
-    }
-    performSmoothZoom(
-        window.nationalBounds.x_start, 
-        window.nationalBounds.x_end, 
-        window.nationalBounds.y_start, 
-        window.nationalBounds.y_end
-    );
-  }
-
-  function performSmoothZoom(targetXStart, targetXEnd, targetYStart, targetYEnd) {
-    const views = Object.values(Bokeh.index);
-    if (views.length === 0) return;
-    const plot = views[0].model;
-    const x_range = plot.x_range;
-    const y_range = plot.y_range;
-
-    // Guardar límites nacionales la primera vez que se hace zoom
-    if (!window.nationalBounds) {
-        window.nationalBounds = {
-            x_start: x_range.start,
-            x_end: x_range.end,
-            y_start: y_range.start,
-            y_end: y_range.end
-        };
-    }
-
-    if (zoomAnimationId) cancelAnimationFrame(zoomAnimationId);
-
-    const duration = 600; // ms
-    const startTime = performance.now();
-    
-    const startXStart = x_range.start;
-    const startXEnd = x_range.end;
-    const startYStart = y_range.start;
-    const startYEnd = y_range.end;
-
-    function frame(now) {
-        const elapsed = now - startTime;
-        const progress = Math.min(elapsed / duration, 1);
-        
-        // Función de easing (easeInOutCubic)
-        const t = progress < 0.5 ? 4 * progress * progress * progress : 1 - Math.pow(-2 * progress + 2, 3) / 2;
-
-        x_range.start = startXStart + (targetXStart - startXStart) * t;
-        x_range.end = startXEnd + (targetXEnd - startXEnd) * t;
-        y_range.start = startYStart + (targetYStart - startYStart) * t;
-        y_range.end = startYEnd + (targetYEnd - startYEnd) * t;
-
-        if (progress < 1) {
-            zoomAnimationId = requestAnimationFrame(frame);
-        } else {
-            // CRÍTICO: Al finalizar la animación, decirle a Bokeh que este es un zoom de usuario.
-            if (x_range) x_range.have_updated_interactively = true;
-            if (y_range) y_range.have_updated_interactively = true;
-        }
-    }
-    zoomAnimationId = requestAnimationFrame(frame);
-  }
+  window.animateToNationalView = function() {
+      if (!map) return;
+      map.flyTo({
+          center: [-102.5528, 23.6345],
+          zoom: 4.5,
+          duration: 800
+      });
+  };
 
   // Función para actualizar el Mapa de Calor Dinámicamente
   window.updateHeatmap = function() {
     const selectedRadio = document.querySelector('input[name="heatmap_metric"]:checked');
-    if (!selectedRadio) return;
+    if (!selectedRadio || !map) return;
     
     const metric = selectedRadio.value;
-    window.currentMetric = metric; // Actualizar variable global
+    window.currentMetric = metric; 
     
-    let colorPrefix = "";
-    if (metric === "todos") colorPrefix = "t";
-    else if (metric === "repatriados") colorPrefix = "rep";
-    else if (metric === "recibidos") colorPrefix = "rec";
-    else if (metric === "rescatados") colorPrefix = "res";
-    else if (metric === "ingresos") colorPrefix = "ing";
-    else if (metric === "tramites") colorPrefix = "tra";
-    else if (metric === "retornados") colorPrefix = "ret";
-    else if (metric === "inadmitidos") colorPrefix = "ina";
+    // Calcular el nombre de la propiedad raw (ej. cs_todos, dt_recibidos)
+    const rawFieldName = currentPeriod + '_' + metric;
     
-    const fieldName = currentPeriod + '_color_' + colorPrefix;
+    // Obtener el valor máximo para ajustar la escala de color
+    let maxValue = 1;
+    if (geoDataJSON && geoDataJSON.features) {
+        geoDataJSON.features.forEach(f => {
+            const val = f.properties[rawFieldName] || 0;
+            if (val > maxValue) {
+                maxValue = val;
+            }
+        });
+    }
     
-    // API Nativa de Bokeh en JavaScript
-    const views = Object.values(Bokeh.index);
-    if (views.length > 0) {
-      const plot = views[0].model;
-      
-      // Buscar el renderizador de tipo Patches (que es el que pinta los estados)
-      const patchRenderer = plot.renderers.find(r => r.type === 'GlyphRenderer' && r.glyph && r.glyph.type === 'Patches');
-      
-      if (patchRenderer && patchRenderer.glyph.fill_color) {
-        // Obtenemos el transformador (LinearColorMapper) existente
-        const cTransform = patchRenderer.glyph.fill_color.transform;
+    // Actualizar color y opacidad de la capa de estados
+    updateStateOpacity();
+
+    // Ocultar marcadores si la métrica no es "todos"
+    const isVisible = (metric === "todos");
+    if (window.mapMarkers) {
+        window.mapMarkers.forEach(m => {
+            m.element.style.display = isVisible ? 'block' : 'none';
+        });
+    }
+
+    if (isVisible && window.currentInfraFilter) {
+        filterInfraPoints(null);
+    }
+    
+    // ACTUALIZAR SECCIÓN DE INFRAESTRUCTURA
+    updateInfraSection();
+
+    // ACTUALIZAR GRÁFICA DE RANKING
+    updateRankingChart(metric);
+  };
+
+  /**
+   * Actualiza la opacidad de los estados para resaltar el seleccionado
+   */
+  window.updateStateOpacity = function() {
+    if (!map || !map.getLayer('mexico-states-fill')) return;
+    
+    const selectedName = (window.selectedStateData && window.selectedStateData.name !== LABEL_NACIONAL) 
+        ? window.selectedStateData.name 
+        : null;
+
+    const selectedRadio = document.querySelector('input[name="heatmap_metric"]:checked');
+    const metric = selectedRadio ? selectedRadio.value : 'todos';
+    
+    // Mapeo de métrica a campo de ranking
+    let rankSuffix = 't';
+    if (metric === 'repatriados') rankSuffix = 'rep';
+    else if (metric === 'recibidos') rankSuffix = 'rec';
+    else if (metric === 'rescatados') rankSuffix = 'res';
+    else if (metric === 'ingresos') rankSuffix = 'ing';
+    else if (metric === 'tramites') rankSuffix = 'tra';
+    else if (metric === 'retornados') rankSuffix = 'ret';
+    else if (metric === 'inadmitidos') rankSuffix = 'ina';
+
+    const rankFieldName = currentPeriod + '_color_' + rankSuffix;
+
+    // Rampa de colores: 31 niveles de verde para los rankings
+    // Usamos una interpolación con múltiples paradas para máxima distinción
+    const heatmapColorExpression = [
+        'interpolate',
+        ['linear'],
+        ['get', rankFieldName],
+        1,  '#00441b', // Rank 1 (Más activo)
+        8,  '#006d2c',
+        16, '#31a354',
+        24, '#a1d99b',
+        31, '#e5f5e0'  // Rank 31 (Menos activo)
+    ];
         
-        // Asignamos un nuevo objeto a la propiedad para que BokehJS identifique el cambio reactivo
-        patchRenderer.glyph.fill_color = { field: fieldName, transform: cTransform };
-        patchRenderer.glyph.hover_fill_color = { field: fieldName, transform: cTransform };
-        patchRenderer.glyph.selection_fill_color = { field: fieldName, transform: cTransform };
-        
-        if (cTransform) {
-            cTransform.low = 1;
-            cTransform.high = 32;
+    if (selectedName) {
+        // MODO ENFOQUE (VENTANA)
+        map.setPaintProperty('mexico-states-fill', 'fill-color', [
+            'case',
+            ['==', ['get', 'name'], selectedName], heatmapColorExpression,
+            '#ffffff'
+        ]);
+        map.setPaintProperty('mexico-states-fill', 'fill-opacity', [
+            'case',
+            ['==', ['get', 'name'], selectedName], 0.1,
+            1.0
+        ]);
+        if (map.getLayer('mexico-states-line')) {
+            map.setPaintProperty('mexico-states-line', 'line-opacity', [
+                'case',
+                ['==', ['get', 'name'], selectedName], 1.0,
+                0.0
+            ]);
         }
-        
-        // Forzamos el request de repintado visual (ligero)
-        patchRenderer.change.emit();
-      }
-
-      // Controlar la visibilidad de las capas de infraestructura y PRH
-      // Solo visibles cuando la métrica es 'todos'
-      const infraLayer = plot.renderers.find(r => r.name === 'infra_layer');
-      const prhLayer = plot.renderers.find(r => r.name === 'prh_layer');
-      
-      const isVisible = (metric === "todos");
-      
-      if (infraLayer) infraLayer.visible = isVisible;
-      if (prhLayer) prhLayer.visible = isVisible;
-
-      if (isVisible) {
-          // Resetear cualquier filtro activo al cambiar de métrica principal
-          if (window.currentInfraFilter) {
-              filterInfraPoints(null);
-          }
-      }
-      
-      // Actualizar el HoverTool de los estados para mostrar solo la categoría actual o todas si es "todos"
-      // Buscamos específicamente el que tiene el nombre 'states_hover' para evitar colisiones con infraestructura
-      let hover = plot.toolbar.tools.find(t => t.name === 'states_hover');
-      if (!hover) hover = plot.tools.find(t => t.name === 'states_hover');
-
-      if (hover) {
-          let html = `
-            <div style="padding: 8px; min-width: 170px; font-family: Arial, sans-serif;">
-                <div style="font-size: 16px; font-weight: 500; margin-bottom: 3px; color: #333;">@name</div>
-                <div style="border-bottom: 1px solid #ddd; margin-bottom: 5px;"></div>
-          `;
-
-          if (metric === "todos") {
-              const cats = [
-                  { label: METRIC_LABELS.repatriados, key: 'repatriados' },
-                  { label: METRIC_LABELS.recibidos, key: 'recibidos' },
-                  { label: METRIC_LABELS.rescatados, key: 'rescatados' },
-                  { label: METRIC_LABELS.ingresos, key: 'ingresos' },
-                  { label: METRIC_LABELS.tramites, key: 'tramites' },
-                  { label: METRIC_LABELS.retornados, key: 'retornados' },
-                  { label: METRIC_LABELS.inadmitidos, key: 'inadmitidos' }
-              ];
-              cats.forEach(c => {
-                  html += `
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
-                        <span style="font-size: 12px; color: #333;">${c.label}</span>
-                        <span style="font-size: 12px; font-weight: 500; color: #333;">@${currentPeriod}_str_${c.key}</span>
-                    </div>
-                    <div style="border-bottom: 1px solid #eee; margin-bottom: 3px;"></div>
-                  `;
-              });
-          } else {
-              const label = METRIC_LABELS[metric] || metric;
-              let fieldDisp = '@' + currentPeriod + '_str_' + metric;
-              html += `
-                <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
-                    <span style="font-size: 12px; color: #333;">${label}</span>
-                    <span style="font-size: 12px; font-weight: 500; color: #333;">${fieldDisp}</span>
-                </div>
-              `;
-          }
-          html += `</div>`;
-          hover.tooltips = html;
-          // Crucial: Avisar a Bokeh que las propiedades del tooltip han cambiado
-          hover.change.emit();
-      }
-
-      // ACTUALIZAR SECCIÓN DE INFRAESTRUCTURA
-      updateInfraSection();
-
-      // ACTUALIZAR GRÁFICA DE RANKING
-      updateRankingChart(metric);
+    } else {
+        // VISTA NACIONAL
+        // El rango 32 se muestra blanco con 0.5 de opacidad
+        map.setPaintProperty('mexico-states-fill', 'fill-color', [
+            'case',
+            ['==', ['get', rankFieldName], 32], '#ffffff',
+            heatmapColorExpression
+        ]);
+        map.setPaintProperty('mexico-states-fill', 'fill-opacity', [
+            'case',
+            ['==', ['get', rankFieldName], 32], 0.8,
+            0.9
+        ]);
+        if (map.getLayer('mexico-states-line')) {
+            map.setPaintProperty('mexico-states-line', 'line-opacity', 1.0);
+        }
     }
   };
 
@@ -1198,18 +1040,14 @@
     if (currentStateName === LABEL_NACIONAL) {
         label.innerText = `Ranking Nacional: ${metric}`;
         
-        // Obtener datos de Bokeh GeoJSONDataSource
-        const views = Object.values(Bokeh.index);
-        if (views.length === 0) return;
+        // Obtener datos del GeoJSON
+        if (!geoDataJSON || !geoDataJSON.features) return;
         
-        const source = views[0].model.renderers.find(r => r.data_source).data_source;
-        const data = source.data;
-        const names = data['name'];
-        const values = data[`${currentPeriod}_${metric}`];
+        let combined = geoDataJSON.features.map(f => ({
+            name: f.properties.name,
+            value: f.properties[`${currentPeriod}_${metric}`] || 0
+        }));
         
-        if (!names || !values) return;
-
-        let combined = names.map((name, i) => ({ name, value: values[i] }));
         combined.sort((a, b) => b.value - a.value);
 
         const topData = combined.slice(0, 15);
@@ -1218,7 +1056,7 @@
             topData.map(d => d.value), 
             `Total ${metric}`
         );
-    } 
+    }
     // MODO ESTADO: Ranking de Nacionalidades
     else {
         label.innerText = `Nacionalidades en ${currentStateName}: ${metric}`;
@@ -1368,9 +1206,319 @@
 <!-- Scripts de Gráficos (Chart.js) -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<!-- Scripts de Bokeh -->
-<script src="https://cdn.bokeh.org/bokeh/release/bokeh-3.6.2.min.js"></script>
-{{ map_script|safe }}
+<!-- Scripts de MapLibre y Turf.js -->
+<script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+<script>
+  // Variables globales con los datos que venían de Bokeh
+  const geoDataJSON = {{ geo_data_json|safe }};
+  const infraPtsDataJSON = {{ infra_pts_data_json|safe }};
+  const prhPtsDataJSON = {{ prh_pts_data_json|safe }};
+
+  let map; // Instancia global de MapLibre
+  let statePopup; // Popup global para hover
+
+  document.addEventListener("DOMContentLoaded", () => {
+    // Inicializar MapLibre
+    map = new maplibregl.Map({
+      container: 'map',
+      style: {
+        'version': 8,
+        'sources': {
+          'esri-imagery': {
+            'type': 'raster',
+            'tiles': [
+              'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}'
+            ],
+            'tileSize': 256,
+            'attribution': 'Tiles &copy; Esri'
+          }
+        },
+        'layers': [
+          {
+            'id': 'esri-imagery-layer',
+            'type': 'raster',
+            'source': 'esri-imagery',
+            'minzoom': 0,
+            'maxzoom': 24
+          }
+        ]
+      },
+      center: [-102.5528, 23.6345],
+      zoom: 4.5,
+      minZoom: 3,
+      maxZoom: 14
+    });
+
+    // Control de navegación
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+
+    map.on('load', () => {
+      // 1. Agregar Fuente GeoJSON
+      map.addSource('mexico-states', {
+        type: 'geojson',
+        data: geoDataJSON,
+        generateId: true // Importante para feature state (hover)
+      });
+
+      // Máscara
+      const worldMask = turf.mask(geoDataJSON);
+      map.addSource('world-mask', {
+        type: 'geojson',
+        data: worldMask
+      });
+
+      map.addLayer({
+        id: 'world-mask-fill',
+        type: 'fill',
+        source: 'world-mask',
+        paint: {
+          'fill-color': '#f9fafb',
+          'fill-opacity': 1
+        }
+      });
+
+      // Relleno de estados (inicialmente 'todos')
+      map.addLayer({
+        id: 'mexico-states-fill',
+        type: 'fill',
+        source: 'mexico-states',
+        paint: {
+          'fill-color': [
+            'interpolate',
+            ['linear'],
+            ['get', 'cs_todos'],
+            0, '#e5f5e0',
+            10000, '#00441b' // Verde INM oscuro
+          ],
+          'fill-opacity': 0.9
+        }
+      });
+
+      // Líneas
+      map.addLayer({
+        id: 'mexico-states-line',
+        type: 'line',
+        source: 'mexico-states',
+        paint: {
+          'line-color': '#ffffff',
+          'line-width': 1.5
+        }
+      });
+
+      // Hover
+      map.addLayer({
+        id: 'mexico-states-fill-hover',
+        type: 'line',
+        source: 'mexico-states',
+        paint: {
+          'line-color': '#285C4D',
+          'line-width': 3
+        },
+        filter: ['==', 'name', '']
+      });
+
+      // Tooltip Popup
+      statePopup = new maplibregl.Popup({
+        closeButton: false,
+        closeOnClick: false,
+        offset: 15
+      });
+
+      map.on('mousemove', 'mexico-states-fill', (e) => {
+        if (e.features.length > 0) {
+          const feature = e.features[0];
+          const stateName = feature.properties.name;
+          map.setFilter('mexico-states-fill-hover', ['==', 'name', stateName]);
+          map.getCanvas().style.cursor = 'pointer';
+          
+          const metric = window.currentMetric || 'todos';
+          const periodo = window.currentPeriod || 'cs';
+          
+          let html = `
+            <div style="padding: 4px; min-width: 150px; font-family: Arial, sans-serif;">
+                <div style="font-size: 14px; font-weight: bold; margin-bottom: 3px; color: #333;">${stateName}</div>
+                <div style="border-bottom: 1px solid #ddd; margin-bottom: 5px;"></div>
+          `;
+          
+          if (metric === "todos") {
+              const cats = [
+                  { label: METRIC_LABELS.repatriados || 'Repatriados', key: 'repatriados' },
+                  { label: METRIC_LABELS.recibidos || 'Recibidos', key: 'recibidos' },
+                  { label: METRIC_LABELS.rescatados || 'Rescatados', key: 'rescatados' },
+                  { label: METRIC_LABELS.ingresos || 'Ingresos', key: 'ingresos' },
+                  { label: METRIC_LABELS.tramites || 'Trámites', key: 'tramites' },
+                  { label: METRIC_LABELS.retornados || 'Retornados', key: 'retornados' },
+                  { label: METRIC_LABELS.inadmitidos || 'Inadmitidos', key: 'inadmitidos' }
+              ];
+              cats.forEach(c => {
+                  const val = feature.properties[`${periodo}_str_${c.key}`] || '0';
+                  html += `
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
+                        <span style="font-size: 12px; color: #333;">${c.label}</span>
+                        <span style="font-size: 12px; font-weight: bold; color: #333;">${val}</span>
+                    </div>
+                  `;
+              });
+          } else {
+              const valStr = feature.properties[`${periodo}_str_${metric}`] || '0';
+              const labelMap = window.metricLabels || METRIC_LABELS || {};
+              const label = labelMap[metric] || metric;
+              html += `
+                <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
+                    <span style="font-size: 12px; color: #333; text-transform: capitalize;">${label}</span>
+                    <span style="font-size: 12px; font-weight: bold; color: #333;">${valStr}</span>
+                </div>
+              `;
+          }
+          html += `</div>`;
+          
+          statePopup.setLngLat(e.lngLat).setHTML(html).addTo(map);
+        }
+      });
+
+      map.on('mouseleave', 'mexico-states-fill', () => {
+        map.setFilter('mexico-states-fill-hover', ['==', 'name', '']);
+        map.getCanvas().style.cursor = '';
+        statePopup.remove();
+      });
+
+      // Clic
+      map.on('click', 'mexico-states-fill', (e) => {
+        if (e.features.length > 0) {
+          const feature = e.features[0];
+          const p = feature.properties;
+          const newStateData = {
+              name: p.name,
+              cs: {}, dt: {}, pe: {}
+          };
+          
+          const keys = [
+            'todos', 'repatriados', 'rep_adultos', 'rep_menores', 'rep_nna_solo', 'rep_nna_acom', 'rep_terrestres', 'rep_vuelos',
+            'recibidos', 'rec_adultos', 'rec_menores',
+            'rescatados', 'res_una_vez', 'res_reincidente', 'res_estacion', 'res_dif', 'res_conduccion',
+            'ingresos', 'ing_aereos', 'ing_maritimos', 'ing_terrestres',
+            'tramites', 'tra_res_perm', 'tra_res_temp', 'tra_res_est', 'tra_vis_hum', 'tra_vis_adop', 'tra_vis_reg', 'tra_vis_trab',
+            'retornados', 'ret_deportado', 'ret_retornado', 'inadmitidos'
+          ];
+          
+          keys.forEach(k => {
+              newStateData.cs[k] = p[`cs_${k}`];
+              newStateData.dt[k] = p[`dt_${k}`];
+              newStateData.pe[k] = p[`pe_${k}`];
+          });
+          
+          window.selectedStateData = newStateData;
+          
+          if (window.animateToSelectedState) {
+              window.animateToSelectedState(newStateData.name); // En Bokeh usaba el índice, aquí pasamos el nombre
+          }
+          if (window.updateInformationPanel) {
+              window.updateInformationPanel();
+          }
+          if (window.updateStateOpacity) {
+              window.updateStateOpacity();
+          }
+        }
+      });
+
+      // Clic fuera
+      map.on('click', (e) => {
+        const features = map.queryRenderedFeatures(e.point, { layers: ['mexico-states-fill'] });
+        if (!features.length) {
+            window.selectedStateData = window.nationalData;
+            if (window.animateToNationalView) {
+                window.animateToNationalView();
+            }
+            if (window.updateInformationPanel) {
+                window.updateInformationPanel();
+            }
+            if (window.updateStateOpacity) {
+                window.updateStateOpacity();
+            }
+        }
+      });
+
+      // Marcadores Infraestructura y PRH
+      window.mapMarkers = [];
+
+      const updateMarkerSizes = () => {
+          if (!map) return;
+          const zoom = map.getZoom();
+          // Escala dinámica: de 12px en vista nacional (4.5) a ~30px en zoom máximo (14)
+          const size = Math.max(10, Math.min(35, 12 + (zoom - 4.5) * 6));
+          window.mapMarkers.forEach(m => {
+              m.element.style.width = size + 'px';
+              m.element.style.height = size + 'px';
+          });
+      };
+
+      const addMarkers = (dataList, typeCategory) => {
+          const currentZoom = map.getZoom();
+          const initialSize = Math.max(10, Math.min(35, 12 + (currentZoom - 4.5) * 2));
+
+          dataList.forEach(item => {
+              const el = document.createElement('img');
+              el.src = item.url;
+              el.style.width = initialSize + 'px';
+              el.style.height = initialSize + 'px';
+              el.style.cursor = 'pointer';
+              el.dataset.type = typeCategory;
+              el.dataset.subtype = item.tipo || 'PRH';
+              el.dataset.estado = item.estado;
+              
+              const mPopup = new maplibregl.Popup({ offset: 15, closeButton: true, closeOnClick: true }).setHTML(`
+                <div style="padding: 4px; border-radius: 5px; font-family: Arial, sans-serif; min-width: 150px;">
+                    <div style="font-size: 13px; font-weight: bold; color: #333; margin-bottom: 4px;">${item.nombre}</div>
+                    <div style="font-size: 11px; color: #666;">${item.tipo ? 'Tipo: ' + item.tipo : 'Modalidad: ' + item.modalidad}</div>
+                    <div style="font-size: 11px; color: #666;">Estado: ${item.estado}</div>
+                </div>
+              `);
+              
+              const marker = new maplibregl.Marker({ element: el })
+                .setLngLat([item.x, item.y])
+                .setPopup(mPopup)
+                .addTo(map);
+                
+              el.addEventListener('click', (e) => { 
+                  e.stopPropagation(); // Prevenir selección de estado
+                  marker.togglePopup();
+              });
+                
+              window.mapMarkers.push({ marker: marker, element: el, type: typeCategory, subtype: item.tipo || 'PRH', estado: item.estado });
+          });
+      };
+      
+      addMarkers(infraPtsDataJSON, 'infra');
+      addMarkers(prhPtsDataJSON, 'prh');
+      
+      // Escuchar cambios de zoom para redimensionar iconos
+      map.on('zoom', updateMarkerSizes);
+
+      // EVENTO LONG PRESS (Comentado según solicitud del usuario)
+      /*
+      let longPressTimer;
+      map.on('mousedown', 'mexico-states-fill', (e) => {
+          if(e.features.length === 0) return;
+          const f = e.features[0];
+          longPressTimer = setTimeout(() => {
+              // Simular apertura del menú contextual
+              if (window.showLongPressMenu) {
+                  // data required by menu: name, cs_todos, etc.
+                  const data = f.properties; 
+                  window.showLongPressMenu(data, e.point.x, e.point.y);
+              }
+          }, 1000);
+      });
+      map.on('mouseup', () => clearTimeout(longPressTimer));
+      map.on('mousemove', () => clearTimeout(longPressTimer));
+      map.on('touchstart', 'mexico-states-fill', (e) => {
+          // ... logic similar
+      });
+      */
+    });
+  });
+</script>
 
 <script>
   /**
@@ -1415,59 +1563,30 @@
    * FUNCIÓN CENTRAL DE FILTRADO: Combina Filtro de Categoría y Filtro Geográfico
    */
   window.applyMapFilters = function() {
-    const views = Object.values(Bokeh.index);
-    if (views.length === 0) return;
-    
-    const plot = views[0].model;
-    const infraLayer = plot.renderers.find(r => r.name === 'infra_layer');
-    const prhLayer = plot.renderers.find(r => r.name === 'prh_layer');
-    
-    if (!infraLayer || !prhLayer) return;
+    if (!window.mapMarkers) return;
 
-    const infraSource = infraLayer.data_source;
-    const prhSource = prhLayer.data_source;
-    
-    // Inicializar Datos Maestros si no existen
-    if (!window.fullInfraData) window.fullInfraData = JSON.parse(JSON.stringify(infraSource.data));
-    if (!window.fullPrhData) window.fullPrhData = JSON.parse(JSON.stringify(prhSource.data));
+    const selectedState = window.selectedStateData ? normalizar_nombre(window.selectedStateData.name) : normalizar_nombre(LABEL_NACIONAL);
+    const activeCategory = window.currentInfraFilter; 
+    const isNational = (selectedState === normalizar_nombre(LABEL_NACIONAL));
 
-    const selectedState = window.selectedStateData ? window.selectedStateData.name : LABEL_NACIONAL;
-    const activeCategory = window.currentInfraFilter; // null, 'ESTACION', 'PRH', etc.
-    const isNational = (selectedState === LABEL_NACIONAL);
+    // Solo mostrar marcadores si la métrica del heatmap es "todos"
+    const heatmapMetric = window.currentMetric || 'todos';
+    const isHeatmapMetricTodos = (heatmapMetric === 'todos');
 
-    // 1. Filtrar Infraestructura
-    const newInfra = {};
-    Object.keys(window.fullInfraData).forEach(k => newInfra[k] = []);
-    
-    for (let i = 0; i < window.fullInfraData.estado.length; i++) {
-        const belongsToState = isNational || window.fullInfraData.estado[i] === normalizar_nombre(selectedState);
-        const matchesCategory = !activeCategory || activeCategory === 'PRH' || window.fullInfraData.tipo[i] === activeCategory;
+    window.mapMarkers.forEach(m => {
+        const belongsToState = isNational || normalizar_nombre(m.estado) === selectedState;
         
-        if (belongsToState && matchesCategory && activeCategory !== 'PRH') {
-            Object.keys(window.fullInfraData).forEach(k => newInfra[k].push(window.fullInfraData[k][i]));
+        let matchesCategory = false;
+        if (!activeCategory) {
+            matchesCategory = true;
+        } else if (activeCategory === 'PRH') {
+            matchesCategory = (m.type === 'prh');
+        } else {
+            matchesCategory = (m.type === 'infra' && m.subtype === activeCategory);
         }
-    }
-    infraSource.data = newInfra;
-    infraLayer.visible = (activeCategory !== 'PRH');
 
-    // 2. Filtrar PRHs
-    const newPrh = {};
-    Object.keys(window.fullPrhData).forEach(k => newPrh[k] = []);
-
-    for (let i = 0; i < window.fullPrhData.estado.length; i++) {
-        const belongsToState = isNational || window.fullPrhData.estado[i] === normalizar_nombre(selectedState);
-        const matchesCategory = !activeCategory || activeCategory === 'PRH';
-
-        if (belongsToState && matchesCategory) {
-            Object.keys(window.fullPrhData).forEach(k => newPrh[k].push(window.fullPrhData[k][i]));
-        }
-    }
-    prhSource.data = newPrh;
-    prhLayer.visible = (!activeCategory || activeCategory === 'PRH');
-
-    // Emitir cambios
-    infraSource.change.emit();
-    prhSource.change.emit();
+        m.element.style.display = (isHeatmapMetricTodos && belongsToState && matchesCategory) ? 'block' : 'none';
+    });
   };
 </script>
 

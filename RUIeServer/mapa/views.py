@@ -326,284 +326,52 @@ def mapa_informacion(request):
             feature['properties'][f'dt_str_{k}'] = f"{dt[k]:,}"
             feature['properties'][f'pe_str_{k}'] = f"{cs[k]:,}"
         
-    geo_source = GeoJSONDataSource(geojson=json.dumps(geo_data))
-    
-    # Crear figura de Bokeh restaurando Auto-Range Dinámico para proporciones perfectas
-    p = figure(
-        title="",
-        sizing_mode="scale_both",
-        toolbar_location=None,
-        tools="tap,pan,wheel_zoom,reset",
-        match_aspect=True,
-    )
-    p.xaxis.visible = False
-    p.yaxis.visible = False
-    p.grid.grid_line_color = None
-    p.outline_line_color = None
-    p.min_border = 0
-    
-    # Asegurar desplazamiento libre sin límites de borde
-    p.x_range.bounds = None
-    p.y_range.bounds = None
-    
-    # Configurar el mapa de calor inicial (Todos)
-    custom_palette = list(Greens256[:205]) # Cortamos la paleta al 80% aprox
-    color_mapper = LinearColorMapper(palette=custom_palette, low=1, high=32)
-
-    # Dibujar los estados
-    states = p.patches(
-        'xs', 'ys', 
-        source=geo_source,
-        fill_color={'field': 'cs_todos', 'transform': color_mapper},
-        line_color="#ffffff",
-        line_width=1,
-        fill_alpha=1.0,
-        hover_fill_color='#285C4D',
-        hover_line_color="#ffffff",
-        hover_line_width=2,
-        selection_fill_color='#285C4D',
-        selection_line_color="#ffffff",
-        selection_line_width=2,
-        nonselection_fill_alpha=0.2,
-        nonselection_line_alpha=0.2
-    )
-
     # --- Capa de Infraestructura (Iconos SVG) ---
     infra_points_objs = PuntosInternacionEstacion.objects.all()
-    infra_pts_data = {
-        'x': [pt.longitud for pt in infra_points_objs],
-        'y': [pt.latitud for pt in infra_points_objs],
-        'nombre': [pt.nombre for pt in infra_points_objs],
-        'estado': [normalizar_nombre(pt.estado.nombre) for pt in infra_points_objs],
-        'tipo': [pt.tipo for pt in infra_points_objs],
-        'url': []
-    }
-    
+    infra_pts_data = []
     for pt in infra_points_objs:
         icon_file = 'terrestre.svg' # Default
         if pt.tipo == 'AEREO': icon_file = 'aereo.svg'
         elif pt.tipo == 'MARITIMO': icon_file = 'maritimo.svg'
         elif pt.tipo == 'ESTACION': icon_file = 'estacion.svg'
         
-        # Construir la URL del icono
-        icon_url = f"{settings.STATIC_URL}mapa/icons/{icon_file}"
-        infra_pts_data['url'].append(icon_url)
-
-    infra_source = ColumnDataSource(infra_pts_data)
-    infra_layer = p.image_url(url='url', x='x', y='y', w=0.25, h=0.25, source=infra_source, 
-                              anchor="center", name="infra_layer")
-    infra_layer.nonselection_glyph = None  # Evitar 404 al intentar renderizar estado "no seleccionado"
-    
-    # Hover específico para puntos de infraestructura
-    infra_hover = HoverTool(
-        renderers=[infra_layer],
-        name="infra_hover",
-        tooltips="""
-            <div style="padding: 8px; border-radius: 5px; font-family: Arial, sans-serif;">
-                <div style="font-size: 13px; font-weight: bold; color: #333;">@nombre</div>
-                <div style="font-size: 11px; color: #666; margin-top: 2px;">Tipo: @tipo</div>
-            </div>
-        """
-    )
-    p.add_tools(infra_hover)
+        infra_pts_data.append({
+            'x': float(pt.longitud) if pt.longitud else 0,
+            'y': float(pt.latitud) if pt.latitud else 0,
+            'nombre': pt.nombre,
+            'estado': normalizar_nombre(pt.estado.nombre),
+            'tipo': pt.tipo,
+            'url': f"{settings.STATIC_URL}mapa/icons/{icon_file}"
+        })
 
     # --- Capa de Puntos de Rescate Humano (PRH) ---
     prh_points = PRHs.objects.all().select_related('modalidad')
-    prh_pts_data = {
-        'x': [pt.longitud for pt in prh_points],
-        'y': [pt.latitud for pt in prh_points],
-        'nombre': [pt.nombre for pt in prh_points],
-        'estado': [normalizar_nombre(pt.estado.nombre) for pt in prh_points],
-        'modalidad': [pt.modalidad.nombre for pt in prh_points],
-        'status': ['Activo' if pt.activo else 'Inactivo' for pt in prh_points],
-        'url': []
-    }
+    prh_pts_data = []
     for pt in prh_points:
         icon = 'agente_activo.svg' if pt.activo else 'agente_inactivo.svg'
-        prh_pts_data['url'].append(f"{settings.STATIC_URL}mapa/icons/{icon}")
+        prh_pts_data.append({
+            'x': float(pt.longitud) if pt.longitud else 0,
+            'y': float(pt.latitud) if pt.latitud else 0,
+            'nombre': pt.nombre,
+            'estado': normalizar_nombre(pt.estado.nombre),
+            'modalidad': pt.modalidad.nombre,
+            'status': 'Activo' if pt.activo else 'Inactivo',
+            'url': f"{settings.STATIC_URL}mapa/icons/{icon}"
+        })
 
-    prh_source = ColumnDataSource(prh_pts_data)
-    prh_layer = p.image_url(url='url', x='x', y='y', w=0.25, h=0.25, source=prh_source, 
-                              anchor="center", name="prh_layer")
-    prh_layer.nonselection_glyph = None  # Evitar 404 al intentar renderizar estado "no seleccionado"
-    
-    # Hover específico para PRHs
-    prh_hover = HoverTool(
-        renderers=[prh_layer],
-        name="prh_hover",
-        tooltips="""
-            <div style="padding: 8px; border-radius: 5px; font-family: Arial, sans-serif;">
-                <div style="font-size: 13px; font-weight: bold; color: #7E1D36;">@nombre</div>
-                <div style="font-size: 11px; color: #666; margin-top: 2px;"><b>Modalidad:</b> @modalidad</div>
-                <div style="font-size: 11px; color: #666;"><b>Estado:</b> @status</div>
-            </div>
-        """
-    )
-    p.add_tools(prh_hover)
-    
-    # Actualizar HoverTool inicial configurado a 'Todos' (muestra todas las categorías dinámicamente)
-    hover_items = []
-    keys_to_show = ['repatriados', 'recibidos', 'rescatados', 'ingresos', 'tramites', 'retornados', 'inadmitidos']
-    
-    for k in keys_to_show:
-        label = METRIC_LABELS.get(k, k.capitalize())
-        hover_items.append(f"""
-            <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
-                <span style="font-size: 12px; color: #333;">{label}</span>
-                <span style="font-size: 12px; font-weight: 500; color: #333;">@cs_str_{k}</span>
-            </div>
-            <div style="border-bottom: 1px solid #eee; margin-bottom: 3px;"></div>
-        """)
-
-    hover_html = f"""
-        <div style="padding: 8px; min-width: 170px; font-family: Arial, sans-serif;">
-            <div style="font-size: 16px; font-weight: 500; margin-bottom: 3px; color: #333;">@name</div>
-            <div style="border-bottom: 1px solid #ddd; margin-bottom: 5px;"></div>
-            {"".join(hover_items)}
-        </div>
-    """
-    
-    hover = HoverTool(
-        renderers=[states],
-        name="states_hover",
-        tooltips=hover_html
-    )
-    p.add_tools(hover)
-    
     national_data = {
         'name': LABEL_NACIONAL,
         'cs': calc_national(totals_cs),
         'dt': calc_national(totals_dt),
         'pe': calc_national(totals_cs) # Inicializar PE con valores de CS
     }
-
-    # Añadir CustomJS para el evento de click (Tap)
-    tap_js = CustomJS(args=dict(source=geo_source, national=national_data), code="""
-        const indices = source.selected.indices;
-        const keys = [
-            'todos',
-            'repatriados', 'rep_adultos', 'rep_menores', 'rep_nna_solo', 'rep_nna_acom', 'rep_terrestres', 'rep_vuelos',
-            'recibidos', 'rec_adultos', 'rec_menores',
-            'rescatados', 'res_una_vez', 'res_reincidente', 'res_estacion', 'res_dif', 'res_conduccion',
-            'ingresos', 'ing_aereos', 'ing_maritimos', 'ing_terrestres',
-            'tramites', 'tra_res_perm', 'tra_res_temp', 'tra_res_est', 'tra_vis_hum', 'tra_vis_adop', 'tra_vis_reg', 'tra_vis_trab',
-            'retornados', 'ret_deportado', 'ret_retornado', 'inadmitidos'
-        ];
-
-        if (indices.length > 0) {
-            const index = indices[0];
-            const data = source.data;
-            
-            const newStateData = {
-                name: data['name'][index],
-                cs: {},
-                dt: {},
-                pe: {}
-            };
-
-            keys.forEach(k => {
-                newStateData.cs[k] = data[`cs_${k}`][index];
-                newStateData.dt[k] = data[`dt_${k}`][index];
-                newStateData.pe[k] = data[`pe_${k}`][index];
-            });
-
-            window.selectedStateData = newStateData;
-            
-            // Disparar animación de zoom si la función existe
-            if (window.animateToSelectedState) {
-                window.animateToSelectedState(index);
-            }
-        } else {
-            window.selectedStateData = national;
-            
-            // Disparar regreso a vista nacional
-            if (window.animateToNationalView) {
-                window.animateToNationalView();
-            }
-        }
-        
-        if (window.updateInformationPanel) {
-            window.updateInformationPanel();
-        }
-    """)
-    p.select(TapTool).callback = tap_js
-
-    # Lógica de Pulsación Larga (Long Press) corregida para Bokeh
-    long_press_callback = CustomJS(args=dict(source=geo_source, renderer=states), code="""
-        const timer_key = 'bokeh_hold_timer';
-        
-        if (cb_obj.event_name === 'press') {
-            // El evento 'press' de Bokeh ya implica una pulsación mantenida.
-            // Para llegar a los 2s aprox, iniciamos un timer adicional.
-            const sx = cb_obj.sx;
-            const sy = cb_obj.sy;
-            
-            window[timer_key] = setTimeout(() => {
-                const plot_view = Bokeh.index[Object.keys(Bokeh.index)[0]];
-                const glyph_view = plot_view.renderer_views[renderer.id];
-                const result = glyph_view.hit_test({ type: 'point', sx: sx, sy: sy });
-                
-                if (result && result.indices.length > 0) {
-                    const idx = result.indices[0];
-                    const data = {};
-                    for (let key in source.data) {
-                        data[key] = source.data[key][idx];
-                    }
-                    if (window.showLongPressMenu) {
-                        const canvas = plot_view.canvas_view.canvas_el;
-                        const rect = canvas.getBoundingClientRect();
-                        const posX = rect.left + sx;
-                        const posY = rect.top + sy;
-                        window.showLongPressMenu(data, posX, posY);
-                    }
-                }
-            }, 1500); // 1.5s + margen de Bokeh ~ 2s
-        } else if (cb_obj.event_name === 'panstart' || cb_obj.event_name === 'tap') {
-            // Cancelar si el usuario mueve el mapa o hace un clic rápido
-            if (window[timer_key]) {
-                clearTimeout(window[timer_key]);
-                delete window[timer_key];
-            }
-        }
-    """)
-    p.js_on_event('press', long_press_callback)
-    p.js_on_event('panstart', long_press_callback)
-    p.js_on_event('tap', long_press_callback)
-
-    # --- ESCALADO DINÁMICO DE ICONOS SEGÚN EL ZOOM ---
-    scale_icons_js = CustomJS(args=dict(
-        x_range=p.x_range,
-        infra_glyph=infra_layer.glyph,
-        prh_glyph=prh_layer.glyph
-    ), code="""
-        const range_width = Math.abs(x_range.end - x_range.start);
-        
-        // --- PARÁMETROS DE ESCALA ---
-        // Escala Inicial (Vista Nacional): el icono ocupará ~0.35 grados de ancho
-        // Escala Final (Zoom Máximo): el icono se reducirá hasta ~0.001 grados
-        const factor = 0.0332; 
-        const min_size = 0.001;  // Límite inferior (Zoom máximo)
-        const max_size = 0.35;   // Límite superior (Vista Nacional)
-        
-        let new_size = range_width * factor; 
-        
-        if (new_size < min_size) new_size = min_size;
-        if (new_size > max_size) new_size = max_size;
-        
-        infra_glyph.w = new_size;
-        infra_glyph.h = new_size;
-        prh_glyph.w = new_size;
-        prh_glyph.h = new_size;
-    """)
-    p.x_range.js_on_change('start', scale_icons_js)
-
-    script, div = components(p)
     
     context = {
-        'map_script': script,
-        'map_div': div,
+        'geo_data_json': json.dumps(geo_data),
         'national_data_json': json.dumps(national_data),
         'infra_data_json': json.dumps(infra_data),
+        'infra_pts_data_json': json.dumps(infra_pts_data),
+        'prh_pts_data_json': json.dumps(prh_pts_data),
         'label_nacional': LABEL_NACIONAL,
         'metric_labels': METRIC_LABELS,
         'metric_labels_json': json.dumps(METRIC_LABELS),
@@ -1593,3 +1361,7 @@ def reportes(request):
     }
 
     return render(request, 'mapa/reportes.html', context)
+
+def mapa_ejemplo(request):
+    """Vista de ejemplo para MapLibre GL JS."""
+    return render(request, 'mapa/mapa_ejemplo.html')
