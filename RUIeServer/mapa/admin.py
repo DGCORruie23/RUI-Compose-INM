@@ -3,7 +3,9 @@ from .models import (
     Estado, Nacionalidad, Repatriados, Recibidos, ExtRescatados, 
     Ingresos, Tramites, Retornados, Inadmitidos,
     PuntosInternacionEstacion, CatalogoOR, Encuentros,
-    TipoPRH, PRHs
+    TipoPRH, PRHs, Titular, Estudio, GradoAcademico,
+    TelefonoTitular, TrayectoriaLaboral, ExperienciaProfesional,
+    CorreoTitular, TipoNombramiento
 )
 
 @admin.register(Estado)
@@ -86,3 +88,46 @@ class PRHsAdmin(admin.ModelAdmin):
     list_display = ('nombre', 'estado', 'modalidad', 'activo')
     list_filter = ('estado', 'modalidad', 'activo')
     search_fields = ('nombre', 'estado__nombre', 'modalidad__nombre')
+
+class EstudioInline(admin.TabularInline):
+    model = Estudio
+    extra = 1
+
+class TelefonoInline(admin.TabularInline):
+    model = TelefonoTitular
+    extra = 1
+
+class CorreoInline(admin.TabularInline):
+    model = CorreoTitular
+    extra = 1
+
+class TrayectoriaInline(admin.TabularInline):
+    model = TrayectoriaLaboral
+    extra = 1
+
+class ExperienciaInline(admin.StackedInline):
+    model = ExperienciaProfesional
+    extra = 1
+
+@admin.register(Titular)
+class TitularAdmin(admin.ModelAdmin):
+    list_display = ('nombre', 'apellido_paterno', 'apellido_materno', 'estado', 'nacionalidad')
+    list_filter = ('estado', 'nacionalidad', 'sexo')
+    search_fields = ('nombre', 'apellido_paterno', 'apellido_materno', 'curp')
+    inlines = [TelefonoInline, CorreoInline, EstudioInline, TrayectoriaInline, ExperienciaInline]
+
+@admin.register(Estudio)
+class EstudioAdmin(admin.ModelAdmin):
+    list_display = ('carrera', 'grado', 'titular', 'institucion')
+    list_filter = ('grado',)
+    search_fields = ('carrera', 'institucion', 'titular__nombre')
+
+@admin.register(GradoAcademico)
+class GradoAcademicoAdmin(admin.ModelAdmin):
+    list_display = ('nombre',)
+    search_fields = ('nombre',)
+
+@admin.register(TipoNombramiento)
+class TipoNombramientoAdmin(admin.ModelAdmin):
+    list_display = ('nombre',)
+    search_fields = ('nombre',)

@@ -1,6 +1,8 @@
 from django.shortcuts import render, redirect
 from django.contrib import messages
-from .models import Estado, Nacionalidad, Repatriados, Recibidos, ExtRescatados, Ingresos, Tramites, Retornados, Inadmitidos, PuntosInternacionEstacion, CatalogoOR, Encuentros, TipoPRH, PRHs
+import base64
+from django.core.files.base import ContentFile
+from .models import Estado, Nacionalidad, Repatriados, Recibidos, ExtRescatados, Ingresos, Tramites, Retornados, Inadmitidos, PuntosInternacionEstacion, CatalogoOR, Encuentros, TipoPRH, PRHs, Titular, Estudio, GradoAcademico, TelefonoTitular, CorreoTitular, TipoNombramiento
 from django.apps import apps
 import openpyxl
 from datetime import datetime
@@ -529,8 +531,121 @@ def carga_datos(request):
     update_dates = get_all_update_dates()
     return render(request, 'mapa/carga_datos.html', {
         'models': models_available.keys(),
-        'update_dates': update_dates
+        'update_dates': update_dates,
+        'estados_list': Estado.objects.all().order_by('nombre'),
+        'nacionalidades_list': Nacionalidad.objects.all().order_by('nombre'),
+        'grados_academicos': GradoAcademico.objects.all().order_by('nombre'),
+        'tipos_nombramiento': TipoNombramiento.objects.all().order_by('nombre'),
     })
+
+@transaction.atomic
+def guardar_titular(request):
+    if not request.user.is_superuser or request.method != 'POST':
+        return render(request, 'base/error404.html')
+
+    try:
+        # 1. Datos Básicos
+        curp = request.POST.get('curp', '').strip().upper()
+        if not curp:
+            messages.error(request, "La CURP es obligatoria.")
+            return redirect('carga_datos')
+
+        titular, created = Titular.objects.update_or_create(
+            curp=curp,
+            defaults={
+                'nombre': normalizar_nombre(request.POST.get('nombre', '')),
+                'apellido_paterno': normalizar_nombre(request.POST.get('apellido_paterno', '')),
+                'apellido_materno': normalizar_nombre(request.POST.get('apellido_materno', '')),
+                'fecha_nacimiento': request.POST.get('fecha_nacimiento'),
+                'sexo': request.POST.get('sexo'),
+                'nivel': request.POST.get('nivel', '').strip().upper(),
+                'codigo_plaza': request.POST.get('codigo_plaza', '').strip().upper(),
+                'tipo_nombramiento_id': request.POST.get('tipo_nombramiento_id'),
+                'estado_id': request.POST.get('estado_id'),
+                'nacionalidad_id': request.POST.get('nacionalidad_id'),
+            }
+        )
+
+        if 'fotografia' in request.FILES:
+            titular.fotografia = request.FILES['fotografia']
+            titular.save()
+        
+        # Procesar imagen recortada (Base64)
+        cropped_data = request.POST.get('cropped_image')
+        if cropped_data and ';base64,' in cropped_data:
+            format, imgstr = cropped_data.split(';base64,')
+            ext = format.split('/')[-1]
+            data = ContentFile(base64.b64decode(imgstr), name=f"titular_{titular.curp}.{ext}")
+            titular.fotografia = data
+            titular.save()
+
+        # 2. Teléfonos
+        tels_tipo = request.POST.getlist('tel_tipo[]')
+        tels_num = request.POST.getlist('tel_numero[]')
+        TelefonoTitular.objects.filter(titular=titular).delete()
+        for t, n in zip(tels_tipo, tels_num):
+            if n.strip():
+                TelefonoTitular.objects.create(titular=titular, tipo=t, numero=n.strip())
+
+        # 3. Correos
+        emails_tipo = request.POST.getlist('email_tipo[]')
+        emails_val = request.POST.getlist('email_valor[]')
+        CorreoTitular.objects.filter(titular=titular).delete()
+        for t, v in zip(emails_tipo, emails_val):
+            if v.strip():
+                CorreoTitular.objects.create(titular=titular, tipo=t, correo=v.strip())
+
+        # 4. Estudios
+        edu_grados = request.POST.getlist('edu_grado[]')
+        edu_carreras = request.POST.getlist('edu_carrera[]')
+        Estudio.objects.filter(titular=titular).delete()
+        for g, c in zip(edu_grados, edu_carreras):
+            if c.strip():
+                Estudio.objects.create(titular=titular, grado_id=g, carrera=normalizar_nombre(c))
+
+        # 5. Trayectoria Institucional (INM)
+        tray_puestos = request.POST.getlist('tray_puesto[]')
+        tray_areas = request.POST.getlist('tray_area[]')
+        tray_inicios = request.POST.getlist('tray_inicio[]')
+        tray_fins = request.POST.getlist('tray_fin[]')
+        tray_actual_idx = request.POST.get('tray_actual_index')
+        
+        TrayectoriaLaboral.objects.filter(titular=titular).delete()
+        for idx, (p, a, i, f) in enumerate(zip(tray_puestos, tray_areas, tray_inicios, tray_fins)):
+            if p.strip() and a.strip() and i:
+                is_actual = str(idx) == tray_actual_idx
+                TrayectoriaLaboral.objects.create(
+                    titular=titular, 
+                    puesto=normalizar_nombre(p), 
+                    area=normalizar_nombre(a), 
+                    fecha_inicio=i,
+                    fecha_fin=f if f else None,
+                    actual=is_actual
+                )
+
+        # 6. Experiencia Profesional Previa
+        exp_insts = request.POST.getlist('exp_inst[]')
+        exp_cargos = request.POST.getlist('exp_cargo[]')
+        exp_inicios = request.POST.getlist('exp_inicio[]')
+        exp_fins = request.POST.getlist('exp_fin[]')
+        exp_descs = request.POST.getlist('exp_desc[]')
+        ExperienciaProfesional.objects.filter(titular=titular).delete()
+        for inst, cargo, ini, fin, desc in zip(exp_insts, exp_cargos, exp_inicios, exp_fins, exp_descs):
+            if inst.strip() and cargo.strip() and ini:
+                ExperienciaProfesional.objects.create(
+                    titular=titular,
+                    institucion=normalizar_nombre(inst),
+                    cargo=normalizar_nombre(cargo),
+                    fecha_inicio=ini,
+                    fecha_fin=fin if fin else None,
+                    descripcion=desc.strip()
+                )
+
+        messages.success(request, f"Expediente de {titular.nombre} {'creado' if created else 'actualizado'} correctamente.")
+    except Exception as e:
+        messages.error(request, f"Error al guardar titular: {str(e)}")
+
+    return redirect('carga_datos')
 
 from django.http import JsonResponse
 

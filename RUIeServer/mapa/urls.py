@@ -12,4 +12,5 @@ urlpatterns = [
     path('api/nacionalidad-ranking', views.api_nacionalidad_ranking, name="api_nacionalidad_ranking"),
     path('api/reporte-nacionalidades', views.api_reporte_nacionalidades, name="api_reporte_nacionalidades"),
     path('reportes', views.reportes, name="reportes"),
+    path('guardar-titular', views.guardar_titular, name="guardar_titular"),
 ]

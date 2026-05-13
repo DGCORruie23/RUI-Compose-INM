@@ -4,6 +4,9 @@
 {% block title %}Carga de Información - RUIE{% endblock title %}
 
 {% block scripts %}
+<!-- Cropper.js -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
     function openUploadModal() {
@@ -41,6 +44,119 @@
         modal.classList.add('hidden');
         document.body.style.overflow = 'auto';
     }
+
+    function openPersonalModal() {
+        const modal = document.getElementById('personalModal');
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closePersonalModal() {
+        const modal = document.getElementById('personalModal');
+        modal.classList.add('hidden');
+        document.body.style.overflow = 'auto';
+    }
+
+    function addDynamicRow(containerId) {
+        const container = document.getElementById(containerId);
+        const firstRow = container.querySelector('div');
+        const newRow = firstRow.cloneNode(true);
+        // Clear inputs
+        newRow.querySelectorAll('input').forEach(input => input.value = '');
+        container.appendChild(newRow);
+    }
+
+    function addAcademicRow() {
+        const container = document.getElementById('academic-container');
+        const firstRow = container.querySelector('div');
+        const newRow = firstRow.cloneNode(true);
+        newRow.querySelectorAll('input').forEach(input => input.value = '');
+        container.appendChild(newRow);
+    }
+
+    function addTrayectoriaRow() {
+        const container = document.getElementById('trayectoria-container');
+        const rows = container.querySelectorAll(':scope > div');
+        const newRow = rows[0].cloneNode(true);
+        newRow.querySelectorAll('input').forEach(input => {
+            input.value = '';
+            if (input.type === 'radio') {
+                input.value = rows.length;
+                input.checked = false;
+            }
+        });
+        container.appendChild(newRow);
+    }
+
+    function addExperienciaRow() {
+        const container = document.getElementById('experiencia-container');
+        const firstRow = container.querySelector('div');
+        const newRow = firstRow.cloneNode(true);
+        newRow.querySelectorAll('input, textarea').forEach(input => input.value = '');
+        container.appendChild(newRow);
+    }
+
+    function removeRow(button) {
+        const container = button.closest('[id$="-container"]');
+        const rows = container.querySelectorAll(':scope > div');
+        if (rows.length > 1) {
+            button.closest(':scope > div').remove();
+        } else {
+            // If only one row, just clear it instead of deleting
+            const row = rows[0];
+            row.querySelectorAll('input, select, textarea').forEach(el => el.value = '');
+        }
+    }
+
+    let cropper;
+    const imageToCrop = document.getElementById('image-to-crop');
+    const fotoInput = document.getElementById('foto-input');
+    const cropperWrapper = document.getElementById('cropper-wrapper');
+    const croppedImageData = document.getElementById('cropped_image_data');
+
+    if (fotoInput) {
+        fotoInput.addEventListener('change', function(e) {
+            const files = e.target.files;
+            if (files && files.length > 0) {
+                const reader = new FileReader();
+                reader.onload = function() {
+                    imageToCrop.src = reader.result;
+                    cropperWrapper.classList.remove('hidden');
+                    if (cropper) {
+                        cropper.destroy();
+                    }
+                    cropper = new Cropper(imageToCrop, {
+                        aspectRatio: 3 / 4,
+                        viewMode: 1,
+                        dragMode: 'move',
+                        autoCropArea: 1,
+                        restore: false,
+                        guides: true,
+                        center: true,
+                        highlight: false,
+                        cropBoxMovable: true,
+                        cropBoxResizable: true,
+                        toggleDragModeOnDblclick: false,
+                    });
+                };
+                reader.readAsDataURL(files[0]);
+            }
+        });
+    }
+
+    function zoomIn() { cropper.zoom(0.1); }
+    function zoomOut() { cropper.zoom(-0.1); }
+
+    // Interceptar el envío del formulario para capturar el recorte
+    document.querySelector('form[action$="guardar_titular"]').addEventListener('submit', function(e) {
+        if (cropper) {
+            const canvas = cropper.getCroppedCanvas({
+                width: 480,
+                height: 640,
+            });
+            croppedImageData.value = canvas.toDataURL('image/jpeg', 0.9);
+        }
+    });
 
     function toggleTipoSelector(modelSelect) {
         const tipoContainer = document.getElementById('tipo-punto-container');
@@ -260,16 +376,24 @@
         </button>
     </div>
 
-    <!-- Update Status Section (Moved below buttons) -->
-    <div class="mt-12 flex flex-wrap justify-center gap-3 animate-slide-up" style="animation-delay: 0.2s;">
-        {% for status in update_dates %}
-        <div class="px-4 py-2 bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col items-center hover:shadow-md transition-shadow">
-            <span class="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{{ status.name }}</span>
-            <span class="text-[11px] font-bold {% if status.date %}text-inm-verde-100{% else %}text-gray-300 italic{% endif %}">
-                {% if status.date %}{{ status.date|date:"d M Y" }}{% else %}Sin Datos{% endif %}
-            </span>
+    </div>
+
+    <!-- Personal & Structure Actions Section -->
+    <div class="mt-8 animate-slide-up" style="animation-delay: 0.3s;">
+        <div class="flex flex-wrap justify-center gap-4">
+            <button onclick="openPersonalModal()" class="group flex items-center space-x-3 px-8 py-4 bg-white border border-gray-200 rounded-[1.5rem] shadow-sm hover:shadow-md hover:border-inm-verde-100 transition-all duration-300">
+                <div class="p-2 bg-emerald-50 rounded-xl group-hover:bg-emerald-100 transition-colors">
+                    <svg class="w-6 h-6 text-inm-verde-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path>
+                    </svg>
+                </div>
+                <div class="text-left">
+                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Personal</p>
+                    <p class="text-sm font-bold text-gray-700">Agregar Titular</p>
+                </div>
+            </button>
+            <!-- Space for future buttons (4 more) -->
         </div>
-        {% endfor %}
     </div>
 
     <!-- Feedback Messages -->
@@ -419,6 +543,288 @@
         </div>
     </div>
 
+    <!-- Personal Modal (Complex Form) -->
+    <div id="personalModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto">
+        <!-- Backdrop -->
+        <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-md transition-opacity" onclick="closePersonalModal()"></div>
+        
+        <!-- Modal Content -->
+        <div class="relative bg-white rounded-[2.5rem] shadow-2xl w-full max-w-4xl my-8 overflow-hidden border border-gray-100 animate-slide-up">
+            <!-- Modal Header -->
+            <div class="p-8 border-b border-gray-50 flex justify-between items-center bg-gray-50/50">
+                <div>
+                    <span class="text-[10px] font-bold uppercase tracking-widest text-inm-verde-100">Expediente Digital</span>
+                    <h2 class="text-3xl font-bold text-gray-900">Registro de Titular</h2>
+                </div>
+                <button onclick="closePersonalModal()" class="text-gray-400 hover:text-gray-600 transition-colors bg-white p-3 rounded-2xl shadow-sm hover:shadow-md">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+
+            <form action="{% url 'guardar_titular' %}" method="POST" enctype="multipart/form-data" class="p-8 max-h-[70vh] overflow-y-auto custom-scrollbar">
+                {% csrf_token %}
+                
+                <!-- Sección 1: Datos Básicos -->
+                <div class="mb-10">
+                    <h3 class="text-lg font-bold text-gray-800 mb-6 flex items-center">
+                        <span class="w-8 h-8 bg-emerald-100 text-inm-verde-100 rounded-lg flex items-center justify-center mr-3 text-sm">1</span>
+                        Información General
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="md:col-span-1">
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Fotografía (Recorte 3:4)</label>
+                            <div class="space-y-4">
+                                <input type="file" id="foto-input" accept="image/*" class="block w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-inm-verde-100 hover:file:bg-emerald-100">
+                                
+                                <!-- Contenedor de Recorte -->
+                                <div id="cropper-wrapper" class="hidden">
+                                    <div class="aspect-[3/4] bg-gray-100 rounded-2xl overflow-hidden border border-gray-200 max-w-[240px] mx-auto">
+                                        <img id="image-to-crop" class="max-w-full">
+                                    </div>
+                                    <div class="flex justify-center mt-2 space-x-2">
+                                        <button type="button" onclick="zoomIn()" class="p-2 bg-gray-100 rounded-lg hover:bg-gray-200"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"></path></svg></button>
+                                        <button type="button" onclick="zoomOut()" class="p-2 bg-gray-100 rounded-lg hover:bg-gray-200"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M20 12H4"></path></svg></button>
+                                    </div>
+                                </div>
+                                <input type="hidden" name="cropped_image" id="cropped_image_data">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">CURP</label>
+                            <input type="text" name="curp" required maxlength="18" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-inm-verde-100 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Sexo</label>
+                            <select name="sexo" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none">
+                                <option value="M">Masculino</option>
+                                <option value="F">Femenino</option>
+                                <option value="X">Otro</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Nombre(s)</label>
+                            <input type="text" name="nombre" required class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Apellido Paterno</label>
+                            <input type="text" name="apellido_paterno" required class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Apellido Materno</label>
+                            <input type="text" name="apellido_materno" required class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Fecha Nacimiento</label>
+                            <input type="date" name="fecha_nacimiento" required class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Estado (Adscripción)</label>
+                            <select name="estado_id" required class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none">
+                                {% for estado in estados_list %}
+                                <option value="{{ estado.id }}">{{ estado.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Nacionalidad</label>
+                            <select name="nacionalidad_id" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none">
+                                {% for nac in nacionalidades_list %}
+                                <option value="{{ nac.id }}" {% if nac.nombre == 'MEXICO' %}selected{% endif %}>{{ nac.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Nivel</label>
+                            <input type="text" name="nivel" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none" placeholder="Ej: 27-A">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Código de Plaza</label>
+                            <input type="text" name="codigo_plaza" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none" placeholder="Único">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Tipo de Nombramiento</label>
+                            <select name="tipo_nombramiento_id" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none">
+                                <option value="" selected>Sin especificar</option>
+                                {% for tipo in tipos_nombramiento %}
+                                <option value="{{ tipo.id }}">{{ tipo.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sección 2: Contacto -->
+                <div class="mb-10 p-6 bg-gray-50/50 rounded-3xl border border-gray-100">
+                    <h3 class="text-lg font-bold text-gray-800 mb-6 flex items-center">
+                        <span class="w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center mr-3 text-sm">2</span>
+                        Medios de Contacto
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <!-- Teléfonos -->
+                        <div>
+                            <div class="flex justify-between items-center mb-4">
+                                <label class="text-xs font-bold text-gray-500 uppercase">Teléfonos</label>
+                                <button type="button" onclick="addDynamicRow('tel-container')" class="text-[10px] font-bold text-inm-verde-100 hover:text-inm-verde-200 uppercase tracking-widest">+ Agregar</button>
+                            </div>
+                            <div id="tel-container" class="space-y-3">
+                                <div class="flex items-center space-x-2 animate-fade-in group">
+                                    <select name="tel_tipo[]" class="w-1/3 px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl outline-none">
+                                        <option value="PERSONAL">Personal</option>
+                                        <option value="OFICINA">Oficina</option>
+                                        <option value="ASISTENTE">Asistente</option>
+                                        <option value="EMERGENCIA">Emergencia</option>
+                                        <option value="OTRO">Otro</option>
+                                    </select>
+                                    <input type="text" name="tel_numero[]" placeholder="Número" class="w-2/3 px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl outline-none">
+                                    <button type="button" onclick="removeRow(this)" class="text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Correos -->
+                        <div>
+                            <div class="flex justify-between items-center mb-4">
+                                <label class="text-xs font-bold text-gray-500 uppercase">Correos</label>
+                                <button type="button" onclick="addDynamicRow('email-container')" class="text-[10px] font-bold text-inm-verde-100 hover:text-inm-verde-200 uppercase tracking-widest">+ Agregar</button>
+                            </div>
+                            <div id="email-container" class="space-y-3">
+                                <div class="flex items-center space-x-2 animate-fade-in group">
+                                    <select name="email_tipo[]" class="w-1/3 px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl outline-none">
+                                        <option value="INSTITUCIONAL">Institucional</option>
+                                        <option value="PERSONAL">Personal</option>
+                                        <option value="OTRO">Otro</option>
+                                    </select>
+                                    <input type="email" name="email_valor[]" placeholder="ejemplo@inami.gob.mx" class="w-2/3 px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl outline-none">
+                                    <button type="button" onclick="removeRow(this)" class="text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sección 3: Formación Académica -->
+                <div class="mb-10">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-lg font-bold text-gray-800 flex items-center">
+                            <span class="w-8 h-8 bg-purple-100 text-purple-600 rounded-lg flex items-center justify-center mr-3 text-sm">3</span>
+                            Formación Académica
+                        </h3>
+                        <button type="button" onclick="addAcademicRow()" class="px-4 py-2 bg-purple-50 text-purple-600 rounded-xl text-xs font-bold hover:bg-purple-100 transition-colors">+ Agregar Grado</button>
+                    </div>
+                    <div id="academic-container" class="space-y-4">
+                        <div class="p-5 bg-white border border-gray-100 rounded-2xl shadow-sm grid grid-cols-1 md:grid-cols-12 gap-4 animate-fade-in relative group">
+                            <div class="md:col-span-3">
+                                <label class="block text-[9px] font-bold text-gray-400 uppercase mb-1">Grado</label>
+                                <select name="edu_grado[]" class="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-100 rounded-xl outline-none">
+                                    {% for grado in grados_academicos %}
+                                    <option value="{{ grado.id }}">{{ grado.nombre }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="md:col-span-8">
+                                <label class="block text-[9px] font-bold text-gray-400 uppercase mb-1">Carrera / Especialidad</label>
+                                <input type="text" name="edu_carrera[]" class="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-100 rounded-xl outline-none">
+                            </div>
+                            <div class="md:col-span-1 flex items-end justify-center pb-2">
+                                <button type="button" onclick="removeRow(this)" class="text-gray-300 hover:text-red-500 transition-colors">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sección 4: Trayectoria Laboral (Interna) -->
+                <div class="mb-10">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-lg font-bold text-gray-800 flex items-center">
+                            <span class="w-8 h-8 bg-amber-100 text-amber-600 rounded-lg flex items-center justify-center mr-3 text-sm">4</span>
+                            Trayectoria en INM
+                        </h3>
+                        <button type="button" onclick="addTrayectoriaRow()" class="px-4 py-2 bg-amber-50 text-amber-600 rounded-xl text-xs font-bold hover:bg-amber-100 transition-colors">+ Agregar Puesto</button>
+                    </div>
+                    <div id="trayectoria-container" class="space-y-4">
+                        <div class="p-5 bg-amber-50/30 border border-amber-100 rounded-2xl grid grid-cols-1 md:grid-cols-12 gap-4 animate-fade-in relative group">
+                            <div class="md:col-span-3">
+                                <label class="block text-[9px] font-bold text-amber-600 uppercase mb-1">Puesto / Cargo</label>
+                                <input type="text" name="tray_puesto[]" class="w-full px-3 py-2 text-sm bg-white border border-amber-100 rounded-xl outline-none">
+                            </div>
+                            <div class="md:col-span-3">
+                                <label class="block text-[9px] font-bold text-amber-600 uppercase mb-1">Área / Unidad</label>
+                                <input type="text" name="tray_area[]" class="w-full px-3 py-2 text-sm bg-white border border-amber-100 rounded-xl outline-none">
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-[9px] font-bold text-amber-600 uppercase mb-1">Fecha Inicio</label>
+                                <input type="date" name="tray_inicio[]" class="w-full px-3 py-2 text-[10px] bg-white border border-amber-100 rounded-xl outline-none">
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-[9px] font-bold text-amber-600 uppercase mb-1">Fecha Fin</label>
+                                <input type="date" name="tray_fin[]" class="w-full px-3 py-2 text-[10px] bg-white border border-amber-100 rounded-xl outline-none">
+                            </div>
+                            <div class="md:col-span-1 flex flex-col items-center justify-center">
+                                <label class="block text-[9px] font-bold text-amber-600 uppercase mb-1">Actual</label>
+                                <input type="radio" name="tray_actual_index" value="0" class="w-5 h-5 text-inm-verde-100 bg-white border-amber-200 focus:ring-inm-verde-100">
+                            </div>
+                            <div class="md:col-span-1 flex items-end justify-center pb-2">
+                                <button type="button" onclick="removeRow(this)" class="text-amber-200 hover:text-red-500 transition-colors">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sección 5: Experiencia Profesional (Externa) -->
+                <div class="mb-10">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-lg font-bold text-gray-800 flex items-center">
+                            <span class="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center mr-3 text-sm">5</span>
+                            Experiencia Profesional Previa
+                        </h3>
+                        <button type="button" onclick="addExperienciaRow()" class="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-xs font-bold hover:bg-indigo-100 transition-colors">+ Agregar Experiencia</button>
+                    </div>
+                    <div id="experiencia-container" class="space-y-4">
+                        <div class="p-6 bg-gray-50 border border-gray-200 rounded-2xl grid grid-cols-1 md:grid-cols-12 gap-4 animate-fade-in relative group">
+                            <div class="md:col-span-4">
+                                <label class="block text-[9px] font-bold text-gray-400 uppercase mb-1">Empresa / Institución</label>
+                                <input type="text" name="exp_inst[]" class="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl outline-none">
+                            </div>
+                            <div class="md:col-span-4">
+                                <label class="block text-[9px] font-bold text-gray-400 uppercase mb-1">Cargo</label>
+                                <input type="text" name="exp_cargo[]" class="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl outline-none">
+                            </div>
+                            <div class="md:col-span-3">
+                                <label class="block text-[9px] font-bold text-gray-400 uppercase mb-1">Periodo (Inicio - Fin)</label>
+                                <div class="flex space-x-2">
+                                    <input type="date" name="exp_inicio[]" class="w-1/2 px-2 py-2 text-[10px] bg-white border border-gray-200 rounded-xl outline-none">
+                                    <input type="date" name="exp_fin[]" class="w-1/2 px-2 py-2 text-[10px] bg-white border border-gray-200 rounded-xl outline-none">
+                                </div>
+                            </div>
+                            <div class="md:col-span-1 flex items-center justify-center">
+                                <button type="button" onclick="removeRow(this)" class="text-gray-300 hover:text-red-500 transition-colors">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                </button>
+                            </div>
+                            <div class="md:col-span-12">
+                                <label class="block text-[9px] font-bold text-gray-400 uppercase mb-1">Descripción de actividades</label>
+                                <textarea name="exp_desc[]" rows="2" class="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl outline-none resize-none"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer del Formulario -->
+                <div class="pt-6 border-t border-gray-100 flex justify-end space-x-4">
+                    <button type="button" onclick="closePersonalModal()" class="px-8 py-4 bg-gray-100 text-gray-500 rounded-2xl font-bold hover:bg-gray-200 transition-all">Cancelar</button>
+                    <button type="submit" class="px-12 py-4 bg-inm-verde-100 text-white rounded-2xl font-bold shadow-lg shadow-emerald-900/20 hover:bg-inm-verde-200 transition-all">Guardar Expediente</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Oficinas Modal -->
     <div id="oficinasModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
         <!-- Backdrop -->
@@ -486,8 +892,6 @@
                         </button>
                     </div>
                 </form>
-            </div>
-        </div>
     </div>
 </main>
 {% endblock content %}

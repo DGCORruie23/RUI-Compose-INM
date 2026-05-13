@@ -213,4 +213,135 @@ class Encuentros(models.Model):
         verbose_name = "Encuentro"
         verbose_name_plural = "Encuentros"
         unique_together = ['fecha', 'agencia', 'ciudadEU', 'estadoEU', 'estado', 'nacionalidad']
+
+#---------------------------------------------------------------------
+#Modelos para Titulares, Estudios, Telefonos, Trayectorias y Experiencias
+#---------------------------------------------------------------------
+
+class GradoAcademico(models.Model):
+    nombre = models.CharField(max_length=100, unique=True)
+
+    def __str__(self):
+        return self.nombre
+
+    class Meta:
+        verbose_name = "Grado Académico"
+        verbose_name_plural = "Grados Académicos"
+
+class TipoNombramiento(models.Model):
+    nombre = models.CharField(max_length=100, unique=True)
+
+    def __str__(self):
+        return self.nombre
+
+    class Meta:
+        verbose_name = "Tipo de Nombramiento"
+        verbose_name_plural = "Tipos de Nombramientos"
+
+class Titular(models.Model):
+    SEXO_CHOICES = [
+        ('M', 'Masculino'),
+        ('F', 'Femenino'),
+        ('X', 'Otro'),
+    ]
+
+    fotografia = models.ImageField(upload_to='titulares', null=True, blank=True)
+    nombre = models.CharField(max_length=100)
+    apellido_paterno = models.CharField(max_length=100)
+    apellido_materno = models.CharField(max_length=100)
+    fecha_nacimiento = models.DateField()
+    sexo = models.CharField(max_length=1, choices=SEXO_CHOICES)
+    curp = models.CharField(max_length=18, unique=True)
+    nacionalidad = models.ForeignKey(Nacionalidad, on_delete=models.CASCADE, null=True, blank=True)
+    estado = models.ForeignKey(Estado, on_delete=models.CASCADE, db_index=True)
+    nivel = models.CharField(max_length=20)
+    codigo_plaza = models.CharField(max_length=20, unique=True)
+    tipo_nombramiento = models.ForeignKey(TipoNombramiento, on_delete=models.PROTECT, blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.nombre} {self.apellido_paterno} {self.apellido_materno}"
+
+    class Meta:
+        verbose_name = "Titular"
+        verbose_name_plural = "Titulares"
+
+class Estudio(models.Model):
+    titular = models.ForeignKey(Titular, on_delete=models.CASCADE, related_name='estudios')
+    grado = models.ForeignKey(GradoAcademico, on_delete=models.PROTECT)
+    carrera = models.CharField(max_length=150)
+    institucion = models.CharField(max_length=200, null=True, blank=True)
+    fecha_conclusion = models.DateField(null=True, blank=True)
+    documento_estudio = models.FileField(upload_to='estudios', null=True, blank=True)
     
+    def __str__(self):
+        return f"{self.grado.nombre} en {self.carrera}"
+
+    class Meta:
+        verbose_name = "Estudio"
+        verbose_name_plural = "Estudios"
+
+class TelefonoTitular(models.Model):
+    TIPO_CHOICES = [
+        ('PERSONAL', 'Personal'),
+        ('OFICINA', 'Oficina'),
+        ('ASISTENTE', 'Asistente'),
+        ('EMERGENCIA', 'Emergencia'),
+        ('OTRO', 'Otro'),
+    ]
+    titular = models.ForeignKey(Titular, on_delete=models.CASCADE, related_name='telefonos')
+    tipo = models.CharField(max_length=20, choices=TIPO_CHOICES)
+    numero = models.CharField(max_length=20)
+
+    def __str__(self):
+        return f"{self.tipo}: {self.numero}"
+
+    class Meta:
+        verbose_name = "Teléfono de contacto"
+        verbose_name_plural = "Teléfonos de contacto"
+
+class CorreoTitular(models.Model):
+    TIPO_CHOICES = [
+        ('PERSONAL', 'Personal'),
+        ('INSTITUCIONAL', 'Institucional'),
+        ('OTRO', 'Otro'),
+    ]
+    titular = models.ForeignKey(Titular, on_delete=models.CASCADE, related_name='correos')
+    tipo = models.CharField(max_length=20, choices=TIPO_CHOICES)
+    correo = models.EmailField()
+
+    def __str__(self):
+        return self.correo
+
+    class Meta:
+        verbose_name = "Correo electrónico"
+        verbose_name_plural = "Correos electrónicos"
+
+class TrayectoriaLaboral(models.Model):
+    titular = models.ForeignKey(Titular, on_delete=models.CASCADE, related_name='trayectoria')
+    puesto = models.CharField(max_length=150)
+    area = models.CharField(max_length=150)
+    fecha_inicio = models.DateField()
+    fecha_fin = models.DateField(null=True, blank=True)
+    actual = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"{self.puesto} en {self.area}"
+
+    class Meta:
+        verbose_name = "Trayectoria Laboral"
+        verbose_name_plural = "Trayectorias Laborales"
+
+class ExperienciaProfesional(models.Model):
+    titular = models.ForeignKey(Titular, on_delete=models.CASCADE, related_name='experiencia_externa')
+    institucion = models.CharField(max_length=150)
+    cargo = models.CharField(max_length=150)
+    fecha_inicio = models.DateField()
+    fecha_fin = models.DateField(null=True, blank=True)
+    descripcion = models.TextField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.cargo} en {self.institucion}"
+
+    class Meta:
+        verbose_name = "Experiencia Profesional"
+        verbose_name_plural = "Experiencias Profesionales"
