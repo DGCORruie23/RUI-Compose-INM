@@ -1,33 +1,65 @@
-from django.shortcuts import render, redirect
-from django.contrib import messages
-import base64
-from django.core.files.base import ContentFile
-from .models import Estado, Nacionalidad, Repatriados, Recibidos, ExtRescatados, Ingresos, Tramites, Retornados, Inadmitidos, PuntosInternacionEstacion, CatalogoOR, Encuentros, TipoPRH, PRHs, Titular, Estudio, GradoAcademico, TelefonoTitular, CorreoTitular, TipoNombramiento
-from django.apps import apps
-import openpyxl
-from datetime import datetime
 from bokeh.plotting import figure
 from bokeh.models import GeoJSONDataSource, HoverTool, TapTool, CustomJS, LinearColorMapper, FactorRange, ColumnDataSource, NumeralTickFormatter, RangeTool, DatetimeTickFormatter
 from bokeh.layouts import column
 from bokeh.embed import components
 from bokeh.palettes import Greens256
+
+from .models import Estado, Nacionalidad, Repatriados, Recibidos, ExtRescatados, Ingresos, Tramites, Retornados, Inadmitidos, PuntosInternacionEstacion, CatalogoOR, Encuentros, TipoPRH, PRHs, Titular, Estudio, GradoAcademico, TelefonoTitular, CorreoTitular, TipoNombramiento, TrayectoriaLaboral, ExperienciaProfesional
+from usuarioL.models import usuarioL
+
+from datetime import datetime
 import json
 import random
 import os
-from django.conf import settings
+import unicodedata
+import base64
+import openpyxl
 
+from django.contrib import messages
+from django.shortcuts import render, redirect
+from django.apps import apps
+from django.core.files.base import ContentFile
+from django.conf import settings
 from django.db import transaction, models
 from django.db.models import Sum, Count, Max, Q
 from django.db.models.functions import TruncDay, TruncMonth, TruncWeek
 from datetime import date, timedelta
-import unicodedata
+from django.http import JsonResponse
+
 
 def normalizar_nombre(texto):
     if not texto: return ""
-    return ''.join(
-        c for c in unicodedata.normalize('NFD', str(texto))
-        if unicodedata.category(c) != 'Mn'
-    ).upper().strip()
+    texto = unicodedata.normalize('NFD', texto)
+    texto = texto.encode('ascii', 'ignore').decode("utf-8")
+    return str(texto).strip().upper()
+
+def get_user_state(request):
+    """Retorna el objeto Estado asociado al usuario o None si es superusuario."""
+    if request.user.is_superuser:
+        return None
+    
+    profile = getattr(request.user, 'usuarioL', None)
+    if not profile:
+        return None
+        
+    # Mapeo especial para nombres comunes en usuarioL vs Estado
+    mapping = {
+        'CDMX': 'CIUDAD DE MEXICO',
+        'EDOMEX': 'ESTADO DE MEXICO',
+    }
+    
+    oficina = profile.oficinaR
+    target_name = mapping.get(oficina, oficina)
+    target_name = normalizar_nombre(target_name)
+    
+    try:
+        return Estado.objects.get(nombre__iexact=target_name)
+    except Estado.DoesNotExist:
+        # Intento de búsqueda por normalización si falla el iexact
+        for edo in Estado.objects.all():
+            if normalizar_nombre(edo.nombre) == target_name:
+                return edo
+    return None
 
 # --- FUNCIONES DE AGREGACIÓN (EXTRACTADAS PARA REUTILIZACIÓN) ---
 
@@ -528,27 +560,115 @@ def carga_datos(request):
             
         return redirect('carga_datos')
 
+    user_state = get_user_state(request)
+    
+    if user_state:
+        estados_list = [user_state]
+        titulares_list = Titular.objects.filter(estado=user_state).order_by('nombre')
+    else:
+        estados_list = Estado.objects.all().order_by('nombre')
+        titulares_list = Titular.objects.all().order_by('nombre')
+
     update_dates = get_all_update_dates()
     return render(request, 'mapa/carga_datos.html', {
         'models': models_available.keys(),
         'update_dates': update_dates,
         'estados_list': Estado.objects.all().order_by('nombre'),
+    })
+
+def titulares_list(request):
+    """Vista para la gestión independiente de expedientes de titulares."""
+    user_state = get_user_state(request)
+    
+    if user_state:
+        estados_list = [user_state]
+        titulares_list = Titular.objects.filter(estado=user_state).order_by('nombre')
+    else:
+        estados_list = Estado.objects.all().order_by('nombre')
+        titulares_list = Titular.objects.all().order_by('nombre')
+
+    return render(request, 'mapa/titulares.html', {
+        'estados_list': estados_list,
         'nacionalidades_list': Nacionalidad.objects.all().order_by('nombre'),
         'grados_academicos': GradoAcademico.objects.all().order_by('nombre'),
         'tipos_nombramiento': TipoNombramiento.objects.all().order_by('nombre'),
+        'titulares_list': titulares_list,
     })
+
+def api_get_titular(request, titular_id):
+    """Retorna los datos de un titular en formato JSON para edición."""
+    try:
+        user_state = get_user_state(request)
+        titular = Titular.objects.get(id=titular_id)
+        
+        # Validación de seguridad
+        if user_state and titular.estado != user_state:
+            return JsonResponse({'status': 'error', 'message': 'Sin permisos'}, status=403)
+            
+        data = {
+            'id': titular.id,
+            'nombre': titular.nombre,
+            'apellido_paterno': titular.apellido_paterno,
+            'apellido_materno': titular.apellido_materno,
+            'curp': titular.curp,
+            'fecha_nacimiento': titular.fecha_nacimiento.isoformat() if titular.fecha_nacimiento else None,
+            'sexo': titular.sexo,
+            'nivel': titular.nivel,
+            'codigo_plaza': titular.codigo_plaza,
+            'tipo_nombramiento': titular.tipo_nombramiento.nombre if titular.tipo_nombramiento else None,
+            'estado': titular.estado.nombre,
+            'foto_url': titular.fotografia.url if titular.fotografia else None,
+            'telefonos': list(titular.telefonos.values('tipo', 'numero')),
+            'correos': list(titular.correos.values('tipo', 'correo')),
+            'estudios': [
+                {
+                    'grado': e.grado.nombre if e.grado else 'Sin grado',
+                    'carrera': e.carrera
+                } for e in titular.estudios.all()
+            ],
+            'trayectoria': list(titular.trayectoria.values('puesto', 'area', 'fecha_inicio', 'fecha_fin', 'actual')),
+            'experiencia': list(titular.experiencia_externa.values('institucion', 'cargo', 'fecha_inicio', 'fecha_fin', 'descripcion')),
+        }
+        return JsonResponse({'status': 'success', 'data': data})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
+@transaction.atomic
+def eliminar_titular(request, titular_id):
+    """Elimina un titular y todos sus datos relacionados."""
+    try:
+        user_state = get_user_state(request)
+        titular = Titular.objects.get(id=titular_id)
+        
+        # Validación de seguridad
+        if user_state and titular.estado != user_state:
+            messages.error(request, "No tienes permisos para eliminar este registro.")
+            return redirect('titulares_list')
+            
+        nombre = titular.nombre
+        titular.delete()
+        messages.success(request, f"Expediente de {nombre} eliminado correctamente.")
+    except Exception as e:
+        messages.error(request, f"Error al eliminar titular: {str(e)}")
+    
+    return redirect('titulares_list')
 
 @transaction.atomic
 def guardar_titular(request):
-    if not request.user.is_superuser or request.method != 'POST':
-        return render(request, 'base/error404.html')
-
+    if request.method != 'POST':
+        return redirect('carga_datos')
+    
+    user_state = get_user_state(request)
+    
     try:
-        # 1. Datos Básicos
         curp = request.POST.get('curp', '').strip().upper()
         if not curp:
-            messages.error(request, "La CURP es obligatoria.")
-            return redirect('carga_datos')
+            raise ValueError("La CURP es obligatoria.")
+        
+        # Validación de seguridad: el estado enviado debe coincidir con el del usuario
+        estado_id = request.POST.get('estado_id')
+        if user_state and str(user_state.id) != str(estado_id):
+            raise PermissionError("No tienes permisos para registrar titulares en este estado.")
 
         titular, created = Titular.objects.update_or_create(
             curp=curp,
@@ -643,13 +763,9 @@ def guardar_titular(request):
 
         messages.success(request, f"Expediente de {titular.nombre} {'creado' if created else 'actualizado'} correctamente.")
     except Exception as e:
-        messages.error(request, f"Error al guardar titular: {str(e)}")
-
-    return redirect('carga_datos')
-
-from django.http import JsonResponse
-
-from django.http import JsonResponse
+        messages.error(request, f"Error al guardar expediente: {str(e)}")
+    
+    return redirect('titulares_list')
 
 def api_periodo_custom(request):
     """API para obtener datos en un rango de fechas personalizado."""
@@ -1480,3 +1596,174 @@ def reportes(request):
 def mapa_ejemplo(request):
     """Vista de ejemplo para MapLibre GL JS."""
     return render(request, 'mapa/mapa_ejemplo.html')
+
+
+# -------------------------------------------------------
+# --- -------  --- VIEW MAPA DR --- ------ ------- ------
+# -------------------------------------------------------
+
+def mapa_interactivo(request):
+    if not request.user.is_superuser:
+        return render(request, 'base/error404.html')
+
+    fecha_act = get_global_update_date() or date.today()
+
+    CS_START = date(2024, 10, 1)
+    DT_START = date(2025, 1, 20)
+
+    totals_cs = get_totals_by_period(CS_START, fecha_act)
+    totals_dt = get_totals_by_period(DT_START, fecha_act)
+    
+    # Etiqueta centralizada para la escala global
+    LABEL_NACIONAL = "Total Nacional"
+
+    # Diccionario maestro de etiquetas de métricas
+    METRIC_LABELS = {
+        'todos': 'Todos',
+        'repatriados': 'Mexicanos Recibidos',
+        'recibidos': 'Extranjeros Recibidos',
+        'rescatados': 'Rescates',
+        'ingresos': 'Internaciones',
+        'tramites': 'Trámites',
+        'retornados': 'Retornados',
+        'inadmitidos': 'Inadmitidos',
+        'recibidos_total': 'Recibidos'
+    }
+
+    # --- Recopilación de Infraestructura y Titulares ---
+    infra_raw = PuntosInternacionEstacion.objects.values('estado__nombre', 'tipo').annotate(total=Count('id'))
+    titulares_raw = Titular.objects.all().select_related('estado')
+    
+    infra_data = {}
+    # Estructura base para todos los estados
+    for edo in Estado.objects.all():
+        infra_data[normalizar_nombre(edo.nombre)] = {
+            'AEREO': 0, 'MARITIMO': 0, 'TERRESTRE': 0, 'ESTACION': 0,
+            'PRH': 0,
+            'titular': 'Sin titular asignado',
+            'titular_id': None,
+            'foto': None
+        }
+    
+    # Población con datos reales
+    for item in infra_raw:
+        edo_name = normalizar_nombre(item['estado__nombre'])
+        if edo_name in infra_data:
+            infra_data[edo_name][item['tipo']] = item['total']
+            
+    for t in titulares_raw:
+        edo_name = normalizar_nombre(t.estado.nombre)
+        if edo_name in infra_data:
+            infra_data[edo_name]['titular'] = f"{t.nombre} {t.apellido_paterno} {t.apellido_materno}"
+            infra_data[edo_name]['titular_id'] = t.id
+            if t.fotografia:
+                infra_data[edo_name]['foto'] = t.fotografia.url
+
+    # PRHs por estado
+    prh_raw = PRHs.objects.values('estado__nombre').annotate(total=Count('id'))
+    for item in prh_raw:
+        edo_name = normalizar_nombre(item['estado__nombre'])
+        if edo_name in infra_data:
+            infra_data[edo_name]['PRH'] = item['total']
+
+    # Totales Nacionales
+    infra_data[LABEL_NACIONAL] = {
+        'AEREO': PuntosInternacionEstacion.objects.filter(tipo='AEREO').count(),
+        'MARITIMO': PuntosInternacionEstacion.objects.filter(tipo='MARITIMO').count(),
+        'TERRESTRE': PuntosInternacionEstacion.objects.filter(tipo='TERRESTRE').count(),
+        'ESTACION': PuntosInternacionEstacion.objects.filter(tipo='ESTACION').count(),
+        'PRH': PRHs.objects.count(),
+        'titular': 'Datos Nacionales',
+        'foto': None
+    }
+
+
+    # Ruta al archivo geojson descargado
+    geojson_path = os.path.join(settings.BASE_DIR, 'mapa', 'static', 'mapa', 'data', 'mexico.geojson')
+    
+    with open(geojson_path, 'r', encoding='utf-8') as f:
+        geo_data = json.load(f)
+          # Inyectar datos reales en cada estado
+    for feature in geo_data['features']:
+        name_normalized = normalizar_nombre(feature['properties']['name'])
+        
+        # Obtener datos de los diccionarios (usar default con ceros para todos los campos nuevos)
+        default_vals = {
+            'todos': 0, 'color_t': 32, 'color_rep': 32, 'color_rec': 32, 'color_res': 32, 'color_ing': 32, 'color_tra': 32, 'color_ret': 32, 'color_ina': 32,
+            'repatriados': 0, 'rep_adultos': 0, 'rep_menores': 0, 'rep_nna_solo': 0, 'rep_nna_acom': 0, 'rep_terrestres': 0, 'rep_vuelos': 0,
+            'recibidos': 0, 'rec_adultos': 0, 'rec_menores': 0,
+            'rescatados': 0, 'res_una_vez': 0, 'res_reincidente': 0, 'res_estacion': 0, 'res_dif': 0, 'res_conduccion': 0,
+            'ingresos': 0, 'ing_aereos': 0, 'ing_maritimos': 0, 'ing_terrestres': 0,
+            'tramites': 0, 'tra_res_perm': 0, 'tra_res_temp': 0, 'tra_res_est': 0, 'tra_vis_hum': 0, 'tra_vis_adop': 0, 'tra_vis_reg': 0, 'tra_vis_trab': 0,
+            'retornados': 0, 'ret_deportado': 0, 'ret_retornado': 0, 'inadmitidos': 0,
+        }
+        
+        cs = totals_cs.get(name_normalized, default_vals)
+        dt = totals_dt.get(name_normalized, default_vals)
+
+        # Inyectar en GeoJSON (usamos prefijos cs_, dt_ y pe_)
+        for k in default_vals:
+            feature['properties'][f'cs_{k}'] = cs[k]
+            feature['properties'][f'dt_{k}'] = dt[k]
+            feature['properties'][f'pe_{k}'] = cs[k] # Inicializar PE con valores de CS
+        
+        # Cadenas formateadas para el Tooltip Dinámico
+        for k in ['todos', 'repatriados', 'recibidos', 'rescatados', 'ingresos', 'tramites', 'retornados', 'inadmitidos']:
+            feature['properties'][f'cs_str_{k}'] = f"{cs[k]:,}"
+            feature['properties'][f'dt_str_{k}'] = f"{dt[k]:,}"
+            feature['properties'][f'pe_str_{k}'] = f"{cs[k]:,}"
+        
+    # --- Capa de Infraestructura (Iconos SVG) ---
+    infra_points_objs = PuntosInternacionEstacion.objects.all()
+    infra_pts_data = []
+    for pt in infra_points_objs:
+        icon_file = 'terrestre2.svg' # Default
+        if pt.tipo == 'AEREO': icon_file = 'aereo2.svg'
+        elif pt.tipo == 'MARITIMO': icon_file = 'maritimo2.svg'
+        elif pt.tipo == 'ESTACION': icon_file = 'estacion2.svg'
+        
+        infra_pts_data.append({
+            'x': float(pt.longitud) if pt.longitud else 0,
+            'y': float(pt.latitud) if pt.latitud else 0,
+            'nombre': pt.nombre,
+            'estado': normalizar_nombre(pt.estado.nombre),
+            'tipo': pt.tipo,
+            'url': f"{settings.STATIC_URL}mapa/icons/{icon_file}"
+        })
+
+    # --- Capa de Puntos de Rescate Humano (PRH) ---
+    prh_points = PRHs.objects.all().select_related('modalidad')
+    prh_pts_data = []
+    for pt in prh_points:
+        icon = 'agente_activo2.svg' if pt.activo else 'agente_inactivo2.svg'
+        prh_pts_data.append({
+            'x': float(pt.longitud) if pt.longitud else 0,
+            'y': float(pt.latitud) if pt.latitud else 0,
+            'nombre': pt.nombre,
+            'estado': normalizar_nombre(pt.estado.nombre),
+            'modalidad': pt.modalidad.nombre,
+            'status': 'Activo' if pt.activo else 'Inactivo',
+            'url': f"{settings.STATIC_URL}mapa/icons/{icon}"
+        })
+
+    national_data = {
+        'name': LABEL_NACIONAL,
+        'cs': calc_national(totals_cs),
+        'dt': calc_national(totals_dt),
+        'pe': calc_national(totals_cs) # Inicializar PE con valores de CS
+    }
+    
+    context = {
+        'geo_data_json': json.dumps(geo_data),
+        'national_data_json': json.dumps(national_data),
+        'infra_data_json': json.dumps(infra_data),
+        'infra_pts_data_json': json.dumps(infra_pts_data),
+        'prh_pts_data_json': json.dumps(prh_pts_data),
+        'label_nacional': LABEL_NACIONAL,
+        'metric_labels': METRIC_LABELS,
+        'metric_labels_json': json.dumps(METRIC_LABELS),
+        'fecha_actualizacion': fecha_act,
+    }
+    
+    return render(request, 'mapa/mapa_activo.html', context)
+

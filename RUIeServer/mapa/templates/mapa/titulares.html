@@ -1,0 +1,552 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}Expediente Digital - RUIE{% endblock title %}
+
+{% block scripts %}
+<!-- Cropper.js -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+<script>
+    function openPersonalModal() {
+        const modal = document.getElementById('personalModal');
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closePersonalModal() {
+        const modal = document.getElementById('personalModal');
+        modal.classList.add('hidden');
+        document.body.style.overflow = 'auto';
+    }
+
+    function addDynamicRow(containerId) {
+        const container = document.getElementById(containerId);
+        const firstRow = container.querySelector('div');
+        const newRow = firstRow.cloneNode(true);
+        newRow.querySelectorAll('input').forEach(input => input.value = '');
+        container.appendChild(newRow);
+    }
+
+    function addAcademicRow() {
+        const container = document.getElementById('academic-container');
+        const firstRow = container.querySelector('div');
+        const newRow = firstRow.cloneNode(true);
+        newRow.querySelectorAll('input').forEach(input => input.value = '');
+        container.appendChild(newRow);
+    }
+
+    function addTrayectoriaRow() {
+        const container = document.getElementById('trayectoria-container');
+        const rows = container.querySelectorAll(':scope > div');
+        const newRow = rows[0].cloneNode(true);
+        newRow.querySelectorAll('input').forEach(input => {
+            input.value = '';
+            if (input.type === 'radio') {
+                input.value = rows.length;
+                input.checked = false;
+            }
+        });
+        container.appendChild(newRow);
+    }
+
+    function addExperienciaRow() {
+        const container = document.getElementById('experiencia-container');
+        const firstRow = container.querySelector('div');
+        const newRow = firstRow.cloneNode(true);
+        newRow.querySelectorAll('input, textarea').forEach(input => input.value = '');
+        container.appendChild(newRow);
+    }
+
+    function removeRow(button) {
+        const container = button.closest('[id$="-container"]');
+        const rows = container.querySelectorAll(':scope > div');
+        if (rows.length > 1) {
+            button.closest(':scope > div').remove();
+        } else {
+            const row = rows[0];
+            row.querySelectorAll('input, select, textarea').forEach(el => el.value = '');
+        }
+    }
+
+    let cropper;
+    const imageToCrop = document.getElementById('image-to-crop');
+    const fotoInput = document.getElementById('foto-input');
+    const cropperWrapper = document.getElementById('cropper-wrapper');
+    const croppedImageData = document.getElementById('cropped_image_data');
+
+    if (fotoInput) {
+        fotoInput.addEventListener('change', function(e) {
+            const files = e.target.files;
+            if (files && files.length > 0) {
+                const reader = new FileReader();
+                reader.onload = function() {
+                    imageToCrop.src = reader.result;
+                    cropperWrapper.classList.remove('hidden');
+                    if (cropper) { cropper.destroy(); }
+                    cropper = new Cropper(imageToCrop, {
+                        aspectRatio: 3 / 4,
+                        viewMode: 1,
+                        dragMode: 'move',
+                        autoCropArea: 1,
+                        guides: true,
+                        center: true,
+                        highlight: false,
+                        cropBoxMovable: true,
+                        cropBoxResizable: true,
+                        toggleDragModeOnDblclick: false,
+                    });
+                };
+                reader.readAsDataURL(files[0]);
+            }
+        });
+    }
+
+    function zoomIn() { if(cropper) cropper.zoom(0.1); }
+    function zoomOut() { if(cropper) cropper.zoom(-0.1); }
+
+    function resetPersonalForm() {
+        const form = document.getElementById('personalForm');
+        if (form) form.reset();
+        document.getElementById('personal-modal-title').innerText = 'Agregar Titular';
+        document.getElementById('personal-modal-subtitle').innerText = 'Registro';
+        if (cropper) {
+            cropper.destroy();
+            cropper = null;
+            cropperWrapper.classList.add('hidden');
+        }
+        ['tel-container', 'email-container', 'academic-container', 'trayectoria-container', 'experiencia-container'].forEach(id => {
+            const container = document.getElementById(id);
+            const rows = container.querySelectorAll(':scope > div');
+            for (let i = 1; i < rows.length; i++) rows[i].remove();
+        });
+    }
+
+    async function editTitular(id) {
+        try {
+            const response = await fetch(`/mapa/api/get-titular/${id}`);
+            const result = await response.json();
+            if (result.status === 'success') {
+                const data = result.data;
+                resetPersonalForm();
+                document.getElementById('personal-modal-title').innerText = 'Editar Titular';
+                document.getElementById('personal-modal-subtitle').innerText = 'Actualización';
+                const form = document.getElementById('personalForm');
+                if (!form) return;
+                form.querySelector('[name="nombre"]').value = data.nombre;
+                form.querySelector('[name="apellido_paterno"]').value = data.apellido_paterno;
+                form.querySelector('[name="apellido_materno"]').value = data.apellido_materno;
+                form.querySelector('[name="curp"]').value = data.curp;
+                form.querySelector('[name="fecha_nacimiento"]').value = data.fecha_nacimiento;
+                form.querySelector('[name="sexo"]').value = data.sexo;
+                form.querySelector('[name="nivel"]').value = data.nivel;
+                form.querySelector('[name="codigo_plaza"]').value = data.codigo_plaza;
+                form.querySelector('[name="tipo_nombramiento_id"]').value = data.tipo_nombramiento_id;
+                form.querySelector('[name="estado_id"]').value = data.estado_id;
+                form.querySelector('[name="nacionalidad_id"]').value = data.nacionalidad_id;
+                data.telefonos.forEach((t, i) => { if (i > 0) addDynamicRow('tel-container'); const rows = document.getElementById('tel-container').querySelectorAll(':scope > div'); rows[i].querySelector('[name="tel_tipo[]"]').value = t.tipo; rows[i].querySelector('[name="tel_numero[]"]').value = t.numero; });
+                data.correos.forEach((c, i) => { if (i > 0) addDynamicRow('email-container'); const rows = document.getElementById('email-container').querySelectorAll(':scope > div'); rows[i].querySelector('[name="email_tipo[]"]').value = c.tipo; rows[i].querySelector('[name="email_valor[]"]').value = c.correo; });
+                data.estudios.forEach((e, i) => { if (i > 0) addAcademicRow(); const rows = document.getElementById('academic-container').querySelectorAll(':scope > div'); rows[i].querySelector('[name="edu_grado[]"]').value = e.grado_id; rows[i].querySelector('[name="edu_carrera[]"]').value = e.carrera; });
+                data.trayectoria.forEach((t, i) => { if (i > 0) addTrayectoriaRow(); const rows = document.getElementById('trayectoria-container').querySelectorAll(':scope > div'); rows[i].querySelector('[name="tray_puesto[]"]').value = t.puesto; rows[i].querySelector('[name="tray_area[]"]').value = t.area; rows[i].querySelector('[name="tray_inicio[]"]').value = t.fecha_inicio; rows[i].querySelector('[name="tray_fin[]"]').value = t.fecha_fin; if (t.actual) rows[i].querySelector('[name="tray_actual_index"]').checked = true; });
+                data.experiencia.forEach((e, i) => { if (i > 0) addExperienciaRow(); const rows = document.getElementById('experiencia-container').querySelectorAll(':scope > div'); rows[i].querySelector('[name="exp_inst[]"]').value = e.institucion; rows[i].querySelector('[name="exp_cargo[]"]').value = e.cargo; rows[i].querySelector('[name="exp_inicio[]"]').value = e.fecha_inicio; rows[i].querySelector('[name="exp_fin[]"]').value = e.fecha_fin; rows[i].querySelector('[name="exp_desc[]"]').value = e.descripcion; });
+                openPersonalModal();
+            } else { alert('Error al cargar datos: ' + result.message); }
+        } catch (err) { alert('Error de conexión'); }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.getElementById('personalForm');
+        if (form) {
+            form.addEventListener('submit', function(e) {
+                if (cropper) {
+                    const canvas = cropper.getCroppedCanvas({ width: 480, height: 640 });
+                    croppedImageData.value = canvas.toDataURL('image/jpeg', 0.9);
+                }
+            });
+        }
+    });
+</script>
+{% endblock scripts %}
+
+{% block content %}
+<main class="min-h-screen bg-[#FDFDFD] pt-24 pb-12 px-4 md:px-8">
+    <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <div class="mb-12 animate-fade-in">
+            <div class="flex items-center space-x-4 mb-4">
+                <a href="{% url 'carga_datos' %}" class="p-2 bg-white border border-gray-100 rounded-xl hover:bg-gray-50 transition-colors">
+                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"></path></svg>
+                </a>
+                <span class="px-4 py-1.5 bg-emerald-50 text-inm-verde-100 text-[10px] font-bold uppercase tracking-[0.2em] rounded-full border border-emerald-100/50">Personal INM</span>
+            </div>
+            <div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
+                <div>
+                    <h1 class="text-5xl font-black text-gray-900 tracking-tight mb-4">Expediente Digital<span class="text-inm-verde-100">.</span></h1>
+                    <p class="text-lg text-gray-500 max-w-2xl font-medium">Gestión administrativa de titulares y trayectorias institucionales.</p>
+                </div>
+                <button onclick="resetPersonalForm(); openPersonalModal();" class="px-8 py-4 bg-stone-800 text-white rounded-2xl font-bold shadow-xl shadow-stone-900/20 hover:bg-stone-900 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
+                    Nuevo Expediente
+                </button>
+            </div>
+        </div>
+
+        {% if messages %}
+        <div class="mb-10 w-full animate-slide-up">
+            {% for message in messages %}
+            <div class="p-4 rounded-2xl mb-3 flex items-center {% if message.tags == 'success' %}bg-emerald-50 text-emerald-800 border border-emerald-100{% else %}bg-rose-50 text-rose-800 border border-rose-100{% endif %} shadow-sm">
+                <div class="flex-shrink-0">
+                    {% if message.tags == 'success' %}
+                    <svg class="h-5 w-5 text-emerald-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
+                    {% else %}
+                    <svg class="h-5 w-5 text-rose-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" /></svg>
+                    {% endif %}
+                </div>
+                <div class="ml-3"><p class="text-sm font-bold">{{ message }}</p></div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Tabla de Titulares Registrados -->
+        <div class="bg-white border border-gray-100 rounded-[2.5rem] shadow-sm overflow-hidden mb-12">
+            <div class="p-8 border-b border-gray-50 flex justify-between items-center">
+                <div>
+                    <h2 class="text-xl font-bold text-gray-900">Titulares Registrados</h2>
+                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Gestión por Estado asignado</p>
+                </div>
+                <div class="flex items-center space-x-2 px-4 py-2 bg-gray-50 rounded-xl">
+                    <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                    <span class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{{ titulares_list.count }} Registros</span>
+                </div>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left">
+                    <thead>
+                        <tr class="bg-gray-50/50">
+                            <th class="px-8 py-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Nombre Completo</th>
+                            <th class="px-8 py-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Estado / Plaza</th>
+                            <th class="px-8 py-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Contacto</th>
+                            <th class="px-8 py-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-right">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-50">
+                        {% for t in titulares_list %}
+                        <tr class="hover:bg-gray-50/80 transition-colors group">
+                            <td class="px-8 py-6">
+                                <div class="flex items-center">
+                                    <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-inm-verde-100 flex items-center justify-center font-black mr-4 text-lg">
+                                        {{ t.nombre|first }}
+                                    </div>
+                                    <div>
+                                        <div class="text-sm font-bold text-gray-900">{{ t.nombre }} {{ t.apellido_paterno }}</div>
+                                        <div class="text-[10px] font-bold text-gray-400">{{ t.curp }}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-8 py-6">
+                                <div class="text-xs font-bold text-gray-700">{{ t.estado.nombre }}</div>
+                                <div class="text-[10px] font-bold text-gray-400 uppercase tracking-tight">{{ t.codigo_plaza|default:"SIN PLAZA" }}</div>
+                            </td>
+                            <td class="px-8 py-6">
+                                <div class="flex flex-col space-y-1">
+                                    {% with tel=t.telefonos.first %}
+                                        {% if tel %}<div class="text-[10px] font-bold text-gray-500 flex items-center"><svg class="w-3 h-3 mr-1 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg> {{ tel.numero }}</div>{% endif %}
+                                    {% endwith %}
+                                    {% with mail=t.correos.first %}
+                                        {% if mail %}<div class="text-[10px] font-bold text-gray-500 flex items-center"><svg class="w-3 h-3 mr-1 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg> {{ mail.correo }}</div>{% endif %}
+                                    {% endwith %}
+                                </div>
+                            </td>
+                            <td class="px-8 py-6 text-right">
+                                <div class="flex justify-end space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button onclick="editTitular({{ t.id }})" class="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors shadow-sm">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                                    </button>
+                                    <a href="{% url 'eliminar_titular' t.id %}" onclick="return confirm('¿Está seguro de eliminar este expediente?')" class="p-2.5 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-100 transition-colors shadow-sm">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="px-8 py-16 text-center">
+                                <div class="flex flex-col items-center">
+                                    <div class="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4 text-gray-300">
+                                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                                    </div>
+                                    <p class="text-sm font-bold text-gray-400 uppercase tracking-widest">No hay registros</p>
+                                    <p class="text-xs text-gray-400 mt-1">Inicia creando un nuevo expediente digital.</p>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Personal Modal (Complex Form) -->
+    <div id="personalModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto">
+        <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-md transition-opacity" onclick="closePersonalModal()"></div>
+        <div class="relative bg-white rounded-[2.5rem] shadow-2xl w-full max-w-4xl my-8 overflow-hidden border border-gray-100 animate-slide-up">
+            <div class="p-8 border-b border-gray-50 flex justify-between items-center bg-gray-50/50">
+                <div>
+                    <span class="text-[10px] font-bold uppercase tracking-widest text-inm-verde-100" id="personal-modal-subtitle">Registro</span>
+                    <h2 class="text-3xl font-bold text-gray-900 mt-1" id="personal-modal-title">Expediente del Titular</h2>
+                </div>
+                <button onclick="closePersonalModal()" class="text-gray-400 hover:text-gray-600 transition-colors bg-white p-3 rounded-2xl shadow-sm hover:shadow-md">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+
+            <form id="personalForm" action="{% url 'guardar_titular' %}" method="POST" enctype="multipart/form-data" class="p-8 max-h-[75vh] overflow-y-auto custom-scrollbar">
+                {% csrf_token %}
+                <div class="mb-10">
+                    <h3 class="text-lg font-bold text-gray-800 mb-6 flex items-center">
+                        <span class="w-8 h-8 bg-emerald-100 text-inm-verde-100 rounded-lg flex items-center justify-center mr-3 text-sm font-bold">1</span>
+                        Información General
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="md:col-span-1">
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Fotografía (Recorte 3:4)</label>
+                            <div class="space-y-4">
+                                <input type="file" id="foto-input" accept="image/*" class="block w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-inm-verde-100 hover:file:bg-emerald-100">
+                                <div id="cropper-wrapper" class="hidden">
+                                    <div class="aspect-[3/4] bg-gray-100 rounded-2xl overflow-hidden border border-gray-200 max-w-[240px] mx-auto">
+                                        <img id="image-to-crop" class="max-w-full">
+                                    </div>
+                                    <div class="flex justify-center mt-2 space-x-2">
+                                        <button type="button" onclick="zoomIn()" class="p-2 bg-gray-100 rounded-lg hover:bg-gray-200"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"></path></svg></button>
+                                        <button type="button" onclick="zoomOut()" class="p-2 bg-gray-100 rounded-lg hover:bg-gray-200"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M20 12H4"></path></svg></button>
+                                    </div>
+                                </div>
+                                <input type="hidden" name="cropped_image" id="cropped_image_data">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">CURP</label>
+                            <input type="text" name="curp" required maxlength="18" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-inm-verde-100 outline-none font-bold uppercase">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Sexo</label>
+                            <select name="sexo" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold">
+                                <option value="M">Masculino</option>
+                                <option value="F">Femenino</option>
+                                <option value="X">Otro</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Nombre(s)</label>
+                            <input type="text" name="nombre" required class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold uppercase">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Apellido Paterno</label>
+                            <input type="text" name="apellido_paterno" required class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold uppercase">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Apellido Materno</label>
+                            <input type="text" name="apellido_materno" required class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold uppercase">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Fecha Nacimiento</label>
+                            <input type="date" name="fecha_nacimiento" required class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Estado (Adscripción)</label>
+                            <select name="estado_id" required class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold">
+                                {% for estado in estados_list %}
+                                <option value="{{ estado.id }}">{{ estado.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Nacionalidad</label>
+                            <select name="nacionalidad_id" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold">
+                                {% for nac in nacionalidades_list %}
+                                <option value="{{ nac.id }}" {% if nac.nombre == 'MEXICO' %}selected{% endif %}>{{ nac.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Nivel</label>
+                            <input type="text" name="nivel" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold uppercase" placeholder="Ej: 27-A">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Código de Plaza</label>
+                            <input type="text" name="codigo_plaza" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold uppercase" placeholder="Único">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Tipo de Nombramiento</label>
+                            <select name="tipo_nombramiento_id" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold">
+                                <option value="" selected>Sin especificar</option>
+                                {% for tipo in tipos_nombramiento %}
+                                <option value="{{ tipo.id }}">{{ tipo.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sección 2: Contacto -->
+                <div class="mb-10 p-6 bg-gray-50/50 rounded-3xl border border-gray-100">
+                    <h3 class="text-lg font-bold text-gray-800 mb-6 flex items-center">
+                        <span class="w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center mr-3 text-sm font-bold">2</span>
+                        Medios de Contacto
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div>
+                            <div class="flex justify-between items-center mb-4">
+                                <label class="text-xs font-bold text-gray-500 uppercase">Teléfonos</label>
+                                <button type="button" onclick="addDynamicRow('tel-container')" class="text-[10px] font-bold text-inm-verde-100 hover:text-inm-verde-200 uppercase tracking-widest">+ Agregar</button>
+                            </div>
+                            <div id="tel-container" class="space-y-3">
+                                <div class="flex items-center space-x-2 animate-fade-in group">
+                                    <select name="tel_tipo[]" class="w-1/3 px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl outline-none font-bold">
+                                        <option value="PERSONAL">Personal</option>
+                                        <option value="OFICINA">Oficina</option>
+                                        <option value="ASISTENTE">Asistente</option>
+                                        <option value="EMERGENCIA">Emergencia</option>
+                                        <option value="OTRO">Otro</option>
+                                    </select>
+                                    <input type="text" name="tel_numero[]" placeholder="Número" class="w-2/3 px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl outline-none font-bold">
+                                    <button type="button" onclick="removeRow(this)" class="text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between items-center mb-4">
+                                <label class="text-xs font-bold text-gray-500 uppercase">Correos</label>
+                                <button type="button" onclick="addDynamicRow('email-container')" class="text-[10px] font-bold text-inm-verde-100 hover:text-inm-verde-200 uppercase tracking-widest">+ Agregar</button>
+                            </div>
+                            <div id="email-container" class="space-y-3">
+                                <div class="flex items-center space-x-2 animate-fade-in group">
+                                    <select name="email_tipo[]" class="w-1/3 px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl outline-none font-bold">
+                                        <option value="INSTITUCIONAL">Institucional</option>
+                                        <option value="PERSONAL">Personal</option>
+                                        <option value="OTRO">Otro</option>
+                                    </select>
+                                    <input type="email" name="email_valor[]" placeholder="ejemplo@inami.gob.mx" class="w-2/3 px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl outline-none font-bold">
+                                    <button type="button" onclick="removeRow(this)" class="text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sección 3: Formación Académica -->
+                <div class="mb-10">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-lg font-bold text-gray-800 flex items-center">
+                            <span class="w-8 h-8 bg-purple-100 text-purple-600 rounded-lg flex items-center justify-center mr-3 text-sm font-bold">3</span>
+                            Formación Académica
+                        </h3>
+                        <button type="button" onclick="addAcademicRow()" class="px-4 py-2 bg-purple-50 text-purple-600 rounded-xl text-xs font-bold hover:bg-purple-100 transition-colors uppercase tracking-widest">+ Agregar Grado</button>
+                    </div>
+                    <div id="academic-container" class="space-y-4">
+                        <div class="p-5 bg-white border border-gray-100 rounded-2xl shadow-sm grid grid-cols-1 md:grid-cols-12 gap-4 animate-fade-in relative group">
+                            <div class="md:col-span-3">
+                                <label class="block text-[9px] font-bold text-gray-400 uppercase mb-1">Grado</label>
+                                <select name="edu_grado[]" class="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-100 rounded-xl outline-none font-bold">
+                                    {% for grado in grados_academicos %}
+                                    <option value="{{ grado.id }}">{{ grado.nombre }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="md:col-span-8">
+                                <label class="block text-[9px] font-bold text-gray-400 uppercase mb-1">Carrera / Especialidad</label>
+                                <input type="text" name="edu_carrera[]" class="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-100 rounded-xl outline-none font-bold uppercase">
+                            </div>
+                            <div class="md:col-span-1 flex items-end justify-center pb-2">
+                                <button type="button" onclick="removeRow(this)" class="text-gray-300 hover:text-red-500 transition-colors"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sección 4: Trayectoria Laboral -->
+                <div class="mb-10">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-lg font-bold text-gray-800 flex items-center">
+                            <span class="w-8 h-8 bg-amber-100 text-amber-600 rounded-lg flex items-center justify-center mr-3 text-sm font-bold">4</span>
+                            Trayectoria en INM
+                        </h3>
+                        <button type="button" onclick="addTrayectoriaRow()" class="px-4 py-2 bg-amber-50 text-amber-600 rounded-xl text-xs font-bold hover:bg-amber-100 transition-colors uppercase tracking-widest">+ Agregar Puesto</button>
+                    </div>
+                    <div id="trayectoria-container" class="space-y-4">
+                        <div class="p-5 bg-amber-50/30 border border-amber-100 rounded-2xl grid grid-cols-1 md:grid-cols-12 gap-4 animate-fade-in relative group">
+                            <div class="md:col-span-3">
+                                <label class="block text-[9px] font-bold text-amber-600 uppercase mb-1">Puesto / Cargo</label>
+                                <input type="text" name="tray_puesto[]" class="w-full px-3 py-2 text-sm bg-white border border-amber-100 rounded-xl outline-none font-bold uppercase">
+                            </div>
+                            <div class="md:col-span-3">
+                                <label class="block text-[9px] font-bold text-amber-600 uppercase mb-1">Área / Unidad</label>
+                                <input type="text" name="tray_area[]" class="w-full px-3 py-2 text-sm bg-white border border-amber-100 rounded-xl outline-none font-bold uppercase">
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-[9px] font-bold text-amber-600 uppercase mb-1">Fecha Inicio</label>
+                                <input type="date" name="tray_inicio[]" class="w-full px-3 py-2 text-[10px] bg-white border border-amber-100 rounded-xl outline-none font-bold">
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-[9px] font-bold text-amber-600 uppercase mb-1">Fecha Fin</label>
+                                <input type="date" name="tray_fin[]" class="w-full px-3 py-2 text-[10px] bg-white border border-amber-100 rounded-xl outline-none font-bold">
+                            </div>
+                            <div class="md:col-span-1 flex flex-col items-center justify-center">
+                                <label class="block text-[9px] font-bold text-amber-600 uppercase mb-1">Actual</label>
+                                <input type="radio" name="tray_actual_index" value="0" class="w-5 h-5 text-inm-verde-100 bg-white border-amber-200 focus:ring-inm-verde-100">
+                            </div>
+                            <div class="md:col-span-1 flex items-end justify-center pb-2">
+                                <button type="button" onclick="removeRow(this)" class="text-amber-200 hover:text-red-500 transition-colors"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sección 5: Experiencia Profesional -->
+                <div class="mb-10">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-lg font-bold text-gray-800 flex items-center">
+                            <span class="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center mr-3 text-sm font-bold">5</span>
+                            Experiencia Previa
+                        </h3>
+                        <button type="button" onclick="addExperienciaRow()" class="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-xs font-bold hover:bg-indigo-100 transition-colors uppercase tracking-widest">+ Agregar Experiencia</button>
+                    </div>
+                    <div id="experiencia-container" class="space-y-4">
+                        <div class="p-6 bg-gray-50 border border-gray-200 rounded-2xl grid grid-cols-1 md:grid-cols-12 gap-4 animate-fade-in relative group">
+                            <div class="md:col-span-4">
+                                <label class="block text-[9px] font-bold text-gray-400 uppercase mb-1">Institución</label>
+                                <input type="text" name="exp_inst[]" class="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl outline-none font-bold uppercase">
+                            </div>
+                            <div class="md:col-span-4">
+                                <label class="block text-[9px] font-bold text-gray-400 uppercase mb-1">Cargo</label>
+                                <input type="text" name="exp_cargo[]" class="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl outline-none font-bold uppercase">
+                            </div>
+                            <div class="md:col-span-3">
+                                <label class="block text-[9px] font-bold text-gray-400 uppercase mb-1">Periodo</label>
+                                <div class="flex space-x-2">
+                                    <input type="date" name="exp_inicio[]" class="w-1/2 px-2 py-2 text-[10px] bg-white border border-gray-200 rounded-xl outline-none font-bold">
+                                    <input type="date" name="exp_fin[]" class="w-1/2 px-2 py-2 text-[10px] bg-white border border-gray-200 rounded-xl outline-none font-bold">
+                                </div>
+                            </div>
+                            <div class="md:col-span-1 flex items-center justify-center">
+                                <button type="button" onclick="removeRow(this)" class="text-gray-300 hover:text-red-500 transition-colors"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
+                            </div>
+                            <div class="md:col-span-12">
+                                <label class="block text-[9px] font-bold text-gray-400 uppercase mb-1">Descripción</label>
+                                <textarea name="exp_desc[]" rows="2" class="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-xl outline-none resize-none font-medium"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pt-8 border-t border-gray-100 flex justify-end space-x-4">
+                    <button type="button" onclick="closePersonalModal()" class="px-8 py-4 bg-gray-100 text-gray-500 rounded-2xl font-bold hover:bg-gray-200 transition-all">Cancelar</button>
+                    <button type="submit" class="px-12 py-4 bg-inm-verde-100 text-white rounded-2xl font-bold shadow-lg shadow-emerald-900/20 hover:bg-inm-verde-200 transition-all">Guardar Expediente</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</main>
+{% endblock content %}
