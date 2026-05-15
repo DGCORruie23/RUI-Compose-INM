@@ -616,13 +616,17 @@ def api_get_titular(request, titular_id):
             'nivel': titular.nivel,
             'codigo_plaza': titular.codigo_plaza,
             'tipo_nombramiento': titular.tipo_nombramiento.nombre if titular.tipo_nombramiento else None,
+            'tipo_nombramiento_id': titular.tipo_nombramiento_id,
             'estado': titular.estado.nombre,
+            'estado_id': titular.estado_id,
+            'nacionalidad_id': titular.nacionalidad_id,
             'foto_url': titular.fotografia.url if titular.fotografia else None,
             'telefonos': list(titular.telefonos.values('tipo', 'numero')),
             'correos': list(titular.correos.values('tipo', 'correo')),
             'estudios': [
                 {
                     'grado': e.grado.nombre if e.grado else 'Sin grado',
+                    'grado_id': e.grado_id,
                     'carrera': e.carrera
                 } for e in titular.estudios.all()
             ],

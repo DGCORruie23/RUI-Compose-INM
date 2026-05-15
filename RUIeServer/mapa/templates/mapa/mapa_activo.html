@@ -1654,12 +1654,12 @@
             trayContainer.innerHTML = data.trayectoria.length ? '' : '<p class="text-[10px] text-gray-300 italic">No hay registros de trayectoria.</p>';
             data.trayectoria.forEach(t => {
                 trayContainer.innerHTML += `
-                    <div class="border-l-2 border-emerald-100 pl-4 py-1 relative">
-                        <div class="absolute -left-[5px] top-2 w-2 h-2 rounded-full bg-emerald-500 shadow-sm"></div>
-                        <div class="text-[11px] font-black text-gray-800 uppercase leading-tight">${t.area}</div>
-                        <div class="flex flex-col mt-1">
-                            <span class="text-[9px] text-gray-400 font-bold uppercase tracking-widest">${t.fecha_inicio} — ${t.actual ? 'PRESENTE' : t.fecha_fin}</span>
-                            <span class="text-[10px] text-emerald-600 font-black uppercase tracking-tight italic mt-0.5">${t.puesto}</span>
+                    <div class="border-l-2 border-inm-verde-200/30 pl-3 py-0.5 relative mb-2">
+                        <div class="absolute -left-[5px] top-1.5 w-2 h-2 rounded-full bg-inm-verde-200 shadow-sm"></div>
+                        <div class="text-[10px] font-black text-gray-800 uppercase leading-tight">${t.area}</div>
+                        <div class="flex items-center gap-2 mt-0.5">
+                            <span class="text-[8px] text-gray-400 font-bold uppercase tracking-wider">${t.fecha_inicio} — ${t.actual ? 'PRESENTE' : t.fecha_fin}</span>
+                            <span class="text-[9px] text-inm-verde-200 font-black uppercase tracking-tight italic">${t.puesto}</span>
                         </div>
                     </div>
                 `;
@@ -1670,12 +1670,12 @@
             expContainer.innerHTML = data.experiencia.length ? '' : '<p class="text-[10px] text-gray-300 italic">No hay registros de experiencia previa.</p>';
             data.experiencia.forEach(e => {
                 expContainer.innerHTML += `
-                    <div class="border-l-2 border-stone-200 pl-4 py-1 relative">
-                        <div class="absolute -left-[5px] top-2 w-2 h-2 rounded-full bg-stone-400 shadow-sm"></div>
-                        <div class="text-[11px] font-black text-gray-800 uppercase leading-tight">${e.institucion}</div>
-                        <div class="flex flex-col mt-1">
-                            <span class="text-[9px] text-gray-400 font-bold uppercase tracking-widest">${e.fecha_inicio} — ${e.fecha_fin || 'PRESENTE'}</span>
-                            <span class="text-[10px] text-stone-500 font-black uppercase tracking-tight italic mt-0.5">${e.cargo}</span>
+                    <div class="border-l-2 border-stone-200 pl-3 py-0.5 relative mb-2">
+                        <div class="absolute -left-[5px] top-1.5 w-2 h-2 rounded-full bg-stone-400 shadow-sm"></div>
+                        <div class="text-[10px] font-black text-gray-800 uppercase leading-tight">${e.institucion}</div>
+                        <div class="flex items-center gap-2 mt-0.5">
+                            <span class="text-[8px] text-gray-400 font-bold uppercase tracking-wider">${e.fecha_inicio} — ${e.fecha_fin || 'PRESENTE'}</span>
+                            <span class="text-[9px] text-stone-500 font-black uppercase tracking-tight italic">${e.cargo}</span>
                         </div>
                     </div>
                 `;
@@ -1705,7 +1705,7 @@
             data.telefonos.forEach(t => {
                 contactContainer.innerHTML += `
                     <div class="flex items-center gap-3">
-                        <div class="w-6 h-6 rounded-lg bg-gray-50 flex items-center justify-center text-emerald-600">
+                        <div class="w-6 h-6 rounded-lg bg-inm-verde-200 flex items-center justify-center text-white">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg>
                         </div>
                         <div class="flex flex-col">
@@ -1718,7 +1718,7 @@
             data.correos.forEach(c => {
                 contactContainer.innerHTML += `
                     <div class="flex items-center gap-3">
-                        <div class="w-6 h-6 rounded-lg bg-gray-50 flex items-center justify-center text-emerald-600">
+                        <div class="w-6 h-6 rounded-lg bg-inm-verde-200 flex items-center justify-center text-white">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
                         </div>
                         <div class="flex flex-col">
@@ -1759,22 +1759,22 @@
 
             <div class="p-12 relative flex flex-col md:flex-row gap-10 flex-grow">
                 <!-- Columna Izquierda: Trayectoria y Experiencia -->
-                <div class="flex-1 space-y-10 max-h-[450px] overflow-y-auto custom-scrollbar pr-4">
+                <div class="flex-1 space-y-8 pr-2">
                     <div>
-                        <h3 class="text-[10px] font-black text-[#611232] uppercase tracking-[0.2em] mb-6 flex items-center">
+                        <h3 class="text-[10px] font-black text-[#611232] uppercase tracking-[0.2em] mb-4 flex items-center">
                             <span class="w-2 h-2 bg-[#611232] rounded-full mr-2"></span>
                             Trayectoria en INM
                         </h3>
-                        <div id="cvTrayectoria" class="space-y-6">
+                        <div id="cvTrayectoria" class="space-y-1 max-h-[180px] overflow-y-auto custom-scrollbar pr-3">
                             <!-- Items dinámicos -->
                         </div>
                     </div>
                     <div>
-                        <h3 class="text-[10px] font-black text-[#611232] uppercase tracking-[0.2em] mb-6 flex items-center">
+                        <h3 class="text-[10px] font-black text-[#611232] uppercase tracking-[0.2em] mb-4 flex items-center">
                             <span class="w-2 h-2 bg-[#611232] rounded-full mr-2"></span>
                             Experiencia Profesional
                         </h3>
-                        <div id="cvExperiencia" class="space-y-6">
+                        <div id="cvExperiencia" class="space-y-1 max-h-[180px] overflow-y-auto custom-scrollbar pr-3">
                             <!-- Items dinámicos -->
                         </div>
                     </div>
@@ -1807,8 +1807,8 @@
 
                 <!-- Columna Derecha: Foto y Perfil -->
                 <div class="w-full md:w-64 flex flex-col items-center text-center">
-                    <div class="w-full h-10 bg-[#10312B] rounded-xl mb-8 flex items-center justify-center text-white font-bold text-[9px] tracking-widest">
-                        RUIE / INM
+                    <div class="w-full h-12 mb-8 flex items-center justify-center bg-[#10312B] rounded-xl p-2">
+                        <img src="{% static 'mapa/fondos/logo_gob.png' %}" alt="Gobierno de México" class="h-full object-contain">
                     </div>
 
                     <div class="w-44 h-56 bg-gray-50 rounded-2xl overflow-hidden border-4 border-white shadow-xl mb-6 flex-shrink-0">
@@ -1819,9 +1819,9 @@
                     </div>
 
                     <h2 id="cvNombre" class="text-xl font-black text-gray-900 mb-2 leading-tight uppercase"></h2>
-                    <p id="cvPuesto" class="text-[9px] font-bold text-emerald-600 uppercase tracking-widest mb-4 bg-emerald-50 px-3 py-1 rounded-full"></p>
+                    <p id="cvPuesto" class="text-[9px] font-bold text-white uppercase tracking-widest mb-2 bg-inm-verde-200 px-3 py-1 rounded-full"></p>
                     <div class="w-full h-px bg-gray-100 mb-4"></div>
-                    <p id="cvEstado" class="text-[9px] font-bold text-gray-400 uppercase tracking-tighter px-4 leading-relaxed"></p>
+                    <p id="cvEstado" class="text-[14px] font-bold text-gray-600 uppercase tracking-tighter px-4 leading-relaxed"></p>
                 </div>
             </div>
 
@@ -1830,9 +1830,9 @@
                  style="background-image: url('{% static 'mapa/fondos/patron_cere.svg' %}'); background-size: cover; background-position: bottom;">
             </div>
 
-            <!-- Icono inferior izquierdo -->
-            <div class="absolute bottom-6 left-12 w-48 h-10 bg-[#10312B] rounded-xl flex items-center justify-center text-white font-bold text-[8px] tracking-widest shadow-lg shadow-emerald-900/20">
-                 INSTITUTO NACIONAL DE MIGRACIÓN
+            <!-- Icono anual centrado en la primera columna (80% más grande) -->
+            <div class="absolute bottom-1 left-[18%] -translate-x-1/2 h-28 flex items-center bg-[#611232] rounded-2xl px-8 py-3 shadow-xl shadow-maroon-900/40 z-10">
+                 <img src="{% static 'mapa/fondos/logo_anual.png' %}" alt="Logo Anual" class="h-full object-contain">
             </div>
         </div>
     </div>
