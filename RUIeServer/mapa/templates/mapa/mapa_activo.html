@@ -1640,7 +1640,7 @@
                         <div class="absolute -left-[5px] top-1.5 w-2 h-2 rounded-full bg-inm-verde-200 shadow-sm"></div>
                         <div class="text-[12px] font-black text-gray-800 uppercase leading-tight">${t.area}</div>
                         <div class="flex items-center gap-2 mt-0.5">
-                            <span class="text-[10px] text-gray-400 font-bold uppercase tracking-wider">${t.fecha_inicio} — ${t.actual ? 'PRESENTE' : t.fecha_fin}</span>
+                            <span class="hidden text-[10px] text-gray-400 font-bold uppercase tracking-wider">${t.fecha_inicio} — ${t.actual ? 'PRESENTE' : t.fecha_fin}</span>
                             <span class="text-[11px] text-inm-verde-200 font-black uppercase tracking-tight italic">${t.puesto}</span>
                         </div>
                     </div>
@@ -1656,7 +1656,7 @@
                         <div class="absolute -left-[5px] top-1.5 w-2 h-2 rounded-full bg-stone-400 shadow-sm"></div>
                         <div class="text-[12px] font-black text-gray-800 uppercase leading-tight">${e.institucion}</div>
                         <div class="flex items-center gap-2 mt-0.5">
-                            <span class="text-[10px] text-gray-400 font-bold uppercase tracking-wider">${e.fecha_inicio} — ${e.fecha_fin || 'PRESENTE'}</span>
+                            <span class="hidden text-[10px] text-gray-400 font-bold uppercase tracking-wider">${e.fecha_inicio} — ${e.fecha_fin || 'PRESENTE'}</span>
                             <span class="text-[11px] text-stone-500 font-black uppercase tracking-tight italic">${e.cargo}</span>
                         </div>
                     </div>

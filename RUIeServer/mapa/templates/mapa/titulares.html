@@ -41,7 +41,7 @@
         const rows = container.querySelectorAll(':scope > div');
         const newRow = rows[0].cloneNode(true);
         newRow.querySelectorAll('input').forEach(input => {
-            input.value = '';
+            input.value = input.type === 'date' ? '2000-01-01' : '';
             if (input.type === 'radio') {
                 input.value = rows.length;
                 input.checked = false;
@@ -54,7 +54,9 @@
         const container = document.getElementById('experiencia-container');
         const firstRow = container.querySelector('div');
         const newRow = firstRow.cloneNode(true);
-        newRow.querySelectorAll('input, textarea').forEach(input => input.value = '');
+        newRow.querySelectorAll('input, textarea').forEach(input => {
+            input.value = input.type === 'date' ? '2000-01-01' : '';
+        });
         container.appendChild(newRow);
     }
 
@@ -353,7 +355,7 @@
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Fecha Nacimiento</label>
-                            <input type="date" name="fecha_nacimiento" required class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold">
+                            <input type="date" name="fecha_nacimiento" required value="2000-01-01" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold">
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Estado (Adscripción)</label>
@@ -497,11 +499,11 @@
                             </div>
                             <div class="md:col-span-2">
                                 <label class="block text-[9px] font-bold text-amber-600 uppercase mb-1">Fecha Inicio</label>
-                                <input type="date" name="tray_inicio[]" class="w-full px-3 py-2 text-[10px] bg-white border border-amber-100 rounded-xl outline-none font-bold">
+                                <input type="date" name="tray_inicio[]" value="2000-01-01" class="w-full px-3 py-2 text-[10px] bg-white border border-amber-100 rounded-xl outline-none font-bold">
                             </div>
                             <div class="md:col-span-2">
                                 <label class="block text-[9px] font-bold text-amber-600 uppercase mb-1">Fecha Fin</label>
-                                <input type="date" name="tray_fin[]" class="w-full px-3 py-2 text-[10px] bg-white border border-amber-100 rounded-xl outline-none font-bold">
+                                <input type="date" name="tray_fin[]" value="2000-01-01" class="w-full px-3 py-2 text-[10px] bg-white border border-amber-100 rounded-xl outline-none font-bold">
                             </div>
                             <div class="md:col-span-1 flex flex-col items-center justify-center">
                                 <label class="block text-[9px] font-bold text-amber-600 uppercase mb-1">Actual</label>
@@ -536,8 +538,8 @@
                             <div class="md:col-span-3">
                                 <label class="block text-[9px] font-bold text-gray-400 uppercase mb-1">Periodo</label>
                                 <div class="flex space-x-2">
-                                    <input type="date" name="exp_inicio[]" class="w-1/2 px-2 py-2 text-[10px] bg-white border border-gray-200 rounded-xl outline-none font-bold">
-                                    <input type="date" name="exp_fin[]" class="w-1/2 px-2 py-2 text-[10px] bg-white border border-gray-200 rounded-xl outline-none font-bold">
+                                    <input type="date" name="exp_inicio[]" value="2000-01-01" class="w-1/2 px-2 py-2 text-[10px] bg-white border border-gray-200 rounded-xl outline-none font-bold">
+                                    <input type="date" name="exp_fin[]" value="2000-01-01" class="w-1/2 px-2 py-2 text-[10px] bg-white border border-gray-200 rounded-xl outline-none font-bold">
                                 </div>
                             </div>
                             <div class="md:col-span-1 flex items-center justify-center">
