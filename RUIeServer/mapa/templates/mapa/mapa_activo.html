@@ -1417,6 +1417,9 @@
 
       // Clic
       map.on('click', 'mexico-states-fill', (e) => {
+        if (e.originalEvent) {
+          e.originalEvent.stateClicked = true;
+        }
         if (e.features.length > 0) {
           const feature = e.features[0];
           const p = feature.properties;
@@ -1456,6 +1459,10 @@
 
       // Clic fuera
       map.on('click', (e) => {
+        // Si se hizo clic en un estado, no reiniciar la vista nacional
+        if (e.originalEvent && e.originalEvent.stateClicked) {
+            return;
+        }
         const features = map.queryRenderedFeatures(e.point, { layers: ['mexico-states-fill'] });
         if (!features.length) {
             window.selectedStateData = window.nationalData;
