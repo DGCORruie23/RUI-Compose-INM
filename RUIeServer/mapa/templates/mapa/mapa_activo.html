@@ -1732,7 +1732,11 @@
     <div id="cvModal" class="hidden fixed inset-0 z-[10000] flex items-center justify-center p-4">
         <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity duration-300" onclick="closeCVModal()"></div>
         <div class="relative w-full max-w-5xl bg-white rounded-[2.5rem] overflow-hidden shadow-2xl animate-fade-in flex flex-col" 
-             style="background-image: url('{% static 'mapa/fondos/patron_.svg' %}'); background-size: 60%; background-position: center; min-height: 580px;">
+             style="min-height: 580px;">
+            <!-- Fondo SVG con opacidad ajustable (10%) -->
+            <div class="absolute inset-0 pointer-events-none opacity-[0.40]" 
+                 style="background-image: url('{% static 'mapa/fondos/patron_.svg' %}'); background-size: 60%; background-position: center;">
+            </div>
             
             <!-- Botón Cerrar -->
             <button onclick="closeCVModal()" class="absolute top-6 right-6 text-gray-400 hover:text-gray-600 z-10 bg-white/80 p-2 rounded-2xl shadow-sm hover:shadow-md transition-all">

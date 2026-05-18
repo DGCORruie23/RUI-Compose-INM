@@ -217,6 +217,15 @@ class Encuentros(models.Model):
 #---------------------------------------------------------------------
 #Modelos para Titulares, Estudios, Telefonos, Trayectorias y Experiencias
 #---------------------------------------------------------------------
+class TipoProcendencia(models.Model):
+    institucion = models.CharField(max_length=100, unique=True)
+
+    def __str__(self):
+        return self.institucion
+
+    class Meta:
+        verbose_name = "Procedencia"
+        verbose_name_plural = "Procedencia"
 
 class GradoAcademico(models.Model):
     nombre = models.CharField(max_length=100, unique=True)
@@ -257,6 +266,7 @@ class Titular(models.Model):
     nivel = models.CharField(max_length=20)
     codigo_plaza = models.CharField(max_length=20, unique=True)
     tipo_nombramiento = models.ForeignKey(TipoNombramiento, on_delete=models.PROTECT, blank=True, null=True)
+    procedencia = models.ForeignKey(TipoProcendencia, on_delete=models.PROTECT, blank=True, null=True)
 
     def __str__(self):
         return f"{self.nombre} {self.apellido_paterno} {self.apellido_materno}"

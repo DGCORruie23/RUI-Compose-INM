@@ -5,7 +5,7 @@ from .models import (
     PuntosInternacionEstacion, CatalogoOR, Encuentros,
     TipoPRH, PRHs, Titular, Estudio, GradoAcademico,
     TelefonoTitular, TrayectoriaLaboral, ExperienciaProfesional,
-    CorreoTitular, TipoNombramiento
+    CorreoTitular, TipoNombramiento, TipoProcendencia
 )
 
 @admin.register(Estado)
@@ -131,3 +131,8 @@ class GradoAcademicoAdmin(admin.ModelAdmin):
 class TipoNombramientoAdmin(admin.ModelAdmin):
     list_display = ('nombre',)
     search_fields = ('nombre',)
+
+@admin.register(TipoProcendencia)
+class TipoProcendenciaAdmin(admin.ModelAdmin):
+    list_display = ('institucion',)
+    search_fields = ('institucion',)

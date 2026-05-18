@@ -142,6 +142,7 @@
                 form.querySelector('[name="nivel"]').value = data.nivel;
                 form.querySelector('[name="codigo_plaza"]').value = data.codigo_plaza;
                 form.querySelector('[name="tipo_nombramiento_id"]').value = data.tipo_nombramiento_id;
+                form.querySelector('[name="procedencia_id"]').value = data.procedencia_id || "";
                 form.querySelector('[name="estado_id"]').value = data.estado_id;
                 form.querySelector('[name="nacionalidad_id"]').value = data.nacionalidad_id;
                 data.telefonos.forEach((t, i) => { if (i > 0) addDynamicRow('tel-container'); const rows = document.getElementById('tel-container').querySelectorAll(':scope > div'); rows[i].querySelector('[name="tel_tipo[]"]').value = t.tipo; rows[i].querySelector('[name="tel_numero[]"]').value = t.numero; });
@@ -384,6 +385,15 @@
                                 <option value="" selected>Sin especificar</option>
                                 {% for tipo in tipos_nombramiento %}
                                 <option value="{{ tipo.id }}">{{ tipo.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Procedencia</label>
+                            <select name="procedencia_id" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold">
+                                <option value="" selected>Sin especificar</option>
+                                {% for proc in procedencias_list %}
+                                <option value="{{ proc.id }}">{{ proc.institucion }}</option>
                                 {% endfor %}
                             </select>
                         </div>

@@ -4,7 +4,11 @@ from bokeh.layouts import column
 from bokeh.embed import components
 from bokeh.palettes import Greens256
 
-from .models import Estado, Nacionalidad, Repatriados, Recibidos, ExtRescatados, Ingresos, Tramites, Retornados, Inadmitidos, PuntosInternacionEstacion, CatalogoOR, Encuentros, TipoPRH, PRHs, Titular, Estudio, GradoAcademico, TelefonoTitular, CorreoTitular, TipoNombramiento, TrayectoriaLaboral, ExperienciaProfesional
+from .models import (Estado, Nacionalidad, Repatriados, Recibidos, 
+                    ExtRescatados, Ingresos, Tramites, Retornados, Inadmitidos, 
+                    PuntosInternacionEstacion, CatalogoOR, Encuentros, TipoPRH, 
+                    PRHs, Titular, Estudio, GradoAcademico, TelefonoTitular, CorreoTitular, 
+                    TipoNombramiento, TrayectoriaLaboral, ExperienciaProfesional, TipoProcendencia)
 from usuarioL.models import usuarioL
 
 from datetime import datetime
@@ -592,6 +596,7 @@ def titulares_list(request):
         'nacionalidades_list': Nacionalidad.objects.all().order_by('nombre'),
         'grados_academicos': GradoAcademico.objects.all().order_by('nombre'),
         'tipos_nombramiento': TipoNombramiento.objects.all().order_by('nombre'),
+        'procedencias_list': TipoProcendencia.objects.all().order_by('institucion'),
         'titulares_list': titulares_list,
     })
 
@@ -617,6 +622,8 @@ def api_get_titular(request, titular_id):
             'codigo_plaza': titular.codigo_plaza,
             'tipo_nombramiento': titular.tipo_nombramiento.nombre if titular.tipo_nombramiento else None,
             'tipo_nombramiento_id': titular.tipo_nombramiento_id,
+            'procedencia': titular.procedencia.institucion if titular.procedencia else None,
+            'procedencia_id': titular.procedencia_id,
             'estado': titular.estado.nombre,
             'estado_id': titular.estado_id,
             'nacionalidad_id': titular.nacionalidad_id,
@@ -684,9 +691,10 @@ def guardar_titular(request):
                 'sexo': request.POST.get('sexo'),
                 'nivel': request.POST.get('nivel', '').strip().upper(),
                 'codigo_plaza': request.POST.get('codigo_plaza', '').strip().upper(),
-                'tipo_nombramiento_id': request.POST.get('tipo_nombramiento_id'),
+                'tipo_nombramiento_id': request.POST.get('tipo_nombramiento_id') or None,
+                'procedencia_id': request.POST.get('procedencia_id') or None,
                 'estado_id': request.POST.get('estado_id'),
-                'nacionalidad_id': request.POST.get('nacionalidad_id'),
+                'nacionalidad_id': request.POST.get('nacionalidad_id') or None,
             }
         )
 
