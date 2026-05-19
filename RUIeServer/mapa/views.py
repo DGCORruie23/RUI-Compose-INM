@@ -690,7 +690,7 @@ def guardar_titular(request):
                 'fecha_nacimiento': request.POST.get('fecha_nacimiento'),
                 'sexo': request.POST.get('sexo'),
                 'nivel': request.POST.get('nivel', '').strip().upper(),
-                'codigo_plaza': request.POST.get('codigo_plaza', '').strip().upper(),
+                'codigo_plaza': request.POST.get('codigo_plaza', '').strip().upper() or None,
                 'tipo_nombramiento_id': request.POST.get('tipo_nombramiento_id') or None,
                 'procedencia_id': request.POST.get('procedencia_id') or None,
                 'estado_id': request.POST.get('estado_id'),
@@ -1644,7 +1644,7 @@ def mapa_interactivo(request):
 
     # --- Recopilación de Infraestructura y Titulares ---
     infra_raw = PuntosInternacionEstacion.objects.values('estado__nombre', 'tipo').annotate(total=Count('id'))
-    titulares_raw = Titular.objects.all().select_related('estado')
+    titulares_raw = Titular.objects.all().select_related('estado', 'tipo_nombramiento')
     
     infra_data = {}
     # Estructura base para todos los estados
@@ -1654,7 +1654,8 @@ def mapa_interactivo(request):
             'PRH': 0,
             'titular': 'Sin titular asignado',
             'titular_id': None,
-            'foto': None
+            'foto': None,
+            'tipo_nombramiento': None
         }
     
     # Población con datos reales
@@ -1668,6 +1669,7 @@ def mapa_interactivo(request):
         if edo_name in infra_data:
             infra_data[edo_name]['titular'] = f"{t.nombre} {t.apellido_paterno} {t.apellido_materno}"
             infra_data[edo_name]['titular_id'] = t.id
+            infra_data[edo_name]['tipo_nombramiento'] = t.tipo_nombramiento.nombre if t.tipo_nombramiento else None
             if t.fotografia:
                 infra_data[edo_name]['foto'] = t.fotografia.url
 
@@ -1686,7 +1688,8 @@ def mapa_interactivo(request):
         'ESTACION': PuntosInternacionEstacion.objects.filter(tipo='ESTACION').count(),
         'PRH': PRHs.objects.count(),
         'titular': 'Datos Nacionales',
-        'foto': None
+        'foto': None,
+        'tipo_nombramiento': None
     }
 
 

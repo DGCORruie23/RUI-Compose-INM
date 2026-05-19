@@ -259,7 +259,7 @@
                             </div>
                         </div>
                         <div class="overflow-hidden">
-                            <div class="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Titular Responsable</div>
+                            <div class="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Responsable</div>
                             <div id="titularName" class="text-sm font-black text-gray-700 truncate hover:text-inm-verde-100 transition-colors">-</div>
                             <div id="titularStatus" class="text-[8px] font-bold text-inm-verde-100/60 uppercase tracking-tighter">Asignado</div>
                         </div>
@@ -495,7 +495,7 @@
           photoImg.src = data.foto;
           photoImg.classList.remove('hidden');
           photoPlaceholder.classList.add('hidden');
-          titularStatus.innerText = "Titular Activo";
+          titularStatus.innerText = data.tipo_nombramiento || "Titular Activo";
           titularStatus.className = "text-[8px] font-bold text-inm-verde-100 uppercase tracking-tighter";
       } else {
           photoImg.classList.add('hidden');
@@ -1624,7 +1624,7 @@
             
             // Llenar campos básicos
             document.getElementById('cvNombre').innerText = `${data.nombre} ${data.apellido_paterno} ${data.apellido_materno}`;
-            document.getElementById('cvPuesto').innerText = data.tipo_nombramiento || 'TITULAR RESPONSABLE';
+            document.getElementById('cvPuesto').innerText = data.tipo_nombramiento || 'RESPONSABLE';
             document.getElementById('cvEstado').innerText = `OFICINA DE REPRESENTACIÓN EN EL ESTADO DE ${data.estado}`;
             
             const photoImg = document.getElementById('cvFoto');

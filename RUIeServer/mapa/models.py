@@ -264,7 +264,7 @@ class Titular(models.Model):
     nacionalidad = models.ForeignKey(Nacionalidad, on_delete=models.CASCADE, null=True, blank=True)
     estado = models.ForeignKey(Estado, on_delete=models.CASCADE, db_index=True)
     nivel = models.CharField(max_length=20)
-    codigo_plaza = models.CharField(max_length=20, unique=True)
+    codigo_plaza = models.CharField(max_length=20, unique=True, null=True, blank=True)
     tipo_nombramiento = models.ForeignKey(TipoNombramiento, on_delete=models.PROTECT, blank=True, null=True)
     procedencia = models.ForeignKey(TipoProcendencia, on_delete=models.PROTECT, blank=True, null=True)
 
@@ -355,3 +355,100 @@ class ExperienciaProfesional(models.Model):
     class Meta:
         verbose_name = "Experiencia Profesional"
         verbose_name_plural = "Experiencias Profesionales"
+
+#---------------------------------------------------------------------
+# Inmueble 
+#---------------------------------------------------------------------
+
+class Comodato(models.Model):
+    nombre = models.CharField(max_length=200, unique=True)
+
+    def __str__(self):
+        return self.nombre
+
+    class Meta:
+        verbose_name = "Comodato"
+        verbose_name_plural = "Comodatos"
+
+class FiguraOcupacion(models.Model):
+    tipo = models.CharField(max_length=200, unique=True)
+
+    def __str__(self):
+        return self.tipo
+
+    class Meta:
+        verbose_name = "Figura de Ocupación"
+        verbose_name_plural = "Figuras de Ocupación"
+
+
+class TipoInmueble(models.Model):
+    nombre = models.CharField(max_length=200, unique=True)
+
+    def __str__(self):
+        return self.nombre
+
+    class Meta:
+        verbose_name = "Tipo de Inmueble"
+        verbose_name_plural = "Tipos de Inmuebles"
+
+class SituacionActual(models.Model):
+    nombre = models.CharField(max_length=200, unique=True)
+
+    def __str__(self):
+        return self.nombre
+
+    class Meta:
+        verbose_name = "Situación Actual"
+        verbose_name_plural = "Situaciones Actuales"
+
+class TipoActividad(models.Model):
+    nombre = models.CharField(max_length=200, unique=True)
+
+    def __str__(self):
+        return self.nombre
+
+    class Meta:
+        verbose_name = "Tipo de Actividad"
+        verbose_name_plural = "Tipos de Actividades"
+
+class Inmueble(models.Model):
+
+    estado = models.ForeignKey(Estado, on_delete=models.CASCADE, db_index=True)
+    nombre_inmueble = models.CharField(max_length=200)
+    calle = models.CharField(max_length=200)
+    numero_exterior = models.CharField(max_length=10)
+    numero_interior = models.CharField(max_length=10)
+    colonia = models.CharField(max_length=200)
+    municipio = models.CharField(max_length=200)
+    codigo_postal = models.CharField(max_length=5)
+
+    latitud = models.FloatField()
+    longitud = models.FloatField()
+
+    tipo_actividad = models.ForeignKey(TipoActividad, on_delete=models.PROTECT, blank=True, null=True)
+    situacion_actual = models.ForeignKey(SituacionActual, on_delete=models.PROTECT, blank=True, null=True)
+    tipo_inmueble = models.ForeignKey(TipoInmueble, on_delete=models.PROTECT, blank=True, null=True)
+    
+    superficie_total = models.FloatField()
+    superficie_construida = models.FloatField()
+    superficie_utilizada = models.FloatField()
+    numero_de_niveles = models.IntegerField()
+    anio_construccion = models.IntegerField()
+
+    fecha_ocupacion = models.DateField(null=True, blank=True)
+
+    figura_ocupacion = models.ForeignKey(FiguraOcupacion, on_delete=models.PROTECT, blank=True, null=True)
+
+    monto_renta = models.DecimalField(max_digits=16, decimal_places=2, null=True, blank=True)
+    
+    comodato = models.ForeignKey(Comodato, on_delete=models.PROTECT, blank=True, null=True)
+    vigencia_pipc = models.DateField(null=True, blank=True)
+
+    observaciones = models.TextField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.id} - {self.nombre_inmueble} - {self.municipio} - {self.tipo_actividad} - {self.situacion_actual}"
+
+    class Meta:
+        verbose_name = "Inmueble"
+        verbose_name_plural = "Inmuebles"

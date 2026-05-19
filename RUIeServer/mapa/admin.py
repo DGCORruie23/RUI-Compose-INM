@@ -5,7 +5,9 @@ from .models import (
     PuntosInternacionEstacion, CatalogoOR, Encuentros,
     TipoPRH, PRHs, Titular, Estudio, GradoAcademico,
     TelefonoTitular, TrayectoriaLaboral, ExperienciaProfesional,
-    CorreoTitular, TipoNombramiento, TipoProcendencia
+    CorreoTitular, TipoNombramiento, TipoProcendencia,
+    Comodato, FiguraOcupacion, TipoInmueble, SituacionActual,
+    TipoActividad, Inmueble
 )
 
 @admin.register(Estado)
@@ -136,3 +138,35 @@ class TipoNombramientoAdmin(admin.ModelAdmin):
 class TipoProcendenciaAdmin(admin.ModelAdmin):
     list_display = ('institucion',)
     search_fields = ('institucion',)
+
+@admin.register(Comodato)
+class ComodatoAdmin(admin.ModelAdmin):
+    list_display = ('nombre',)
+    search_fields = ('nombre',)
+
+@admin.register(FiguraOcupacion)
+class FiguraOcupacionAdmin(admin.ModelAdmin):
+    list_display = ('tipo',)
+    search_fields = ('tipo',)
+
+@admin.register(TipoInmueble)
+class TipoInmuebleAdmin(admin.ModelAdmin):
+    list_display = ('nombre',)
+    search_fields = ('nombre',)
+
+@admin.register(SituacionActual)
+class SituacionActualAdmin(admin.ModelAdmin):
+    list_display = ('nombre',)
+    search_fields = ('nombre',)
+
+@admin.register(TipoActividad)
+class TipoActividadAdmin(admin.ModelAdmin):
+    list_display = ('nombre',)
+    search_fields = ('nombre',)
+
+@admin.register(Inmueble)
+class InmuebleAdmin(admin.ModelAdmin):
+    list_display = ('nombre_inmueble', 'municipio', 'estado', 'tipo_inmueble', 'tipo_actividad', 'situacion_actual')
+    list_filter = ('estado', 'tipo_inmueble', 'tipo_actividad', 'situacion_actual', 'figura_ocupacion')
+    search_fields = ('nombre_inmueble', 'municipio', 'colonia', 'calle', 'codigo_postal')
+
