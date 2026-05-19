@@ -586,10 +586,10 @@ def titulares_list(request):
     
     if user_state:
         estados_list = [user_state]
-        titulares_list = Titular.objects.filter(estado=user_state).order_by('nombre')
+        titulares_list = Titular.objects.filter(estado=user_state).order_by('estado__nombre', 'nombre')
     else:
         estados_list = Estado.objects.all().order_by('nombre')
-        titulares_list = Titular.objects.all().order_by('nombre')
+        titulares_list = Titular.objects.all().order_by('estado__nombre', 'nombre')
 
     return render(request, 'mapa/titulares.html', {
         'estados_list': estados_list,
