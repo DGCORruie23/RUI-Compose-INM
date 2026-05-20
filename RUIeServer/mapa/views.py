@@ -8,7 +8,8 @@ from .models import (Estado, Nacionalidad, Repatriados, Recibidos,
                     ExtRescatados, Ingresos, Tramites, Retornados, Inadmitidos, 
                     PuntosInternacionEstacion, CatalogoOR, Encuentros, TipoPRH, 
                     PRHs, Titular, Estudio, GradoAcademico, TelefonoTitular, CorreoTitular, 
-                    TipoNombramiento, TrayectoriaLaboral, ExperienciaProfesional, TipoProcendencia)
+                    TipoNombramiento, TrayectoriaLaboral, ExperienciaProfesional, TipoProcendencia,
+                    Comodato, FiguraOcupacion, TipoInmueble, SituacionActual, TipoActividad, Inmueble)
 from usuarioL.models import usuarioL
 
 from datetime import datetime
@@ -1781,4 +1782,211 @@ def mapa_interactivo(request):
     }
     
     return render(request, 'mapa/mapa_activo.html', context)
+
+
+# =====================================================================
+# GESTIÓN DE INMUEBLES
+# =====================================================================
+
+def inmuebles_list(request):
+    """Muestra la lista de inmuebles y gestiona sus catálogos."""
+    user_state = get_user_state(request)
+    
+    if request.user.is_superuser:
+        inmuebles_list = Inmueble.objects.all().order_by('estado__nombre', 'nombre_inmueble')
+        estados_list = Estado.objects.all().order_by('nombre')
+    elif user_state:
+        inmuebles_list = Inmueble.objects.filter(estado=user_state).order_by('nombre_inmueble')
+        estados_list = [user_state]
+    else:
+        inmuebles_list = Inmueble.objects.none()
+        estados_list = []
+        
+    return render(request, 'mapa/inmuebles.html', {
+        'inmuebles_list': inmuebles_list,
+        'estados_list': estados_list,
+        'tipos_inmueble': TipoInmueble.objects.all().order_by('nombre'),
+        'situaciones_actuales': SituacionActual.objects.all().order_by('nombre'),
+        'tipos_actividad': TipoActividad.objects.all().order_by('nombre'),
+        'figuras_ocupacion': FiguraOcupacion.objects.all().order_by('tipo'),
+        'comodatos_list': Comodato.objects.all().order_by('nombre'),
+    })
+
+
+@transaction.atomic
+def guardar_inmueble(request):
+    if request.method != 'POST':
+        return redirect('inmuebles_list')
+        
+    user_state = get_user_state(request)
+    
+    try:
+        inmueble_id = request.POST.get('inmueble_id')
+        estado_id = request.POST.get('estado_id')
+        
+        # Validación de seguridad: el estado enviado debe coincidir con el del usuario
+        if not request.user.is_superuser:
+            if not user_state or str(user_state.id) != str(estado_id):
+                raise PermissionError("No tienes permisos para registrar inmuebles en este estado.")
+        
+        # Obtener o crear objeto Comodato si viene
+        comodato_id = request.POST.get('comodato_id') or None
+        
+        # Campos de superficie
+        try:
+            sup_total = float(request.POST.get('superficie_total') or 0)
+            sup_const = float(request.POST.get('superficie_construida') or 0)
+            sup_util = float(request.POST.get('superficie_utilizada') or 0)
+        except ValueError:
+            raise ValueError("Las superficies deben ser valores numéricos válidos.")
+
+        # Coordenadas
+        try:
+            lat = float(request.POST.get('latitud') or 0)
+            lng = float(request.POST.get('longitud') or 0)
+        except ValueError:
+            raise ValueError("La latitud y longitud deben ser coordenadas numéricas válidas.")
+
+        # Fechas
+        fecha_ocup = request.POST.get('fecha_ocupacion') or None
+        anio_const = request.POST.get('anio_construccion') or None
+        vig_pipc = request.POST.get('vigencia_pipc') or None
+
+        # Monto Renta
+        monto_renta = request.POST.get('monto_renta') or None
+        if monto_renta:
+            monto_renta = monto_renta.replace('$', '').replace(',', '').strip()
+            if not monto_renta:
+                monto_renta = None
+
+        defaults = {
+            'estado_id': estado_id,
+            'nombre_inmueble': normalizar_nombre(request.POST.get('nombre_inmueble', '')),
+            'calle': normalizar_nombre(request.POST.get('calle', '')),
+            'numero_exterior': request.POST.get('numero_exterior', '').strip(),
+            'numero_interior': request.POST.get('numero_interior', '').strip(),
+            'colonia': normalizar_nombre(request.POST.get('colonia', '')),
+            'municipio': normalizar_nombre(request.POST.get('municipio', '')),
+            'codigo_postal': request.POST.get('codigo_postal', '').strip(),
+            'latitud': lat,
+            'longitud': lng,
+            'situacion_actual_id': request.POST.get('situacion_actual_id') or None,
+            'tipo_inmueble_id': request.POST.get('tipo_inmueble_id') or None,
+            'superficie_total': sup_total,
+            'superficie_construida': sup_const,
+            'superficie_utilizada': sup_util,
+            'numero_de_niveles': int(request.POST.get('numero_de_niveles') or 0),
+            'anio_construccion': anio_const,
+            'fecha_ocupacion': fecha_ocup,
+            'figura_ocupacion_id': request.POST.get('figura_ocupacion_id') or None,
+            'monto_renta': monto_renta,
+            'comodato_id': comodato_id,
+            'vigencia_pipc': vig_pipc,
+            'observaciones': request.POST.get('observaciones', '').strip() or None,
+        }
+
+        if inmueble_id:
+            inmueble = Inmueble.objects.get(id=inmueble_id)
+            # Validación adicional de seguridad para edición
+            if not request.user.is_superuser and inmueble.estado != user_state:
+                raise PermissionError("No tienes permisos para modificar este inmueble.")
+            for key, val in defaults.items():
+                setattr(inmueble, key, val)
+            inmueble.save()
+            created = False
+        else:
+            inmueble = Inmueble.objects.create(**defaults)
+            created = True
+
+        # Guardar ManyToMany tipo_actividad
+        tipo_actividades_ids = request.POST.getlist('tipo_actividad[]')
+        inmueble.tipo_actividad.set(tipo_actividades_ids)
+
+        messages.success(request, f"Inmueble '{inmueble.nombre_inmueble}' {'creado' if created else 'actualizado'} correctamente.")
+    except Exception as e:
+        messages.error(request, f"Error al guardar inmueble: {str(e)}")
+        
+    return redirect('inmuebles_list')
+
+
+@transaction.atomic
+def eliminar_inmueble(request, inmueble_id):
+    """Elimina un inmueble si tiene permisos por estado."""
+    try:
+        user_state = get_user_state(request)
+        inmueble = Inmueble.objects.get(id=inmueble_id)
+        
+        # Validación de seguridad
+        if not request.user.is_superuser:
+            if not user_state or inmueble.estado != user_state:
+                messages.error(request, "No tienes permisos para eliminar este registro.")
+                return redirect('inmuebles_list')
+                
+        nombre = inmueble.nombre_inmueble
+        inmueble.delete()
+        messages.success(request, f"Inmueble '{nombre}' eliminado correctamente.")
+    except Exception as e:
+        messages.error(request, f"Error al eliminar inmueble: {str(e)}")
+        
+    return redirect('inmuebles_list')
+
+
+def api_get_inmueble(request, inmueble_id):
+    """Retorna los datos de un inmueble en formato JSON."""
+    try:
+        user_state = get_user_state(request)
+        inmueble = Inmueble.objects.get(id=inmueble_id)
+        
+        # Validación de seguridad
+        if not request.user.is_superuser:
+            if not user_state or inmueble.estado != user_state:
+                return JsonResponse({'status': 'error', 'message': 'Sin permisos'}, status=403)
+                
+        data = {
+            'id': inmueble.id,
+            'nombre_inmueble': inmueble.nombre_inmueble,
+            'estado_id': inmueble.estado_id,
+            'calle': inmueble.calle,
+            'numero_exterior': inmueble.numero_exterior,
+            'numero_interior': inmueble.numero_interior,
+            'colonia': inmueble.colonia,
+            'municipio': inmueble.municipio,
+            'codigo_postal': inmueble.codigo_postal,
+            'latitud': inmueble.latitud,
+            'longitud': inmueble.longitud,
+            'situacion_actual_id': inmueble.situacion_actual_id,
+            'tipo_inmueble_id': inmueble.tipo_inmueble_id,
+            'superficie_total': inmueble.superficie_total,
+            'superficie_construida': inmueble.superficie_construida,
+            'superficie_utilizada': inmueble.superficie_utilizada,
+            'numero_de_niveles': inmueble.numero_de_niveles,
+            'anio_construccion': inmueble.anio_construccion.isoformat() if inmueble.anio_construccion else None,
+            'fecha_ocupacion': inmueble.fecha_ocupacion.isoformat() if inmueble.fecha_ocupacion else None,
+            'figura_ocupacion_id': inmueble.figura_ocupacion_id,
+            'monto_renta': float(inmueble.monto_renta) if inmueble.monto_renta else None,
+            'comodato_id': inmueble.comodato_id,
+            'vigencia_pipc': inmueble.vigencia_pipc.isoformat() if inmueble.vigencia_pipc else None,
+            'observaciones': inmueble.observaciones or "",
+            'tipo_actividad_ids': list(inmueble.tipo_actividad.values_list('id', flat=True)),
+        }
+        return JsonResponse({'status': 'success', 'data': data})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
+
+@transaction.atomic
+def api_guardar_comodato(request):
+    """Crea un nuevo comodato mediante petición AJAX y lo retorna."""
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Método no permitido'}, status=405)
+    try:
+        nombre = request.POST.get('nombre', '').strip().upper()
+        if not nombre:
+            return JsonResponse({'status': 'error', 'message': 'El nombre es obligatorio.'}, status=400)
+            
+        comodato, created = Comodato.objects.get_or_create(nombre=nombre)
+        return JsonResponse({'status': 'success', 'data': {'id': comodato.id, 'nombre': comodato.nombre}})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
 

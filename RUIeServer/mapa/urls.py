@@ -17,4 +17,9 @@ urlpatterns = [
     path('guardar-titular', views.guardar_titular, name="guardar_titular"),
     path('eliminar-titular/<int:titular_id>', views.eliminar_titular, name="eliminar_titular"),
     path('api/get-titular/<int:titular_id>', views.api_get_titular, name="api_get_titular"),
+    path('inmuebles', views.inmuebles_list, name="inmuebles_list"),
+    path('guardar-inmueble', views.guardar_inmueble, name="guardar_inmueble"),
+    path('eliminar-inmueble/<int:inmueble_id>', views.eliminar_inmueble, name="eliminar_inmueble"),
+    path('api/get-inmueble/<int:inmueble_id>', views.api_get_inmueble, name="api_get_inmueble"),
+    path('api/guardar-comodato', views.api_guardar_comodato, name="api_guardar_comodato"),
 ]

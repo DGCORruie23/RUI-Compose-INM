@@ -1,0 +1,642 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}Gestión de Inmuebles - RUIE{% endblock title %}
+
+{% block scripts %}
+<script>
+    function openInmuebleModal() {
+        const modal = document.getElementById('inmuebleModal');
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeInmuebleModal() {
+        const modal = document.getElementById('inmuebleModal');
+        modal.classList.add('hidden');
+        document.body.style.overflow = 'auto';
+    }
+
+    function resetInmuebleForm() {
+        const form = document.getElementById('inmuebleForm');
+        form.reset();
+        
+        // Limpiar ID de edición
+        document.getElementById('inmueble_id').value = '';
+        document.getElementById('modal-title').innerText = 'Nuevo Registro de Inmueble';
+        
+        // Limpiar checkboxes del mini-modal de actividades
+        document.querySelectorAll('input[name="tipo_actividad[]"]').forEach(cb => {
+            cb.checked = false;
+        });
+        updateActividadesDisplay();
+    }
+
+    // --- Lógica del selector de actividades (Mini-Modal / Dropdown) ---
+    function toggleActividadSelector() {
+        const dropdown = document.getElementById('actividad-selector-dropdown');
+        dropdown.classList.toggle('hidden');
+    }
+
+    // Cerrar el selector si se hace clic fuera de él
+    document.addEventListener('click', function(event) {
+        const dropdown = document.getElementById('actividad-selector-dropdown');
+        const button = document.getElementById('actividad-selector-btn');
+        if (dropdown && button && !dropdown.contains(event.target) && !button.contains(event.target)) {
+            dropdown.classList.add('hidden');
+        }
+    });
+
+    function updateActividadesDisplay() {
+        const checkboxes = document.querySelectorAll('input[name="tipo_actividad[]"]');
+        const badgesContainer = document.getElementById('actividades-badges');
+        const label = document.getElementById('actividades-seleccionadas-label');
+        
+        badgesContainer.innerHTML = '';
+        let selectedNames = [];
+        
+        checkboxes.forEach(cb => {
+            if (cb.checked) {
+                selectedNames.push(cb.getAttribute('data-nombre'));
+                
+                // Crear badge
+                const badge = document.createElement('span');
+                badge.className = 'px-3 py-1 bg-emerald-50 text-inm-verde-100 text-[10px] font-bold uppercase tracking-wider rounded-full border border-emerald-100/50 flex items-center shadow-sm';
+                badge.innerHTML = `${cb.getAttribute('data-nombre')} <button type="button" class="ml-1 text-emerald-400 hover:text-emerald-600 font-bold focus:outline-none" onclick="uncheckActividad(${cb.value})">&times;</button>`;
+                badgesContainer.appendChild(badge);
+            }
+        });
+        
+        if (selectedNames.length > 0) {
+            label.innerText = `${selectedNames.length} actividad(es) seleccionada(s)`;
+            label.classList.remove('text-gray-400');
+            label.classList.add('text-gray-900', 'font-bold');
+        } else {
+            label.innerText = 'Seleccionar Actividades...';
+            label.classList.remove('text-gray-900', 'font-bold');
+            label.classList.add('text-gray-400');
+        }
+    }
+
+    function uncheckActividad(id) {
+        const cb = document.querySelector(`input[name="tipo_actividad[]"][value="${id}"]`);
+        if (cb) {
+            cb.checked = false;
+            updateActividadesDisplay();
+        }
+    }
+
+    // --- Lógica de Comodato al Vuelo ---
+    function agregarComodatoAlVuelo() {
+        document.getElementById('nuevo-comodato-nombre').value = '';
+        document.getElementById('comodatoModal').classList.remove('hidden');
+    }
+
+    function closeComodatoModal() {
+        document.getElementById('comodatoModal').classList.add('hidden');
+    }
+
+    async function guardarComodatoAlVuelo() {
+        const nombreInput = document.getElementById('nuevo-comodato-nombre');
+        const nombre = nombreInput.value.trim();
+        if (!nombre) {
+            alert('Por favor, ingrese un nombre.');
+            return;
+        }
+        
+        try {
+            const response = await fetch('{% url "api_guardar_comodato" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: `nombre=${encodeURIComponent(nombre)}`
+            });
+            
+            const result = await response.json();
+            if (result.status === 'success') {
+                const select = document.getElementById('comodato_select');
+                
+                // Comprobar si ya existe en el select
+                let optionExists = false;
+                for (let i = 0; i < select.options.length; i++) {
+                    if (select.options[i].value == result.data.id) {
+                        optionExists = true;
+                        break;
+                    }
+                }
+                
+                if (!optionExists) {
+                    const opt = document.createElement('option');
+                    opt.value = result.data.id;
+                    opt.innerText = result.data.nombre;
+                    select.appendChild(opt);
+                }
+                
+                select.value = result.data.id;
+                closeComodatoModal();
+            } else {
+                alert('Error al guardar comodato: ' + result.message);
+            }
+        } catch (err) {
+            alert('Error de red al guardar comodato: ' + err.message);
+        }
+    }
+
+    // --- Edición de Inmueble ---
+    async function editInmueble(id) {
+        try {
+            const response = await fetch(`/mapa/api/get-inmueble/${id}`);
+            const result = await response.json();
+            
+            if (result.status === 'success') {
+                resetInmuebleForm();
+                
+                const data = result.data;
+                const form = document.getElementById('inmuebleForm');
+                
+                document.getElementById('inmueble_id').value = data.id;
+                document.getElementById('modal-title').innerText = 'Editar Registro de Inmueble';
+                
+                // Llenar campos simples
+                form.querySelector('[name="nombre_inmueble"]').value = data.nombre_inmueble;
+                form.querySelector('[name="estado_id"]').value = data.estado_id;
+                form.querySelector('[name="calle"]').value = data.calle;
+                form.querySelector('[name="numero_exterior"]').value = data.numero_exterior;
+                form.querySelector('[name="numero_interior"]').value = data.numero_interior;
+                form.querySelector('[name="colonia"]').value = data.colonia;
+                form.querySelector('[name="municipio"]').value = data.municipio;
+                form.querySelector('[name="codigo_postal"]').value = data.codigo_postal;
+                form.querySelector('[name="latitud"]').value = data.latitud;
+                form.querySelector('[name="longitud"]').value = data.longitud;
+                form.querySelector('[name="situacion_actual_id"]').value = data.situacion_actual_id || '';
+                form.querySelector('[name="tipo_inmueble_id"]').value = data.tipo_inmueble_id || '';
+                form.querySelector('[name="superficie_total"]').value = data.superficie_total;
+                form.querySelector('[name="superficie_construida"]').value = data.superficie_construida;
+                form.querySelector('[name="superficie_utilizada"]').value = data.superficie_utilizada;
+                form.querySelector('[name="numero_de_niveles"]').value = data.numero_de_niveles;
+                form.querySelector('[name="anio_construccion"]').value = data.anio_construccion || '';
+                form.querySelector('[name="fecha_ocupacion"]').value = data.fecha_ocupacion || '';
+                form.querySelector('[name="figura_ocupacion_id"]').value = data.figura_ocupacion_id || '';
+                form.querySelector('[name="monto_renta"]').value = data.monto_renta || '';
+                form.querySelector('[name="comodato_id"]').value = data.comodato_id || '';
+                form.querySelector('[name="vigencia_pipc"]').value = data.vigencia_pipc || '';
+                form.querySelector('[name="observaciones"]').value = data.observaciones;
+                
+                // Llenar ManyToMany checkboxes
+                if (data.tipo_actividad_ids && data.tipo_actividad_ids.length > 0) {
+                    data.tipo_actividad_ids.forEach(actId => {
+                        const cb = document.querySelector(`input[name="tipo_actividad[]"][value="${actId}"]`);
+                        if (cb) cb.checked = true;
+                    });
+                }
+                
+                updateActividadesDisplay();
+                openInmuebleModal();
+            } else {
+                alert('Error al obtener datos: ' + result.message);
+            }
+        } catch (err) {
+            alert('Error de red: ' + err.message);
+        }
+    }
+
+    // --- Filtro de Búsqueda Frontend ---
+    function filterTable() {
+        const query = document.getElementById('search-input').value.toLowerCase();
+        const rows = document.querySelectorAll('tbody.inmuebles-tbody tr:not(.empty-row)');
+        let visibleCount = 0;
+        
+        rows.forEach(row => {
+            const nombre = row.querySelector('.col-nombre').innerText.toLowerCase();
+            const municipio = row.querySelector('.col-municipio').innerText.toLowerCase();
+            const estado = row.querySelector('.col-estado').innerText.toLowerCase();
+            
+            if (nombre.includes(query) || municipio.includes(query) || estado.includes(query)) {
+                row.classList.remove('hidden');
+                visibleCount++;
+            } else {
+                row.classList.add('hidden');
+            }
+        });
+        
+        const emptyRow = document.querySelector('tr.empty-row');
+        if (visibleCount === 0) {
+            if (emptyRow) emptyRow.classList.remove('hidden');
+        } else {
+            if (emptyRow) emptyRow.classList.add('hidden');
+        }
+    }
+</script>
+{% endblock scripts %}
+
+{% block styles %}
+<style>
+    @keyframes slideUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .animate-slide-up {
+        animation: slideUp 0.4s ease-out forwards;
+    }
+    
+    .custom-select {
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236b7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 0.75rem center;
+        background-size: 1.25em 1.25em;
+    }
+</style>
+{% endblock styles %}
+
+{% block content %}
+<main class="min-h-screen bg-gray-50/50 p-6 md:p-12">
+    <div class="max-w-7xl mx-auto">
+        <!-- Cabecera -->
+        <div class="mb-12 animate-slide-up">
+            <div class="flex items-center space-x-3 mb-4">
+                <a href="{% url 'carga_datos' %}" class="px-4 py-1.5 bg-gray-100 text-gray-600 text-[10px] font-bold uppercase tracking-[0.2em] rounded-full hover:bg-gray-200 transition-colors">
+                    &larr; Volver
+                </a>
+                <span class="px-4 py-1.5 bg-emerald-50 text-inm-verde-100 text-[10px] font-bold uppercase tracking-[0.2em] rounded-full border border-emerald-100/50">Infraestructura</span>
+            </div>
+            <div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
+                <div>
+                    <h1 class="text-5xl font-black text-gray-900 tracking-tight mb-4">Control de Inmuebles<span class="text-inm-verde-100">.</span></h1>
+                    <p class="text-lg text-gray-500 max-w-2xl font-medium">Gestión física, actividades operativas y figuras de ocupación de las sedes del INM.</p>
+                </div>
+                {% if estados_list %}
+                <button onclick="resetInmuebleForm(); openInmuebleModal();" class="px-8 py-4 bg-stone-800 text-white rounded-2xl font-bold shadow-xl shadow-stone-900/20 hover:bg-stone-900 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
+                    Nuevo Inmueble
+                </button>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Notificaciones de Django -->
+        {% if messages %}
+        <div class="mb-10 w-full animate-slide-up">
+            {% for message in messages %}
+            <div class="p-4 rounded-2xl mb-3 flex items-center {% if message.tags == 'success' %}bg-emerald-50 text-emerald-800 border border-emerald-100{% else %}bg-rose-50 text-rose-800 border border-rose-100{% endif %} shadow-sm">
+                <div class="flex-shrink-0">
+                    {% if message.tags == 'success' %}
+                    <svg class="h-5 w-5 text-emerald-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
+                    {% else %}
+                    <svg class="h-5 w-5 text-rose-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" /></svg>
+                    {% endif %}
+                </div>
+                <div class="ml-3"><p class="text-sm font-bold">{{ message }}</p></div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Panel de Búsqueda y Tabla -->
+        <div class="bg-white border border-gray-100 rounded-[2.5rem] shadow-sm overflow-hidden mb-12 animate-slide-up" style="animation-delay: 0.1s;">
+            <div class="p-8 border-b border-gray-50 flex flex-col md:flex-row justify-between items-center gap-4">
+                <div>
+                    <h2 class="text-xl font-bold text-gray-900">Inmuebles Registrados</h2>
+                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Gestión administrativa y logística de inmuebles</p>
+                </div>
+                <div class="flex items-center space-x-3 w-full md:w-auto">
+                    <input type="text" id="search-input" onkeyup="filterTable()" placeholder="Buscar por nombre, municipio o estado..." class="w-full md:w-80 px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl outline-none text-sm font-bold text-gray-700 placeholder-gray-400 focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all">
+                    <div class="flex items-center space-x-2 px-4 py-3 bg-gray-50 rounded-xl flex-shrink-0">
+                        <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                        <span class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{{ inmuebles_list.count }} Inmuebles</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="w-full text-left">
+                    <thead>
+                        <tr class="bg-gray-50/50">
+                            <th class="px-8 py-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Nombre Inmueble</th>
+                            <th class="px-8 py-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Ubicación / Estado</th>
+                            <th class="px-8 py-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Tipo e Inmueble</th>
+                            <th class="px-8 py-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Actividades</th>
+                            <th class="px-8 py-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-right">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-50 inmuebles-tbody">
+                        {% for inm in inmuebles_list %}
+                        <tr class="hover:bg-gray-50/80 transition-colors group">
+                            <td class="px-8 py-6">
+                                <div class="flex items-center">
+                                    <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-inm-verde-100 flex items-center justify-center font-black mr-4 text-lg">
+                                        {{ inm.nombre_inmueble|first }}
+                                    </div>
+                                    <div>
+                                        <div class="text-sm font-bold text-gray-900 col-nombre">{{ inm.nombre_inmueble }}</div>
+                                        <div class="text-[10px] font-bold text-gray-400">{{ inm.calle }} Ext: {{ inm.numero_exterior }}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-8 py-6">
+                                <div class="text-xs font-bold text-gray-700 col-estado">{{ inm.estado.nombre }}</div>
+                                <div class="text-[10px] font-bold text-gray-400 col-municipio">{{ inm.municipio }}, CP {{ inm.codigo_postal }}</div>
+                            </td>
+                            <td class="px-8 py-6">
+                                <div class="text-xs font-bold text-gray-700">{{ inm.tipo_inmueble.nombre|default:"SIN TIPO" }}</div>
+                                <span class="px-2 py-0.5 mt-1 inline-block text-[9px] font-black rounded-full {% if inm.situacion_actual.nombre == 'ACTIVO' %}bg-emerald-50 text-emerald-700 border border-emerald-100{% else %}bg-amber-50 text-amber-700 border border-amber-100{% endif %}">
+                                    {{ inm.situacion_actual.nombre|default:"SIN DEFINIR" }}
+                                </span>
+                            </td>
+                            <td class="px-8 py-6">
+                                <div class="flex flex-wrap gap-1 max-w-xs">
+                                    {% for act in inm.tipo_actividad.all %}
+                                    <span class="px-2 py-0.5 bg-gray-100 text-gray-600 text-[9px] font-bold rounded-md">
+                                        {{ act.nombre }}
+                                    </span>
+                                    {% empty %}
+                                    <span class="text-[10px] font-bold text-gray-400 uppercase">Ninguna</span>
+                                    {% endfor %}
+                                </div>
+                            </td>
+                            <td class="px-8 py-6 text-right">
+                                <div class="flex justify-end space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button onclick="editInmueble({{ inm.id }})" class="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors shadow-sm">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                                    </button>
+                                    <a href="{% url 'eliminar_inmueble' inm.id %}" onclick="return confirm('¿Está seguro de eliminar este inmueble?')" class="p-2.5 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-100 transition-colors shadow-sm">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr class="empty-row">
+                            <td colspan="5" class="px-8 py-16 text-center">
+                                <div class="flex flex-col items-center">
+                                    <div class="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4 text-gray-300">
+                                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+                                    </div>
+                                    <p class="text-sm font-bold text-gray-400 uppercase tracking-widest">No hay registros</p>
+                                    {% if estados_list %}
+                                    <p class="text-xs text-gray-400 mt-1">Comienza agregando un nuevo inmueble.</p>
+                                    {% else %}
+                                    <p class="text-xs text-gray-400 mt-1">No tienes permisos asociados a ningún estado para registrar o ver inmuebles.</p>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        <tr class="empty-row hidden">
+                            <td colspan="5" class="px-8 py-16 text-center">
+                                <div class="flex flex-col items-center">
+                                    <p class="text-sm font-bold text-gray-400 uppercase tracking-widest">Sin resultados</p>
+                                    <p class="text-xs text-gray-400 mt-1">Ningún inmueble coincide con tu búsqueda.</p>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Formulario Principal (Nuevo / Editar Inmueble) -->
+    <div id="inmuebleModal" class="hidden fixed inset-0 z-40 flex items-center justify-center p-4">
+        <!-- Fondo Translúcido -->
+        <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-md transition-opacity" onclick="closeInmuebleModal()"></div>
+        
+        <!-- Contenido Modal -->
+        <div class="relative bg-white rounded-[2.5rem] shadow-2xl w-full max-w-5xl overflow-hidden border border-gray-100 animate-slide-up max-h-[90vh] flex flex-col">
+            <!-- Cabecera de Modal -->
+            <div class="p-8 border-b border-gray-50 flex justify-between items-start flex-shrink-0">
+                <div>
+                    <span class="text-[10px] font-bold uppercase tracking-widest text-inm-verde-100">Expediente de Inmueble</span>
+                    <h2 id="modal-title" class="text-3xl font-extrabold text-gray-900 mt-1">Nuevo Registro de Inmueble</h2>
+                </div>
+                <button onclick="closeInmuebleModal()" class="text-gray-400 hover:text-gray-600 transition-colors bg-gray-50 p-3 rounded-2xl hover:bg-gray-100 focus:outline-none">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+
+            <!-- Cuerpo de Formulario (Scrollable) -->
+            <form id="inmuebleForm" action="{% url 'guardar_inmueble' %}" method="POST" class="p-8 space-y-8 overflow-y-auto flex-grow text-left">
+                {% csrf_token %}
+                <input type="hidden" name="inmueble_id" id="inmueble_id">
+
+                <!-- Sección 1: Datos de Identificación y Dirección -->
+                <div>
+                    <h3 class="text-lg font-bold text-gray-800 flex items-center mb-6">
+                        <span class="w-8 h-8 bg-emerald-100 text-inm-verde-100 rounded-lg flex items-center justify-center mr-3 text-sm font-bold">1</span>
+                        Identificación y Dirección
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Nombre del Inmueble</label>
+                            <input type="text" name="nombre_inmueble" required placeholder="Ej: ESTACIÓN MIGRATORIA PRINCIPAL" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold uppercase text-sm focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Estado</label>
+                            <select name="estado_id" required class="custom-select block w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all outline-none font-bold text-gray-700">
+                                {% for estado in estados_list %}
+                                <option value="{{ estado.id }}">{{ estado.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Municipio / Alcaldía</label>
+                            <input type="text" name="municipio" required class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold uppercase text-sm focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Calle</label>
+                            <input type="text" name="calle" required class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold uppercase text-sm focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all">
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">No. Ext</label>
+                                <input type="text" name="numero_exterior" required class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold uppercase text-sm focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">No. Int</label>
+                                <input type="text" name="numero_interior" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold uppercase text-sm focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Colonia</label>
+                            <input type="text" name="colonia" required class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold uppercase text-sm focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Código Postal</label>
+                            <input type="text" name="codigo_postal" required maxlength="5" pattern="\d{5}" placeholder="00000" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold text-sm focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all">
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Latitud</label>
+                                <input type="number" step="any" name="latitud" required placeholder="19.4326" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold text-sm focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Longitud</label>
+                                <input type="number" step="any" name="longitud" required placeholder="-99.1332" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold text-sm focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sección 2: Operatividad y Logística -->
+                <div>
+                    <h3 class="text-lg font-bold text-gray-800 flex items-center mb-6">
+                        <span class="w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center mr-3 text-sm font-bold">2</span>
+                        Operatividad y Clasificación
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Tipo de Inmueble</label>
+                            <select name="tipo_inmueble_id" class="custom-select block w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all outline-none font-bold text-gray-700">
+                                <option value="">--- Seleccionar ---</option>
+                                {% for ti in tipos_inmueble %}
+                                <option value="{{ ti.id }}">{{ ti.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Situación Actual</label>
+                            <select name="situacion_actual_id" class="custom-select block w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all outline-none font-bold text-gray-700">
+                                <option value="">--- Seleccionar ---</option>
+                                {% for sa in situaciones_actuales %}
+                                <option value="{{ sa.id }}">{{ sa.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <!-- Tipo de Actividad (ManyToMany - Multi Select) -->
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Tipo de Actividad</label>
+                            <div class="relative">
+                                <button type="button" id="actividad-selector-btn" onclick="toggleActividadSelector()" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl flex justify-between items-center outline-none transition-all focus:ring-2 focus:ring-inm-verde-100">
+                                    <span id="actividades-seleccionadas-label" class="text-sm font-medium text-gray-400 overflow-hidden text-ellipsis whitespace-nowrap">Seleccionar Actividades...</span>
+                                    <svg class="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                                </button>
+                                
+                                <div id="actividad-selector-dropdown" class="hidden absolute left-0 right-0 mt-2 p-4 bg-white border border-gray-200 rounded-2xl shadow-2xl z-50 max-h-60 overflow-y-auto">
+                                    <div class="space-y-2">
+                                        {% for ta in tipos_actividad %}
+                                        <label class="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded-xl cursor-pointer">
+                                            <input type="checkbox" name="tipo_actividad[]" value="{{ ta.id }}" data-nombre="{{ ta.nombre }}" onchange="updateActividadesDisplay()" class="w-5 h-5 text-inm-verde-100 border-gray-300 rounded focus:ring-inm-verde-100">
+                                            <span class="text-sm font-bold text-gray-700 uppercase">{{ ta.nombre }}</span>
+                                        </label>
+                                        {% endfor %}
+                                    </div>
+                                    <div class="mt-4 pt-3 border-t border-gray-100 flex justify-end">
+                                        <button type="button" onclick="toggleActividadSelector()" class="px-4 py-2 bg-stone-800 text-white text-xs font-bold rounded-xl hover:bg-stone-900 transition-colors">Aceptar</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Contenedor para mostrar badges de seleccionados -->
+                            <div id="actividades-badges" class="flex flex-wrap gap-1.5 mt-2"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sección 3: Datos Físicos -->
+                <div>
+                    <h3 class="text-lg font-bold text-gray-800 flex items-center mb-6">
+                        <span class="w-8 h-8 bg-purple-100 text-purple-600 rounded-lg flex items-center justify-center mr-3 text-sm font-bold">3</span>
+                        Físicos e Históricos
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Sup. Total (m²)</label>
+                            <input type="number" step="any" name="superficie_total" required placeholder="0.00" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold text-sm focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Sup. Construida (m²)</label>
+                            <input type="number" step="any" name="superficie_construida" required placeholder="0.00" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold text-sm focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Sup. Utilizada (m²)</label>
+                            <input type="number" step="any" name="superficie_utilizada" required placeholder="0.00" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold text-sm focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Número de Niveles</label>
+                            <input type="number" name="numero_de_niveles" required placeholder="1" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold text-sm focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Año Construcción</label>
+                            <input type="date" name="anio_construccion" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold text-sm focus:ring-2 focus:ring-inm-verde-100">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Fecha Ocupación</label>
+                            <input type="date" name="fecha_ocupacion" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold text-sm focus:ring-2 focus:ring-inm-verde-100">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sección 4: Legal y Administrativo -->
+                <div>
+                    <h3 class="text-lg font-bold text-gray-800 flex items-center mb-6">
+                        <span class="w-8 h-8 bg-amber-100 text-amber-600 rounded-lg flex items-center justify-center mr-3 text-sm font-bold">4</span>
+                        Información Legal y Costos
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Figura de Ocupación</label>
+                            <select name="figura_ocupacion_id" class="custom-select block w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all outline-none font-bold text-gray-700">
+                                <option value="">--- Seleccionar ---</option>
+                                {% for fo in figuras_ocupacion %}
+                                <option value="{{ fo.id }}">{{ fo.tipo }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Monto Renta Mensual ($)</label>
+                            <input type="text" name="monto_renta" placeholder="Ej: 45,000.00" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold text-sm focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all">
+                        </div>
+                        
+                        <!-- Comodato (Con botón agregar al vuelo) -->
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Comodato</label>
+                            <div class="flex space-x-2">
+                                <select name="comodato_id" id="comodato_select" class="custom-select block w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all outline-none font-bold text-gray-700">
+                                    <option value="">Ninguno / Sin Comodato</option>
+                                    {% for c in comodatos_list %}
+                                    <option value="{{ c.id }}">{{ c.nombre }}</option>
+                                    {% endfor %}
+                                </select>
+                                <button type="button" onclick="agregarComodatoAlVuelo()" class="px-4 py-3 bg-emerald-50 text-inm-verde-100 border border-emerald-100 rounded-xl hover:bg-emerald-100 transition-colors font-black text-sm flex items-center justify-center shadow-sm" title="Agregar Comodato">
+                                    +
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Vigencia PIPC</label>
+                            <input type="date" name="vigencia_pipc" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold text-sm focus:ring-2 focus:ring-inm-verde-100">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Observaciones</label>
+                            <textarea name="observaciones" rows="3" placeholder="Detalles de mantenimiento, renovaciones o particularidades del inmueble..." class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-medium text-sm focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all resize-none"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Botones Acción -->
+                <div class="pt-8 border-t border-gray-100 flex justify-end space-x-4 flex-shrink-0">
+                    <button type="button" onclick="closeInmuebleModal()" class="px-8 py-4 bg-gray-100 text-gray-500 rounded-2xl font-bold hover:bg-gray-200 transition-all focus:outline-none">Cancelar</button>
+                    <button type="submit" class="px-12 py-4 bg-inm-verde-100 text-white rounded-2xl font-bold shadow-lg shadow-emerald-900/20 hover:bg-inm-verde-200 transition-all focus:outline-none">Guardar Inmueble</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal para Agregar Comodato Al Vuelo -->
+    <div id="comodatoModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" onclick="closeComodatoModal()"></div>
+        <div class="relative bg-white rounded-3xl shadow-xl w-full max-w-sm p-6 border border-gray-100 animate-slide-up">
+            <h4 class="text-lg font-bold text-gray-900 mb-3">Nuevo Comodato</h4>
+            <input type="text" id="nuevo-comodato-nombre" placeholder="ESCRIBA EL NOMBRE DEL COMODATO" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold uppercase text-sm mb-4">
+            <div class="flex justify-end space-x-3">
+                <button type="button" onclick="closeComodatoModal()" class="px-4 py-2 bg-gray-100 text-gray-500 rounded-xl text-xs font-bold hover:bg-gray-200 focus:outline-none">Cancelar</button>
+                <button type="button" onclick="guardarComodatoAlVuelo()" class="px-5 py-2 bg-inm-verde-100 text-white rounded-xl text-xs font-bold hover:bg-inm-verde-200 focus:outline-none">Guardar</button>
+            </div>
+        </div>
+    </div>
+</main>
+{% endblock content %}

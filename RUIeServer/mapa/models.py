@@ -425,7 +425,7 @@ class Inmueble(models.Model):
     latitud = models.FloatField()
     longitud = models.FloatField()
 
-    tipo_actividad = models.ForeignKey(TipoActividad, on_delete=models.PROTECT, blank=True, null=True)
+    tipo_actividad = models.ManyToManyField(TipoActividad, blank=True)
     situacion_actual = models.ForeignKey(SituacionActual, on_delete=models.PROTECT, blank=True, null=True)
     tipo_inmueble = models.ForeignKey(TipoInmueble, on_delete=models.PROTECT, blank=True, null=True)
     
@@ -433,7 +433,7 @@ class Inmueble(models.Model):
     superficie_construida = models.FloatField()
     superficie_utilizada = models.FloatField()
     numero_de_niveles = models.IntegerField()
-    anio_construccion = models.IntegerField()
+    anio_construccion = models.DateField(null=True, blank=True)
 
     fecha_ocupacion = models.DateField(null=True, blank=True)
 
@@ -447,7 +447,7 @@ class Inmueble(models.Model):
     observaciones = models.TextField(null=True, blank=True)
 
     def __str__(self):
-        return f"{self.id} - {self.nombre_inmueble} - {self.municipio} - {self.tipo_actividad} - {self.situacion_actual}"
+        return f"{self.id} - {self.nombre_inmueble} - {self.municipio} - {self.situacion_actual}"
 
     class Meta:
         verbose_name = "Inmueble"

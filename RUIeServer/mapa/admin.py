@@ -166,7 +166,11 @@ class TipoActividadAdmin(admin.ModelAdmin):
 
 @admin.register(Inmueble)
 class InmuebleAdmin(admin.ModelAdmin):
-    list_display = ('nombre_inmueble', 'municipio', 'estado', 'tipo_inmueble', 'tipo_actividad', 'situacion_actual')
+    list_display = ('nombre_inmueble', 'municipio', 'estado', 'tipo_inmueble', 'get_tipos_actividad', 'situacion_actual')
     list_filter = ('estado', 'tipo_inmueble', 'tipo_actividad', 'situacion_actual', 'figura_ocupacion')
     search_fields = ('nombre_inmueble', 'municipio', 'colonia', 'calle', 'codigo_postal')
+
+    def get_tipos_actividad(self, obj):
+        return ", ".join([ta.nombre for ta in obj.tipo_actividad.all()])
+    get_tipos_actividad.short_description = 'Tipos de Actividad'
 
