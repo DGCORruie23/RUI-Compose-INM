@@ -438,8 +438,8 @@
                         <tr class="bg-gray-50/50">
                             <th class="px-8 py-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Nombre Inmueble</th>
                             <th class="px-8 py-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Ubicación / Estado</th>
-                            <th class="px-8 py-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Tipo e Inmueble</th>
-                            <th class="px-8 py-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Actividades</th>
+                            <th class="px-8 py-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Tipo de Inmueble</th>
+                            <th class="px-8 py-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Tipos de Oficina</th>
                             <th class="px-8 py-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-right">Acciones</th>
                         </tr>
                     </thead>
@@ -466,23 +466,22 @@
                                 <span class="px-2 py-0.5 mt-1 inline-block text-[9px] font-black rounded-full {% if inm.situacion_actual.nombre == 'ACTIVO' %}bg-emerald-50 text-emerald-700 border border-emerald-100{% else %}bg-amber-50 text-amber-700 border border-amber-100{% endif %}">
                                     {{ inm.situacion_actual.nombre|default:"SIN DEFINIR" }}
                                 </span>
-                                <div class="flex flex-wrap gap-1 mt-2">
+                            </td>
+                            <td class="px-8 py-6">
+                                <div class="flex flex-wrap gap-1 max-w-xs">
                                     {% for ofi in inm.tipo_oficina.all %}
                                     <span class="px-1.5 py-0.5 bg-blue-50 text-blue-700 text-[8px] font-bold rounded border border-blue-100/50 uppercase">
                                         {{ ofi.nombre }}
                                     </span>
                                     {% endfor %}
-                                </div>
-                            </td>
-                            <td class="px-8 py-6">
-                                <div class="flex flex-wrap gap-1 max-w-xs">
                                     {% for act in inm.tipo_actividad.all %}
                                     <span class="px-2 py-0.5 bg-gray-100 text-gray-600 text-[9px] font-bold rounded-md">
                                         {{ act.nombre }}
                                     </span>
-                                    {% empty %}
-                                    <span class="text-[10px] font-bold text-gray-400 uppercase">Ninguna</span>
                                     {% endfor %}
+                                    {% if not inm.tipo_oficina.exists and not inm.tipo_actividad.exists %}
+                                    <span class="text-[10px] font-bold text-gray-400 uppercase">Ninguna</span>
+                                    {% endif %}
                                 </div>
                             </td>
                             <td class="px-8 py-6 text-right">
