@@ -1610,6 +1610,44 @@
   }
   window.applyMapFilters = applyMapFilters;
 
+  /**
+   * Filtra los iconos de infraestructura y PRH en el mapa por Categoría
+   * @param {string|null} type - El tipo a filtrar (AEREO, MARITIMO, TERRESTRE, ESTACION, PRH) o null para resetear
+   */
+  window.filterInfraPoints = function(type) {
+    if (type === window.currentInfraFilter) {
+        window.currentInfraFilter = null;
+    } else {
+        window.currentInfraFilter = type;
+    }
+    
+    // Aplicar filtros unificados (Categoría + Geografía)
+    applyMapFilters();
+
+    // Actualizar Estilos de las tarjetas de filtros
+    const types = ['ESTACION', 'AEREO', 'MARITIMO', 'TERRESTRE', 'PRH'];
+    const ids = {
+        'ESTACION': 'btn_infra_estacion',
+        'AEREO': 'btn_infra_aereo',
+        'MARITIMO': 'btn_infra_maritimo',
+        'TERRESTRE': 'btn_infra_terrestre',
+        'PRH': 'btn_infra_prh'
+    };
+
+    types.forEach(t => {
+        const el = document.getElementById(ids[t]);
+        if (!el) return;
+        
+        if (t === window.currentInfraFilter) {
+            el.classList.add('border-inm-verde-100', 'bg-inm-verde-100/5', 'shadow-sm', 'scale-[1.02]');
+            el.classList.remove('border-gray-100', 'bg-white');
+        } else {
+            el.classList.remove('border-inm-verde-100', 'bg-inm-verde-100/5', 'shadow-sm', 'scale-[1.02]');
+            el.classList.add('border-gray-100', 'bg-white');
+        }
+    });
+  };
+
   // --- CV MODAL LOGIC ---
   window.openCVModal = async function(titularId) {
     if (!titularId) return;
