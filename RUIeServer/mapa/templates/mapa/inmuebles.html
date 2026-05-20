@@ -25,11 +25,29 @@
         document.getElementById('inmueble_id').value = '';
         document.getElementById('modal-title').innerText = 'Nuevo Registro de Inmueble';
         
+        // Ocultar sección de historial de comentarios
+        const historialSeccion = document.getElementById('historial-seccion');
+        if (historialSeccion) {
+            historialSeccion.classList.add('hidden');
+        }
+        // Limpiar el select de fechas
+        const selectFechas = document.getElementById('select-observaciones');
+        if (selectFechas) {
+            selectFechas.innerHTML = '<option value="" data-comentario="">Sin observaciones</option>';
+            selectFechas.disabled = true;
+        }
+
         // Limpiar checkboxes del mini-modal de actividades
         document.querySelectorAll('input[name="tipo_actividad[]"]').forEach(cb => {
             cb.checked = false;
         });
         updateActividadesDisplay();
+
+        // Limpiar checkboxes del mini-modal de oficinas
+        document.querySelectorAll('input[name="tipo_oficina[]"]').forEach(cb => {
+            cb.checked = false;
+        });
+        updateOficinasDisplay();
     }
 
     // --- Lógica del selector de actividades (Mini-Modal / Dropdown) ---
@@ -38,12 +56,26 @@
         dropdown.classList.toggle('hidden');
     }
 
+    // --- Lógica del selector de oficinas (Mini-Modal / Dropdown) ---
+    function toggleOficinaSelector() {
+        const dropdown = document.getElementById('oficina-selector-dropdown');
+        dropdown.classList.toggle('hidden');
+    }
+
     // Cerrar el selector si se hace clic fuera de él
     document.addEventListener('click', function(event) {
-        const dropdown = document.getElementById('actividad-selector-dropdown');
-        const button = document.getElementById('actividad-selector-btn');
-        if (dropdown && button && !dropdown.contains(event.target) && !button.contains(event.target)) {
-            dropdown.classList.add('hidden');
+        // Actividades
+        const dropdownAct = document.getElementById('actividad-selector-dropdown');
+        const buttonAct = document.getElementById('actividad-selector-btn');
+        if (dropdownAct && buttonAct && !dropdownAct.contains(event.target) && !buttonAct.contains(event.target)) {
+            dropdownAct.classList.add('hidden');
+        }
+
+        // Oficinas
+        const dropdownOfi = document.getElementById('oficina-selector-dropdown');
+        const buttonOfi = document.getElementById('oficina-selector-btn');
+        if (dropdownOfi && buttonOfi && !dropdownOfi.contains(event.target) && !buttonOfi.contains(event.target)) {
+            dropdownOfi.classList.add('hidden');
         }
     });
 
@@ -86,7 +118,65 @@
         }
     }
 
+    function updateOficinasDisplay() {
+        const checkboxes = document.querySelectorAll('input[name="tipo_oficina[]"]');
+        const badgesContainer = document.getElementById('oficinas-badges');
+        const label = document.getElementById('oficinas-seleccionadas-label');
+        
+        badgesContainer.innerHTML = '';
+        let selectedNames = [];
+        
+        checkboxes.forEach(cb => {
+            if (cb.checked) {
+                selectedNames.push(cb.getAttribute('data-nombre'));
+                
+                // Crear badge
+                const badge = document.createElement('span');
+                badge.className = 'px-3 py-1 bg-blue-50 text-blue-700 text-[10px] font-bold uppercase tracking-wider rounded-full border border-blue-100/50 flex items-center shadow-sm';
+                badge.innerHTML = `${cb.getAttribute('data-nombre')} <button type="button" class="ml-1 text-blue-400 hover:text-blue-600 font-bold focus:outline-none" onclick="uncheckOficina(${cb.value})">&times;</button>`;
+                badgesContainer.appendChild(badge);
+            }
+        });
+        
+        if (selectedNames.length > 0) {
+            label.innerText = `${selectedNames.length} oficina(s) seleccionada(s)`;
+            label.classList.remove('text-gray-400');
+            label.classList.add('text-gray-900', 'font-bold');
+        } else {
+            label.innerText = 'Seleccionar Oficinas...';
+            label.classList.remove('text-gray-900', 'font-bold');
+            label.classList.add('text-gray-400');
+        }
+    }
+
+    function uncheckOficina(id) {
+        const cb = document.querySelector(`input[name="tipo_oficina[]"][value="${id}"]`);
+        if (cb) {
+            cb.checked = false;
+            updateOficinasDisplay();
+        }
+    }
+
+    // --- Lógica del Modal de Observación ---
+    function verObservacionSeleccionada() {
+        const select = document.getElementById('select-observaciones');
+        const selected = select.options[select.selectedIndex];
+        if (!selected || !selected.value) return;
+
+        const comentario = selected.getAttribute('data-comentario');
+        const fecha = selected.textContent;
+
+        document.getElementById('observacion-modal-fecha').textContent = fecha;
+        document.getElementById('observacion-modal-texto').textContent = comentario;
+        document.getElementById('observacionModal').classList.remove('hidden');
+    }
+
+    function closeObservacionModal() {
+        document.getElementById('observacionModal').classList.add('hidden');
+    }
+
     // --- Lógica de Comodato al Vuelo ---
+
     function agregarComodatoAlVuelo() {
         document.getElementById('nuevo-comodato-nombre').value = '';
         document.getElementById('comodatoModal').classList.remove('hidden');
@@ -182,17 +272,48 @@
                 form.querySelector('[name="monto_renta"]').value = data.monto_renta || '';
                 form.querySelector('[name="comodato_id"]').value = data.comodato_id || '';
                 form.querySelector('[name="vigencia_pipc"]').value = data.vigencia_pipc || '';
-                form.querySelector('[name="observaciones"]').value = data.observaciones;
                 
-                // Llenar ManyToMany checkboxes
+                // Llenar selector de fechas del historial de observaciones
+                const selectFechas = document.getElementById('select-observaciones');
+                selectFechas.innerHTML = '';
+
+                if (data.comentarios && data.comentarios.length > 0) {
+                    data.comentarios.forEach(c => {
+                        const opt = document.createElement('option');
+                        opt.value = c.id;
+                        opt.setAttribute('data-comentario', c.comentario);
+                        opt.textContent = c.fecha_creacion;
+                        selectFechas.appendChild(opt);
+                    });
+                    selectFechas.disabled = false;
+                } else {
+                    const opt = document.createElement('option');
+                    opt.value = '';
+                    opt.setAttribute('data-comentario', '');
+                    opt.textContent = 'Sin observaciones';
+                    selectFechas.appendChild(opt);
+                    selectFechas.disabled = true;
+                }
+                form.querySelector('[name="observaciones"]').value = '';
+                
+                // Llenar ManyToMany checkboxes de actividades
                 if (data.tipo_actividad_ids && data.tipo_actividad_ids.length > 0) {
                     data.tipo_actividad_ids.forEach(actId => {
                         const cb = document.querySelector(`input[name="tipo_actividad[]"][value="${actId}"]`);
                         if (cb) cb.checked = true;
                     });
                 }
-                
                 updateActividadesDisplay();
+
+                // Llenar ManyToMany checkboxes de oficinas
+                if (data.tipo_oficina_ids && data.tipo_oficina_ids.length > 0) {
+                    data.tipo_oficina_ids.forEach(ofiId => {
+                        const cb = document.querySelector(`input[name="tipo_oficina[]"][value="${ofiId}"]`);
+                        if (cb) cb.checked = true;
+                    });
+                }
+                updateOficinasDisplay();
+                
                 openInmuebleModal();
             } else {
                 alert('Error al obtener datos: ' + result.message);
@@ -345,6 +466,13 @@
                                 <span class="px-2 py-0.5 mt-1 inline-block text-[9px] font-black rounded-full {% if inm.situacion_actual.nombre == 'ACTIVO' %}bg-emerald-50 text-emerald-700 border border-emerald-100{% else %}bg-amber-50 text-amber-700 border border-amber-100{% endif %}">
                                     {{ inm.situacion_actual.nombre|default:"SIN DEFINIR" }}
                                 </span>
+                                <div class="flex flex-wrap gap-1 mt-2">
+                                    {% for ofi in inm.tipo_oficina.all %}
+                                    <span class="px-1.5 py-0.5 bg-blue-50 text-blue-700 text-[8px] font-bold rounded border border-blue-100/50 uppercase">
+                                        {{ ofi.nombre }}
+                                    </span>
+                                    {% endfor %}
+                                </div>
                             </td>
                             <td class="px-8 py-6">
                                 <div class="flex flex-wrap gap-1 max-w-xs">
@@ -486,7 +614,7 @@
                         <span class="w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center mr-3 text-sm font-bold">2</span>
                         Operatividad y Clasificación
                     </h3>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                         <div>
                             <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Tipo de Inmueble</label>
                             <select name="tipo_inmueble_id" class="custom-select block w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all outline-none font-bold text-gray-700">
@@ -531,6 +659,33 @@
                             </div>
                             <!-- Contenedor para mostrar badges de seleccionados -->
                             <div id="actividades-badges" class="flex flex-wrap gap-1.5 mt-2"></div>
+                        </div>
+
+                        <!-- Tipo de Oficina (ManyToMany - Multi Select) -->
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Tipo de Oficina</label>
+                            <div class="relative">
+                                <button type="button" id="oficina-selector-btn" onclick="toggleOficinaSelector()" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl flex justify-between items-center outline-none transition-all focus:ring-2 focus:ring-inm-verde-100">
+                                    <span id="oficinas-seleccionadas-label" class="text-sm font-medium text-gray-400 overflow-hidden text-ellipsis whitespace-nowrap">Seleccionar Oficinas...</span>
+                                    <svg class="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                                </button>
+                                
+                                <div id="oficina-selector-dropdown" class="hidden absolute left-0 right-0 mt-2 p-4 bg-white border border-gray-200 rounded-2xl shadow-2xl z-50 max-h-60 overflow-y-auto">
+                                    <div class="space-y-2">
+                                        {% for to in tipos_oficina %}
+                                        <label class="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded-xl cursor-pointer">
+                                            <input type="checkbox" name="tipo_oficina[]" value="{{ to.id }}" data-nombre="{{ to.nombre }}" onchange="updateOficinasDisplay()" class="w-5 h-5 text-inm-verde-100 border-gray-300 rounded focus:ring-inm-verde-100">
+                                            <span class="text-sm font-bold text-gray-700 uppercase">{{ to.nombre }}</span>
+                                        </label>
+                                        {% endfor %}
+                                    </div>
+                                    <div class="mt-4 pt-3 border-t border-gray-100 flex justify-end">
+                                        <button type="button" onclick="toggleOficinaSelector()" class="px-4 py-2 bg-stone-800 text-white text-xs font-bold rounded-xl hover:bg-stone-900 transition-colors">Aceptar</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Contenedor para mostrar badges de seleccionados -->
+                            <div id="oficinas-badges" class="flex flex-wrap gap-1.5 mt-2"></div>
                         </div>
                     </div>
                 </div>
@@ -611,8 +766,17 @@
                             <input type="date" name="vigencia_pipc" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold text-sm focus:ring-2 focus:ring-inm-verde-100">
                         </div>
                         <div class="md:col-span-2">
-                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Observaciones</label>
-                            <textarea name="observaciones" rows="3" placeholder="Detalles de mantenimiento, renovaciones o particularidades del inmueble..." class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-medium text-sm focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all resize-none"></textarea>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Historial de Observaciones</label>
+                            <div class="flex space-x-2 mb-4">
+                                <select id="select-observaciones" disabled class="custom-select block w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all outline-none font-bold text-gray-700">
+                                    <option value="" data-comentario="">Sin observaciones</option>
+                                </select>
+                                <button type="button" id="btn-ver-observacion" onclick="verObservacionSeleccionada()" class="px-4 py-3 bg-blue-50 text-blue-600 border border-blue-100 rounded-xl hover:bg-blue-100 transition-colors font-black text-sm flex items-center justify-center shadow-sm flex-shrink-0" title="Ver observación">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                </button>
+                            </div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Nueva Observación</label>
+                            <textarea name="observaciones" rows="3" placeholder="Escriba un nuevo comentario para agregar al historial..." class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-medium text-sm focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all resize-none"></textarea>
                         </div>
                     </div>
                 </div>
@@ -623,6 +787,28 @@
                     <button type="submit" class="px-12 py-4 bg-inm-verde-100 text-white rounded-2xl font-bold shadow-lg shadow-emerald-900/20 hover:bg-inm-verde-200 transition-all focus:outline-none">Guardar Inmueble</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Modal para ver detalle de Observación -->
+    <div id="observacionModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" onclick="closeObservacionModal()"></div>
+        <div class="relative bg-white rounded-3xl shadow-xl w-full max-w-md p-6 border border-gray-100 animate-slide-up">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h4 class="text-sm font-black text-gray-900">Detalle de Observación</h4>
+                    <p id="observacion-modal-fecha" class="text-[10px] font-bold text-gray-400 uppercase mt-0.5"></p>
+                </div>
+                <button type="button" onclick="closeObservacionModal()" class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="bg-gray-50 rounded-2xl p-4 border border-gray-100">
+                <p id="observacion-modal-texto" class="text-sm font-semibold text-gray-700 leading-relaxed whitespace-pre-wrap"></p>
+            </div>
+            <div class="flex justify-end mt-4">
+                <button type="button" onclick="closeObservacionModal()" class="px-5 py-2 bg-gray-100 text-gray-600 rounded-xl text-xs font-bold hover:bg-gray-200 focus:outline-none">Cerrar</button>
+            </div>
         </div>
     </div>
 

@@ -411,6 +411,16 @@ class TipoActividad(models.Model):
         verbose_name = "Tipo de Actividad"
         verbose_name_plural = "Tipos de Actividades"
 
+class TipoOficina(models.Model):
+    nombre = models.CharField(max_length=200, unique=True)
+
+    def __str__(self):
+        return self.nombre
+
+    class Meta:
+        verbose_name = "Tipo de Oficina"
+        verbose_name_plural = "Tipos de Oficinas"
+
 class Inmueble(models.Model):
 
     estado = models.ForeignKey(Estado, on_delete=models.CASCADE, db_index=True)
@@ -425,9 +435,10 @@ class Inmueble(models.Model):
     latitud = models.FloatField()
     longitud = models.FloatField()
 
-    tipo_actividad = models.ManyToManyField(TipoActividad, blank=True)
+    tipo_oficina = models.ManyToManyField(TipoOficina, blank=True)
     situacion_actual = models.ForeignKey(SituacionActual, on_delete=models.PROTECT, blank=True, null=True)
     tipo_inmueble = models.ForeignKey(TipoInmueble, on_delete=models.PROTECT, blank=True, null=True)
+    tipo_actividad = models.ManyToManyField(TipoActividad, blank=True)
     
     superficie_total = models.FloatField()
     superficie_construida = models.FloatField()
@@ -444,11 +455,21 @@ class Inmueble(models.Model):
     comodato = models.ForeignKey(Comodato, on_delete=models.PROTECT, blank=True, null=True)
     vigencia_pipc = models.DateField(null=True, blank=True)
 
-    observaciones = models.TextField(null=True, blank=True)
-
     def __str__(self):
         return f"{self.id} - {self.nombre_inmueble} - {self.municipio} - {self.situacion_actual}"
 
     class Meta:
         verbose_name = "Inmueble"
         verbose_name_plural = "Inmuebles"
+
+class HistoricoComentarios(models.Model):
+    inmueble = models.ForeignKey(Inmueble, on_delete=models.CASCADE, related_name='comentarios')
+    comentario = models.TextField()
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Comentario en {self.inmueble.nombre_inmueble} - {self.fecha_creacion.strftime('%d/%m/%Y %H:%M')}"
+
+    class Meta:
+        verbose_name = "Historial de Comentario"
+        verbose_name_plural = "Historial de Comentarios"

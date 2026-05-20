@@ -9,7 +9,7 @@ from .models import (Estado, Nacionalidad, Repatriados, Recibidos,
                     PuntosInternacionEstacion, CatalogoOR, Encuentros, TipoPRH, 
                     PRHs, Titular, Estudio, GradoAcademico, TelefonoTitular, CorreoTitular, 
                     TipoNombramiento, TrayectoriaLaboral, ExperienciaProfesional, TipoProcendencia,
-                    Comodato, FiguraOcupacion, TipoInmueble, SituacionActual, TipoActividad, Inmueble)
+                    Comodato, FiguraOcupacion, TipoInmueble, SituacionActual, TipoActividad, Inmueble, HistoricoComentarios, TipoOficina)
 from usuarioL.models import usuarioL
 
 from datetime import datetime
@@ -1808,6 +1808,7 @@ def inmuebles_list(request):
         'tipos_inmueble': TipoInmueble.objects.all().order_by('nombre'),
         'situaciones_actuales': SituacionActual.objects.all().order_by('nombre'),
         'tipos_actividad': TipoActividad.objects.all().order_by('nombre'),
+        'tipos_oficina': TipoOficina.objects.all().order_by('nombre'),
         'figuras_ocupacion': FiguraOcupacion.objects.all().order_by('tipo'),
         'comodatos_list': Comodato.objects.all().order_by('nombre'),
     })
@@ -1882,7 +1883,6 @@ def guardar_inmueble(request):
             'monto_renta': monto_renta,
             'comodato_id': comodato_id,
             'vigencia_pipc': vig_pipc,
-            'observaciones': request.POST.get('observaciones', '').strip() or None,
         }
 
         if inmueble_id:
@@ -1901,6 +1901,18 @@ def guardar_inmueble(request):
         # Guardar ManyToMany tipo_actividad
         tipo_actividades_ids = request.POST.getlist('tipo_actividad[]')
         inmueble.tipo_actividad.set(tipo_actividades_ids)
+
+        # Guardar ManyToMany tipo_oficina
+        tipo_oficina_ids = request.POST.getlist('tipo_oficina[]')
+        inmueble.tipo_oficina.set(tipo_oficina_ids)
+
+        # Guardar nuevo comentario en el histórico si existe
+        comentario_texto = request.POST.get('observaciones', '').strip()
+        if comentario_texto:
+            HistoricoComentarios.objects.create(
+                inmueble=inmueble,
+                comentario=comentario_texto
+            )
 
         messages.success(request, f"Inmueble '{inmueble.nombre_inmueble}' {'creado' if created else 'actualizado'} correctamente.")
     except Exception as e:
@@ -1966,8 +1978,16 @@ def api_get_inmueble(request, inmueble_id):
             'monto_renta': float(inmueble.monto_renta) if inmueble.monto_renta else None,
             'comodato_id': inmueble.comodato_id,
             'vigencia_pipc': inmueble.vigencia_pipc.isoformat() if inmueble.vigencia_pipc else None,
-            'observaciones': inmueble.observaciones or "",
+            'comentarios': [
+                {
+                    'id': c.id,
+                    'comentario': c.comentario,
+                    'fecha_creacion': c.fecha_creacion.strftime('%d/%m/%Y %H:%M')
+                }
+                for c in inmueble.comentarios.all().order_by('-fecha_creacion')
+            ],
             'tipo_actividad_ids': list(inmueble.tipo_actividad.values_list('id', flat=True)),
+            'tipo_oficina_ids': list(inmueble.tipo_oficina.values_list('id', flat=True)),
         }
         return JsonResponse({'status': 'success', 'data': data})
     except Exception as e:

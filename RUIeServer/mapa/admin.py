@@ -7,7 +7,7 @@ from .models import (
     TelefonoTitular, TrayectoriaLaboral, ExperienciaProfesional,
     CorreoTitular, TipoNombramiento, TipoProcendencia,
     Comodato, FiguraOcupacion, TipoInmueble, SituacionActual,
-    TipoActividad, Inmueble
+    TipoActividad, Inmueble, HistoricoComentarios, TipoOficina
 )
 
 @admin.register(Estado)
@@ -164,13 +164,31 @@ class TipoActividadAdmin(admin.ModelAdmin):
     list_display = ('nombre',)
     search_fields = ('nombre',)
 
+@admin.register(TipoOficina)
+class TipoOficinaAdmin(admin.ModelAdmin):
+    list_display = ('nombre',)
+    search_fields = ('nombre',)
+
+class HistoricoComentariosInline(admin.TabularInline):
+    model = HistoricoComentarios
+    extra = 1
+    readonly_fields = ('fecha_creacion',)
+
 @admin.register(Inmueble)
 class InmuebleAdmin(admin.ModelAdmin):
     list_display = ('nombre_inmueble', 'municipio', 'estado', 'tipo_inmueble', 'get_tipos_actividad', 'situacion_actual')
     list_filter = ('estado', 'tipo_inmueble', 'tipo_actividad', 'situacion_actual', 'figura_ocupacion')
     search_fields = ('nombre_inmueble', 'municipio', 'colonia', 'calle', 'codigo_postal')
+    inlines = [HistoricoComentariosInline]
 
     def get_tipos_actividad(self, obj):
         return ", ".join([ta.nombre for ta in obj.tipo_actividad.all()])
     get_tipos_actividad.short_description = 'Tipos de Actividad'
+
+@admin.register(HistoricoComentarios)
+class HistoricoComentariosAdmin(admin.ModelAdmin):
+    list_display = ('inmueble', 'comentario', 'fecha_creacion')
+    list_filter = ('fecha_creacion', 'inmueble')
+    search_fields = ('comentario', 'inmueble__nombre_inmueble')
+    readonly_fields = ('fecha_creacion',)
 
