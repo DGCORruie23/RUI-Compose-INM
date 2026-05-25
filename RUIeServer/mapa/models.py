@@ -421,6 +421,23 @@ class TipoOficina(models.Model):
         verbose_name = "Tipo de Oficina"
         verbose_name_plural = "Tipos de Oficinas"
 
+class ProgramaIPC(models.Model):
+    inmueble = models.ForeignKey('Inmueble', on_delete=models.CASCADE, related_name='pipc')
+    inm_pipc = models.BooleanField(default=False)
+    fecha_inm = models.DateField(null=True, blank=True)
+    comodante_pipc = models.BooleanField(default=False)
+    fecha_comodante = models.DateField(null=True, blank=True)
+    plan_emergencia = models.BooleanField(default=False)
+    fecha_inicio_plan = models.DateField(null=True, blank=True)
+
+    def __str__(self):
+        return f"Programa IPC {self.id}"
+
+    class Meta:
+        verbose_name = "Programa IPC"
+        verbose_name_plural = "Programas IPC"
+
+
 class Inmueble(models.Model):
 
     estado = models.ForeignKey(Estado, on_delete=models.CASCADE, db_index=True)
@@ -453,7 +470,6 @@ class Inmueble(models.Model):
     monto_renta = models.DecimalField(max_digits=16, decimal_places=2, null=True, blank=True)
     
     comodato = models.ForeignKey(Comodato, on_delete=models.PROTECT, blank=True, null=True)
-    vigencia_pipc = models.DateField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.id} - {self.nombre_inmueble} - {self.municipio} - {self.situacion_actual}"

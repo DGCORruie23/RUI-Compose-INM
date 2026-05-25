@@ -9,7 +9,8 @@ from .models import (Estado, Nacionalidad, Repatriados, Recibidos,
                     PuntosInternacionEstacion, CatalogoOR, Encuentros, TipoPRH, 
                     PRHs, Titular, Estudio, GradoAcademico, TelefonoTitular, CorreoTitular, 
                     TipoNombramiento, TrayectoriaLaboral, ExperienciaProfesional, TipoProcendencia,
-                    Comodato, FiguraOcupacion, TipoInmueble, SituacionActual, TipoActividad, Inmueble, HistoricoComentarios, TipoOficina)
+                    Comodato, FiguraOcupacion, TipoInmueble, SituacionActual, TipoActividad, Inmueble, HistoricoComentarios, TipoOficina,
+                    ProgramaIPC)
 from usuarioL.models import usuarioL
 
 from datetime import datetime
@@ -1762,6 +1763,19 @@ def mapa_interactivo(request):
             'url': f"{settings.STATIC_URL}mapa/icons/{icon}"
         })
 
+    # --- Capa de Inmuebles (Icono OR_ACTIVO) ---
+    inmuebles_objs = Inmueble.objects.all()
+    inmuebles_pts_data = []
+    for pt in inmuebles_objs:
+        inmuebles_pts_data.append({
+            'x': float(pt.longitud) if pt.longitud else 0,
+            'y': float(pt.latitud) if pt.latitud else 0,
+            'nombre': pt.nombre_inmueble,
+            'estado': normalizar_nombre(pt.estado.nombre),
+            'tipo': 'INMUEBLE',
+            'url': f"{settings.STATIC_URL}mapa/icons/OR_ACTIVO.svg"
+        })
+
     national_data = {
         'name': LABEL_NACIONAL,
         'cs': calc_national(totals_cs),
@@ -1775,6 +1789,7 @@ def mapa_interactivo(request):
         'infra_data_json': json.dumps(infra_data),
         'infra_pts_data_json': json.dumps(infra_pts_data),
         'prh_pts_data_json': json.dumps(prh_pts_data),
+        'inmuebles_pts_data_json': json.dumps(inmuebles_pts_data),
         'label_nacional': LABEL_NACIONAL,
         'metric_labels': METRIC_LABELS,
         'metric_labels_json': json.dumps(METRIC_LABELS),
@@ -1851,7 +1866,6 @@ def guardar_inmueble(request):
         # Fechas
         fecha_ocup = request.POST.get('fecha_ocupacion') or None
         anio_const = request.POST.get('anio_construccion') or None
-        vig_pipc = request.POST.get('vigencia_pipc') or None
 
         # Monto Renta
         monto_renta = request.POST.get('monto_renta') or None
@@ -1882,7 +1896,6 @@ def guardar_inmueble(request):
             'figura_ocupacion_id': request.POST.get('figura_ocupacion_id') or None,
             'monto_renta': monto_renta,
             'comodato_id': comodato_id,
-            'vigencia_pipc': vig_pipc,
         }
 
         if inmueble_id:
@@ -1897,6 +1910,16 @@ def guardar_inmueble(request):
         else:
             inmueble = Inmueble.objects.create(**defaults)
             created = True
+
+        # Guardar/Actualizar ProgramaIPC
+        programa_ipc, _ = ProgramaIPC.objects.get_or_create(inmueble=inmueble)
+        programa_ipc.inm_pipc = request.POST.get('inm_pipc') == 'on'
+        programa_ipc.fecha_inm = request.POST.get('fecha_inm') or None
+        programa_ipc.comodante_pipc = request.POST.get('comodante_pipc') == 'on'
+        programa_ipc.fecha_comodante = request.POST.get('fecha_comodante') or None
+        programa_ipc.plan_emergencia = request.POST.get('plan_emergencia') == 'on'
+        programa_ipc.fecha_inicio_plan = request.POST.get('fecha_inicio_plan') or None
+        programa_ipc.save()
 
         # Guardar ManyToMany tipo_actividad
         tipo_actividades_ids = request.POST.getlist('tipo_actividad[]')
@@ -1977,7 +2000,12 @@ def api_get_inmueble(request, inmueble_id):
             'figura_ocupacion_id': inmueble.figura_ocupacion_id,
             'monto_renta': float(inmueble.monto_renta) if inmueble.monto_renta else None,
             'comodato_id': inmueble.comodato_id,
-            'vigencia_pipc': inmueble.vigencia_pipc.isoformat() if inmueble.vigencia_pipc else None,
+            'inm_pipc': inmueble.pipc.first().inm_pipc if inmueble.pipc.exists() else False,
+            'fecha_inm': inmueble.pipc.first().fecha_inm.isoformat() if inmueble.pipc.exists() and inmueble.pipc.first().fecha_inm else None,
+            'comodante_pipc': inmueble.pipc.first().comodante_pipc if inmueble.pipc.exists() else False,
+            'fecha_comodante': inmueble.pipc.first().fecha_comodante.isoformat() if inmueble.pipc.exists() and inmueble.pipc.first().fecha_comodante else None,
+            'plan_emergencia': inmueble.pipc.first().plan_emergencia if inmueble.pipc.exists() else False,
+            'fecha_inicio_plan': inmueble.pipc.first().fecha_inicio_plan.isoformat() if inmueble.pipc.exists() and inmueble.pipc.first().fecha_inicio_plan else None,
             'comentarios': [
                 {
                     'id': c.id,

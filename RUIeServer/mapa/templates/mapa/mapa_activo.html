@@ -1246,6 +1246,7 @@
   const geoDataJSON = {{ geo_data_json|safe }};
   const infraPtsDataJSON = {{ infra_pts_data_json|safe }};
   const prhPtsDataJSON = {{ prh_pts_data_json|safe }};
+  const inmueblesPtsDataJSON = {{ inmuebles_pts_data_json|safe }};
 
   let map; // Instancia global de MapLibre
   let statePopup; // Popup global para hover
@@ -1546,6 +1547,7 @@
       
       addMarkers(infraPtsDataJSON, 'infra');
       addMarkers(prhPtsDataJSON, 'prh');
+      addMarkers(inmueblesPtsDataJSON, 'inmuebles');
       
       // Escuchar cambios de zoom para redimensionar iconos
       map.on('zoom', updateMarkerSizes);

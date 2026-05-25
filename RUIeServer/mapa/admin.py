@@ -7,7 +7,8 @@ from .models import (
     TelefonoTitular, TrayectoriaLaboral, ExperienciaProfesional,
     CorreoTitular, TipoNombramiento, TipoProcendencia,
     Comodato, FiguraOcupacion, TipoInmueble, SituacionActual,
-    TipoActividad, Inmueble, HistoricoComentarios, TipoOficina
+    TipoActividad, Inmueble, HistoricoComentarios, TipoOficina,
+    ProgramaIPC
 )
 
 @admin.register(Estado)
@@ -174,12 +175,16 @@ class HistoricoComentariosInline(admin.TabularInline):
     extra = 1
     readonly_fields = ('fecha_creacion',)
 
+class ProgramaIPCInline(admin.StackedInline):
+    model = ProgramaIPC
+    extra = 1
+
 @admin.register(Inmueble)
 class InmuebleAdmin(admin.ModelAdmin):
     list_display = ('nombre_inmueble', 'municipio', 'estado', 'tipo_inmueble', 'get_tipos_actividad', 'situacion_actual')
     list_filter = ('estado', 'tipo_inmueble', 'tipo_actividad', 'situacion_actual', 'figura_ocupacion')
     search_fields = ('nombre_inmueble', 'municipio', 'colonia', 'calle', 'codigo_postal')
-    inlines = [HistoricoComentariosInline]
+    inlines = [HistoricoComentariosInline, ProgramaIPCInline]
 
     def get_tipos_actividad(self, obj):
         return ", ".join([ta.nombre for ta in obj.tipo_actividad.all()])
@@ -191,4 +196,11 @@ class HistoricoComentariosAdmin(admin.ModelAdmin):
     list_filter = ('fecha_creacion', 'inmueble')
     search_fields = ('comentario', 'inmueble__nombre_inmueble')
     readonly_fields = ('fecha_creacion',)
+
+@admin.register(ProgramaIPC)
+class ProgramaIPCAdmin(admin.ModelAdmin):
+    list_display = ('inmueble', 'inm_pipc', 'fecha_inm', 'comodante_pipc', 'fecha_comodante', 'plan_emergencia', 'fecha_inicio_plan')
+    list_filter = ('inm_pipc', 'comodante_pipc', 'plan_emergencia')
+    search_fields = ('inmueble__nombre_inmueble',)
+
 
