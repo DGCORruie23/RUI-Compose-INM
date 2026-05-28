@@ -1,0 +1,553 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}Personal INM - RUIE{% endblock title %}
+
+{% block scripts %}
+<script>
+    function openPersonalModal() {
+        const modal = document.getElementById('personalModal');
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function openCargaRapidaModal() {
+        const modal = document.getElementById('cargaRapidaModal');
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeCargaRapidaModal() {
+        const modal = document.getElementById('cargaRapidaModal');
+        modal.classList.add('hidden');
+        document.body.style.overflow = 'auto';
+    }
+
+    function updateFastFileName(input) {
+        const label = document.getElementById('upload-label');
+        const filename = document.getElementById('upload-filename');
+        if (input.files && input.files.length > 0) {
+            label.innerText = 'Archivo seleccionado';
+            filename.innerText = input.files[0].name;
+            filename.classList.remove('text-gray-400');
+            filename.classList.add('text-emerald-600', 'font-bold');
+        } else {
+            label.innerText = 'Seleccionar Plantilla Excel';
+            filename.innerText = 'Formatos permitidos: .xlsx, .xls';
+            filename.classList.remove('text-emerald-600', 'font-bold');
+            filename.classList.add('text-gray-400');
+        }
+    }
+
+    function closePersonalModal() {
+        const modal = document.getElementById('personalModal');
+        modal.classList.add('hidden');
+        document.body.style.overflow = 'auto';
+    }
+
+    function filterLugarAsignadoByEstado() {
+        const estadoSelect = document.querySelector('[name="estado_id"]');
+        const lugarSelect = document.querySelector('[name="lugar_asignado_id"]');
+        if (!estadoSelect || !lugarSelect) return;
+        
+        const selectedEstadoId = estadoSelect.value;
+        const options = lugarSelect.querySelectorAll('option');
+        
+        let firstMatch = '';
+        options.forEach(opt => {
+            if (opt.value === '') {
+                opt.style.display = 'block';
+                return;
+            }
+            const optEstadoId = opt.getAttribute('data-estado');
+            if (optEstadoId === selectedEstadoId) {
+                opt.style.display = 'block';
+                if (!firstMatch) firstMatch = opt.value;
+            } else {
+                opt.style.display = 'none';
+            }
+        });
+        
+        const selectedOpt = lugarSelect.querySelector(`option[value="${lugarSelect.value}"]`);
+        if (selectedOpt && selectedOpt.style.display === 'none') {
+            lugarSelect.value = firstMatch;
+        }
+    }
+
+    function resetPersonalForm() {
+        const form = document.getElementById('personalForm');
+        if (form) form.reset();
+        
+        document.getElementById('personal_id').value = '';
+        document.getElementById('personal-modal-title').innerText = 'Registrar Personal';
+        document.getElementById('personal-modal-subtitle').innerText = 'Registro';
+        
+        const jefeChk = form.querySelector('[name="jefe_oficina"]');
+        if (jefeChk) jefeChk.checked = false;
+        
+        const lugarSel = form.querySelector('[name="lugar_asignado_id"]');
+        if (lugarSel) lugarSel.value = '';
+        
+        filterLugarAsignadoByEstado();
+    }
+
+    async function editPersonal(id) {
+        try {
+            const response = await fetch(`/mapa/api/get-personal/${id}`);
+            const result = await response.json();
+            
+            if (result.status === 'success') {
+                resetPersonalForm();
+                
+                document.getElementById('personal-modal-title').innerText = 'Editar Personal';
+                document.getElementById('personal-modal-subtitle').innerText = 'Actualización';
+                
+                const data = result.data;
+                const form = document.getElementById('personalForm');
+                if (!form) return;
+                
+                form.querySelector('[name="personal_id"]').value = data.id;
+                form.querySelector('[name="estado_id"]').value = data.estado_id;
+                form.querySelector('[name="estatus"]').checked = data.estatus;
+                form.querySelector('[name="tipo_plaza"]').value = data.tipo_plaza;
+                form.querySelector('[name="codigo_plaza"]').value = data.codigo_plaza;
+                form.querySelector('[name="nivel"]').value = data.nivel;
+                form.querySelector('[name="num_empleado"]').value = data.num_empleado;
+                form.querySelector('[name="nombre"]').value = data.nombre;
+                form.querySelector('[name="apellido"]').value = data.apellido;
+                form.querySelector('[name="tipo_movimiento"]').checked = data.tipo_movimiento;
+                form.querySelector('[name="fecha_ingreso_inm"]').value = data.fecha_ingreso_inm || '';
+                form.querySelector('[name="fecha_ingreso_plaza"]').value = data.fecha_ingreso_plaza || '';
+                form.querySelector('[name="vig_inicio_mov"]').value = data.vig_inicio_mov || '';
+                form.querySelector('[name="vig_termino_mov"]').value = data.vig_termino_mov || '';
+                form.querySelector('[name="puesto_especifico"]').value = data.puesto_especifico;
+                form.querySelector('[name="sueldo_bruto"]').value = data.sueldo_bruto || '';
+                form.querySelector('[name="sueldo_neto"]').value = data.sueldo_neto || '';
+                form.querySelector('[name="actividad_id"]').value = data.actividad_id || '';
+                
+                const jefeChk = form.querySelector('[name="jefe_oficina"]');
+                if (jefeChk) jefeChk.checked = data.jefe_oficina || false;
+                
+                const lugarSel = form.querySelector('[name="lugar_asignado_id"]');
+                if (lugarSel) lugarSel.value = data.lugar_asignado_id || '';
+                
+                filterLugarAsignadoByEstado();
+                openPersonalModal();
+            } else {
+                alert('Error al cargar datos: ' + result.message);
+            }
+        } catch (err) {
+            alert('Error de conexión al servidor: ' + err.message);
+        }
+    }
+
+    function filterTable() {
+        const query = document.getElementById('search-input').value.toLowerCase();
+        const rows = document.querySelectorAll('tbody tr:not(.empty-row)');
+        let visibleCount = 0;
+        
+        rows.forEach(row => {
+            const nombre = row.querySelector('.col-nombre').innerText.toLowerCase();
+            const empleado = row.querySelector('.col-empleado').innerText.toLowerCase();
+            const puesto = row.querySelector('.col-puesto').innerText.toLowerCase();
+            
+            if (nombre.includes(query) || empleado.includes(query) || puesto.includes(query)) {
+                row.classList.remove('hidden');
+                visibleCount++;
+            } else {
+                row.classList.add('hidden');
+            }
+        });
+        
+        const emptyRow = document.querySelector('tr.empty-row');
+        if (visibleCount === 0) {
+            if (emptyRow) emptyRow.classList.remove('hidden');
+        } else {
+            if (emptyRow) emptyRow.classList.add('hidden');
+        }
+    }
+</script>
+{% endblock scripts %}
+
+{% block styles %}
+<style>
+    @keyframes slideUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .animate-slide-up {
+        animation: slideUp 0.4s ease-out forwards;
+    }
+    
+    .custom-select {
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236b7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 0.75rem center;
+        background-size: 1.25em 1.25em;
+    }
+</style>
+{% endblock styles %}
+
+{% block content %}
+<main class="min-h-screen bg-gray-50/50 p-6 md:p-12">
+    <div class="max-w-7xl mx-auto">
+        <!-- Cabecera -->
+        <div class="mb-12 animate-slide-up">
+            <div class="flex items-center space-x-3 mb-4">
+                <a href="{% url 'carga_datos' %}" class="px-4 py-1.5 bg-gray-100 text-gray-600 text-[10px] font-bold uppercase tracking-[0.2em] rounded-full hover:bg-gray-200 transition-colors">
+                    &larr; Volver
+                </a>
+                <span class="px-4 py-1.5 bg-emerald-50 text-inm-verde-100 text-[10px] font-bold uppercase tracking-[0.2em] rounded-full border border-emerald-100/50">Personal</span>
+            </div>
+            <div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
+                <div>
+                    <h1 class="text-5xl font-black text-gray-900 tracking-tight mb-4">Personal INM<span class="text-inm-verde-100">.</span></h1>
+                    <p class="text-lg text-gray-500 max-w-2xl font-medium">Gestión administrativa, plazas, sueldos y movimientos del personal por oficina de representación.</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-3">
+                    <button onclick="openCargaRapidaModal();" class="px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-bold shadow-xl shadow-emerald-950/20 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center">
+                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                        Carga Rápida
+                    </button>
+                    <button onclick="resetPersonalForm(); openPersonalModal();" class="px-8 py-4 bg-stone-800 text-white rounded-2xl font-bold shadow-xl shadow-stone-900/20 hover:bg-stone-900 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center">
+                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
+                        Nuevo Personal
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notificaciones de Django -->
+        {% if messages %}
+        <div class="mb-10 w-full animate-slide-up">
+            {% for message in messages %}
+            <div class="p-4 rounded-2xl mb-3 flex items-center {% if message.tags == 'success' %}bg-emerald-50 text-emerald-800 border border-emerald-100{% else %}bg-rose-50 text-rose-800 border border-rose-100{% endif %} shadow-sm">
+                <div class="flex-shrink-0">
+                    {% if message.tags == 'success' %}
+                    <svg class="h-5 w-5 text-emerald-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
+                    {% else %}
+                    <svg class="h-5 w-5 text-rose-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" /></svg>
+                    {% endif %}
+                </div>
+                <div class="ml-3"><p class="text-sm font-bold">{{ message }}</p></div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Panel de Búsqueda y Tabla -->
+        <div class="bg-white border border-gray-100 rounded-[2.5rem] shadow-sm overflow-hidden mb-12 animate-slide-up" style="animation-delay: 0.1s;">
+            <div class="p-8 border-b border-gray-50 flex flex-col md:flex-row justify-between items-center gap-4">
+                <div>
+                    <h2 class="text-xl font-bold text-gray-900">Personal Registrado</h2>
+                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Gestión de personal de la representación</p>
+                </div>
+                <div class="flex items-center space-x-3 w-full md:w-auto">
+                    <input type="text" id="search-input" onkeyup="filterTable()" placeholder="Buscar por nombre, empleado o puesto..." class="w-full md:w-80 px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl outline-none text-sm font-bold text-gray-700 placeholder-gray-400 focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all">
+                    <div class="flex items-center space-x-2 px-4 py-3 bg-gray-50 rounded-xl flex-shrink-0">
+                        <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                        <span class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{{ personal_list.count }} Empleados</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="w-full text-left">
+                    <thead>
+                        <tr class="bg-gray-50/50">
+                            <th class="px-8 py-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Nombre Completo</th>
+                            <th class="px-8 py-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Plaza / Nivel</th>
+                            <th class="px-8 py-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Puesto Específico</th>
+                            <th class="px-8 py-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Estatus / Movimiento</th>
+                            <th class="px-8 py-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-right">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-50">
+                        {% for pers in personal_list %}
+                        <tr class="hover:bg-gray-50/80 transition-colors group">
+                            <td class="px-8 py-6">
+                                <div class="flex items-center">
+                                    <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-inm-verde-100 flex items-center justify-center font-black mr-4 text-lg">
+                                        {{ pers.nombre|default:"U"|first }}
+                                    </div>
+                                    <div>
+                                        <div class="text-sm font-bold text-gray-900 col-nombre">{{ pers.nombre|default:"" }} {{ pers.apellido|default:"" }}</div>
+                                        <div class="text-[10px] font-bold text-gray-400 col-empleado">Nº Emp: {{ pers.num_empleado|default:"SIN NÚMERO" }}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-8 py-6">
+                                <div class="text-xs font-bold text-gray-700">{{ pers.estado.nombre }}</div>
+                                <div class="text-[10px] font-bold text-gray-400 uppercase tracking-tight">CÓD: {{ pers.codigo_plaza }} ({{ pers.tipo_plaza }}) — NIVEL {{ pers.nivel }}</div>
+                            </td>
+                            <td class="px-8 py-6">
+                                <div class="text-xs font-bold text-gray-700 col-puesto">
+                                    {{ pers.puesto_especifico }}
+                                    {% if pers.jefe_oficina %}
+                                    <span class="ml-1 px-2 py-0.5 inline-block text-[8px] font-black rounded bg-purple-50 text-purple-700 border border-purple-100 uppercase">JEFE</span>
+                                    {% endif %}
+                                </div>
+                                <div class="text-[10px] font-bold text-gray-400">Act: {{ pers.actividad.nombre|default:"SIN ACTIVIDAD ASOCIADA" }}</div>
+                                <div class="text-[9px] font-bold text-emerald-600 mt-1 uppercase tracking-tight">📍 {{ pers.lugar_asignado.nombre_inmueble|default:"SIN LUGAR ASIGNADO" }}</div>
+                            </td>
+                            <td class="px-8 py-6">
+                                <div class="flex flex-col space-y-1">
+                                    <span class="px-2 py-0.5 inline-block text-[9px] font-black rounded-full w-max {% if pers.estatus %}bg-emerald-50 text-emerald-700 border border-emerald-100{% else %}bg-amber-50 text-amber-700 border border-amber-100{% endif %}">
+                                        {% if pers.estatus %}ACTIVO{% else %}INACTIVO{% endif %}
+                                    </span>
+                                    <span class="text-[9px] font-bold text-gray-400 uppercase">
+                                        MOVIMIENTO: {% if pers.tipo_movimiento %}SÍ{% else %}NO{% endif %}
+                                    </span>
+                                </div>
+                            </td>
+                            <td class="px-8 py-6 text-right">
+                                <div class="flex justify-end space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button onclick="editPersonal({{ pers.id }})" class="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors shadow-sm">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                                    </button>
+                                    <a href="{% url 'eliminar_personal' pers.id %}" onclick="return confirm('¿Está seguro de eliminar este registro?')" class="p-2.5 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-100 transition-colors shadow-sm">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr class="empty-row">
+                            <td colspan="5" class="px-8 py-16 text-center">
+                                <div class="flex flex-col items-center">
+                                    <div class="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4 text-gray-300">
+                                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                                    </div>
+                                    <p class="text-sm font-bold text-gray-400 uppercase tracking-widest">No hay registros</p>
+                                    <p class="text-xs text-gray-400 mt-1">Comienza agregando un nuevo miembro de personal.</p>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        <tr class="empty-row hidden">
+                            <td colspan="5" class="px-8 py-16 text-center">
+                                <div class="flex flex-col items-center">
+                                    <p class="text-sm font-bold text-gray-400 uppercase tracking-widest">Sin resultados</p>
+                                    <p class="text-xs text-gray-400 mt-1">Ningún personal coincide con tu búsqueda.</p>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Formulario Principal -->
+    <div id="personalModal" class="hidden fixed inset-0 z-40 flex items-center justify-center p-4">
+        <!-- Fondo Translúcido -->
+        <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-md transition-opacity" onclick="closePersonalModal()"></div>
+        
+        <!-- Contenido Modal -->
+        <div class="relative bg-white rounded-[2.5rem] shadow-2xl w-full max-w-4xl overflow-hidden border border-gray-100 animate-slide-up max-h-[90vh] flex flex-col">
+            <!-- Cabecera de Modal -->
+            <div class="p-8 border-b border-gray-50 flex justify-between items-start flex-shrink-0 bg-gray-50/50">
+                <div>
+                    <span class="text-[10px] font-bold uppercase tracking-widest text-inm-verde-100" id="personal-modal-subtitle">Registro</span>
+                    <h2 id="personal-modal-title" class="text-3xl font-extrabold text-gray-900 mt-1">Registrar Personal</h2>
+                </div>
+                <button onclick="closePersonalModal()" class="text-gray-400 hover:text-gray-600 transition-colors bg-white p-3 rounded-2xl shadow-sm hover:shadow-md focus:outline-none">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+
+            <!-- Cuerpo de Formulario -->
+            <form id="personalForm" action="{% url 'guardar_personal' %}" method="POST" class="p-8 space-y-8 overflow-y-auto flex-grow text-left custom-scrollbar">
+                {% csrf_token %}
+                <input type="hidden" name="personal_id" id="personal_id">
+
+                <!-- Sección 1: Datos de Identificación del Empleado -->
+                <div>
+                    <h3 class="text-lg font-bold text-gray-800 flex items-center mb-6">
+                        <span class="w-8 h-8 bg-emerald-100 text-inm-verde-100 rounded-lg flex items-center justify-center mr-3 text-sm font-bold">1</span>
+                        Identificación y Adscripción
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Nombre(s)</label>
+                            <input type="text" name="nombre" placeholder="Ej: JUAN" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold uppercase text-sm focus:ring-2 focus:ring-inm-verde-100 transition-all">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Apellido(s)</label>
+                            <input type="text" name="apellido" placeholder="Ej: PÉREZ LÓPEZ" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold uppercase text-sm focus:ring-2 focus:ring-inm-verde-100 transition-all">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Estado</label>
+                            <select name="estado_id" required onchange="filterLugarAsignadoByEstado()" class="custom-select block w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-inm-verde-100 transition-all outline-none font-bold text-gray-700">
+                                {% for estado in estados_list %}
+                                <option value="{{ estado.id }}">{{ estado.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Nº Empleado</label>
+                            <input type="text" name="num_empleado" maxlength="8" placeholder="Ej: 12345678" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold uppercase text-sm focus:ring-2 focus:ring-inm-verde-100 transition-all">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Lugar Asignado (Inmueble)</label>
+                            <select name="lugar_asignado_id" required class="custom-select block w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-inm-verde-100 transition-all outline-none font-bold text-gray-700">
+                                <option value="">--- Seleccione Lugar ---</option>
+                                {% for inm in inmuebles_list %}
+                                <option value="{{ inm.id }}" data-estado="{{ inm.estado_id }}">[{{ inm.estado.nombre }}] {{ inm.nombre_inmueble }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="flex items-center flex-wrap gap-4 h-full pt-4 pl-2">
+                            <label class="flex items-center cursor-pointer space-x-3">
+                                <input type="checkbox" name="estatus" checked class="w-5 h-5 text-inm-verde-100 border-gray-300 rounded focus:ring-inm-verde-100">
+                                <span class="text-xs font-bold text-gray-700 uppercase">Activo</span>
+                            </label>
+                            <label class="flex items-center cursor-pointer space-x-3">
+                                <input type="checkbox" name="tipo_movimiento" checked class="w-5 h-5 text-inm-verde-100 border-gray-300 rounded focus:ring-inm-verde-100">
+                                <span class="text-xs font-bold text-gray-700 uppercase">Movimiento</span>
+                            </label>
+                            <label class="flex items-center cursor-pointer space-x-3">
+                                <input type="checkbox" name="jefe_oficina" class="w-5 h-5 text-inm-verde-100 border-gray-300 rounded focus:ring-inm-verde-100">
+                                <span class="text-xs font-bold text-purple-700 font-extrabold uppercase">Jefe Oficina</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sección 2: Plaza y Compensaciones -->
+                <div>
+                    <h3 class="text-lg font-bold text-gray-800 flex items-center mb-6">
+                        <span class="w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center mr-3 text-sm font-bold">2</span>
+                        Plaza, Cargo y Sueldos
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Tipo de Plaza</label>
+                            <select name="tipo_plaza" required class="custom-select block w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-inm-verde-100 transition-all outline-none font-bold text-gray-700">
+                                <option value="CONFIANZA">CONFIANZA</option>
+                                <option value="BASE">BASE</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Código de Plaza</label>
+                            <input type="text" name="codigo_plaza" required placeholder="Ej: CF01020" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold uppercase text-sm focus:ring-2 focus:ring-inm-verde-100 transition-all">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Nivel</label>
+                            <input type="text" name="nivel" required maxlength="4" placeholder="Ej: 27A" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold uppercase text-sm focus:ring-2 focus:ring-inm-verde-100 transition-all">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Actividad</label>
+                            <select name="actividad_id" class="custom-select block w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-inm-verde-100 transition-all outline-none font-bold text-gray-700">
+                                <option value="">--- Ninguna ---</option>
+                                {% for act in actividades_list %}
+                                <option value="{{ act.id }}">{{ act.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Puesto Específico</label>
+                            <input type="text" name="puesto_especifico" required placeholder="Ej: SUBDIRECTOR DE ENLACE OPERATIVO" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold uppercase text-sm focus:ring-2 focus:ring-inm-verde-100 transition-all">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Sueldo Bruto ($)</label>
+                            <input type="number" step="any" name="sueldo_bruto" placeholder="0.00" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold text-sm focus:ring-2 focus:ring-inm-verde-100 transition-all">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Sueldo Neto ($)</label>
+                            <input type="number" step="any" name="sueldo_neto" placeholder="0.00" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold text-sm focus:ring-2 focus:ring-inm-verde-100 transition-all">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sección 3: Fechas y Vigencias -->
+                <div>
+                    <h3 class="text-lg font-bold text-gray-800 flex items-center mb-6">
+                        <span class="w-8 h-8 bg-purple-100 text-purple-600 rounded-lg flex items-center justify-center mr-3 text-sm font-bold">3</span>
+                        Fechas y Vigencias
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Fecha Ingreso INM</label>
+                            <input type="date" name="fecha_ingreso_inm" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold text-sm focus:ring-2 focus:ring-inm-verde-100">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Fecha Ingreso Plaza</label>
+                            <input type="date" name="fecha_ingreso_plaza" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold text-sm focus:ring-2 focus:ring-inm-verde-100">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Vigencia Inicio Movimiento</label>
+                            <input type="date" name="vig_inicio_mov" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold text-sm focus:ring-2 focus:ring-inm-verde-100">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Vigencia Término Movimiento</label>
+                            <input type="date" name="vig_termino_mov" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold text-sm focus:ring-2 focus:ring-inm-verde-100">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Botones Acción -->
+                <div class="pt-8 border-t border-gray-100 flex justify-end space-x-4 flex-shrink-0">
+                    <button type="button" onclick="closePersonalModal()" class="px-8 py-4 bg-gray-100 text-gray-500 rounded-2xl font-bold hover:bg-gray-200 transition-all focus:outline-none">Cancelar</button>
+                    <button type="submit" class="px-12 py-4 bg-inm-verde-100 text-white rounded-2xl font-bold shadow-lg shadow-emerald-900/20 hover:bg-inm-verde-200 transition-all focus:outline-none">Guardar Personal</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Carga Rápida -->
+    <div id="cargaRapidaModal" class="hidden fixed inset-0 z-40 flex items-center justify-center p-4">
+        <!-- Fondo Oscuro -->
+        <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-md transition-opacity" onclick="closeCargaRapidaModal()"></div>
+        
+        <!-- Contenido Modal -->
+        <div class="bg-white rounded-[2.5rem] w-full max-w-lg p-8 shadow-2xl relative z-10 border border-gray-100 flex flex-col max-h-[90vh]">
+            <!-- Cabecera de Modal -->
+            <div class="flex justify-between items-start mb-6">
+                <div>
+                    <span class="text-[10px] font-bold uppercase tracking-widest text-emerald-600">Importación Rápida</span>
+                    <h2 class="text-3xl font-extrabold text-gray-900 mt-1">Carga Rápida Excel</h2>
+                </div>
+                <button onclick="closeCargaRapidaModal()" class="text-gray-400 hover:text-gray-600 transition-colors bg-white p-3 rounded-2xl shadow-sm hover:shadow-md focus:outline-none">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+
+            <!-- Cuerpo Modal -->
+            <form action="{% url 'carga_rapida_personal' %}" method="POST" enctype="multipart/form-data" class="space-y-6">
+                {% csrf_token %}
+                <div class="bg-gray-50/50 border border-dashed border-gray-200 rounded-3xl p-8 text-center hover:border-emerald-400 transition-colors group cursor-pointer relative">
+                    <input type="file" name="excel_file" id="excel_file" accept=".xlsx, .xls" required class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="updateFastFileName(this)">
+                    <div class="flex flex-col items-center">
+                        <div class="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 mb-4 group-hover:scale-110 transition-transform">
+                            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        </div>
+                        <p class="text-sm font-bold text-gray-700 mb-1" id="upload-label">Seleccionar Plantilla Excel</p>
+                        <p class="text-xs font-bold text-gray-400 uppercase tracking-wider" id="upload-filename">Formatos permitidos: .xlsx, .xls</p>
+                    </div>
+                </div>
+
+                <div class="bg-amber-50/60 border border-amber-100 rounded-2xl p-4 flex items-start space-x-3">
+                    <svg class="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <div class="text-xs font-semibold text-amber-800 leading-relaxed">
+                        <p class="font-bold mb-1">Notas importantes:</p>
+                        <ul class="list-disc list-inside space-y-1">
+                            <li>El sistema identificará si debe actualizar o crear a partir del <strong>Código de Plaza</strong>.</li>
+                            <li>Si el estatus es diferente a <code class="bg-amber-100 px-1 rounded">ACTIVO</code> o <code class="bg-amber-100 px-1 rounded">VACANTE</code>, se guardará en blanco.</li>
+                            <li>Si el estatus es <code class="bg-amber-100 px-1 rounded">VACANTE</code>, se limpiarán los datos demográficos y de fechas de forma automática.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Botones Acción -->
+                <div class="pt-6 border-t border-gray-100 flex justify-end space-x-4">
+                    <button type="button" onclick="closeCargaRapidaModal()" class="px-6 py-3 bg-gray-100 text-gray-500 rounded-xl font-bold hover:bg-gray-200 transition-all focus:outline-none">Cancelar</button>
+                    <button type="submit" class="px-8 py-3 bg-emerald-600 text-white rounded-xl font-bold shadow-lg shadow-emerald-950/20 hover:bg-emerald-700 transition-all focus:outline-none">Iniciar Carga</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</main>
+{% endblock content %}

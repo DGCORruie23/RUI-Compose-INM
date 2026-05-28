@@ -489,3 +489,49 @@ class HistoricoComentarios(models.Model):
     class Meta:
         verbose_name = "Historial de Comentario"
         verbose_name_plural = "Historial de Comentarios"
+
+
+class PersonalINM(models.Model):
+    TIPO_PLAZA_CHOICES = [
+        ('CONFIANZA', 'CONFIANZA'),
+        ('BASE', 'BASE'),
+    ]
+
+    estado = models.ForeignKey(Estado, on_delete=models.CASCADE, db_index=True)
+    estatus = models.BooleanField(default=True, null=True, blank=True)
+    tipo_plaza = models.CharField(max_length=15, choices=TIPO_PLAZA_CHOICES)
+    codigo_plaza = models.CharField(max_length=20)
+    nivel = models.CharField(max_length=4)
+    num_empleado = models.CharField(max_length=8, null=True, blank=True)
+    nombre = models.CharField(max_length=100, null=True, blank=True)
+    apellido = models.CharField(max_length=100, null=True, blank=True)
+    tipo_movimiento = models.BooleanField(default=True, null=True, blank=True)
+    fecha_ingreso_inm = models.DateField(null=True, blank=True)
+    fecha_ingreso_plaza = models.DateField(null=True, blank=True)
+    vig_inicio_mov = models.DateField(null=True, blank=True)
+    vig_termino_mov = models.DateField(null=True, blank=True)
+    puesto_especifico = models.CharField(max_length=200)
+    sueldo_bruto = models.FloatField(null=True, blank=True)
+    sueldo_neto = models.FloatField(null=True, blank=True)
+    actividad = models.ForeignKey(TipoActividad, on_delete=models.SET_NULL, null=True, blank=True)
+    jefe_oficina = models.BooleanField(default=False, null=True, blank=True)
+    lugar_asignado = models.ForeignKey('Inmueble', on_delete=models.CASCADE, related_name='inmuebleAsignado', blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.nombre or ''} {self.apellido or ''} - {self.puesto_especifico}"
+
+    class Meta:
+        verbose_name = "Personal INM"
+        verbose_name_plural = "Personal INM"
+        unique_together = ['codigo_plaza']
+
+class OrganigramaF(models.Model):
+    estado = models.ForeignKey(Estado, on_delete=models.CASCADE, db_index=True)
+    archivo = models.FileField(upload_to='Organigramas', null=True, blank=True)
+    vigencia = models.DateField(null=True, blank=True)
+
+
+    class Meta:
+        verbose_name = "Organigrama"
+        verbose_name_plural = "Organigramas"
+        unique_together = ['estado']

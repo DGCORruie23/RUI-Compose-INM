@@ -1,0 +1,164 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}Estructura Orgánica - RUIE{% endblock title %}
+
+{% block content %}
+<main class="min-h-screen bg-gray-50/50 p-6 md:p-12">
+    <div class="max-w-6xl mx-auto">
+        <!-- Cabecera -->
+        <div class="mb-12 animate-slide-up">
+            <div class="flex items-center space-x-3 mb-4">
+                <a href="{% url 'carga_datos' %}" class="px-4 py-1.5 bg-gray-100 text-gray-600 text-[10px] font-bold uppercase tracking-[0.2em] rounded-full hover:bg-gray-200 transition-colors">
+                    &larr; Volver
+                </a>
+                <span class="px-4 py-1.5 bg-emerald-50 text-inm-verde-100 text-[10px] font-bold uppercase tracking-[0.2em] rounded-full border border-emerald-100/50">Estructuras</span>
+            </div>
+            <div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
+                <div>
+                    <h1 class="text-5xl font-black text-gray-900 tracking-tight mb-4">Estructura Orgánica<span class="text-inm-verde-100">.</span></h1>
+                    <p class="text-lg text-gray-500 max-w-2xl font-medium">Gestión de archivos de estructura y organigramas vigentes de las Oficinas de Representación por estado.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notificaciones de Django -->
+        {% if messages %}
+        <div class="mb-10 w-full animate-slide-up">
+            {% for message in messages %}
+            <div class="p-4 rounded-2xl mb-3 flex items-center {% if message.tags == 'success' %}bg-emerald-50 text-emerald-800 border border-emerald-100{% else %}bg-rose-50 text-rose-800 border border-rose-100{% endif %} shadow-sm">
+                <div class="flex-shrink-0">
+                    {% if message.tags == 'success' %}
+                    <svg class="h-5 w-5 text-emerald-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
+                    {% else %}
+                    <svg class="h-5 w-5 text-rose-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" /></svg>
+                    {% endif %}
+                </div>
+                <div class="ml-3"><p class="text-sm font-bold">{{ message }}</p></div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Formulario de Registro/Carga -->
+            <div class="bg-white border border-gray-100 rounded-[2.5rem] shadow-sm p-8 animate-slide-up self-start h-auto">
+                <h2 class="text-xl font-bold text-gray-900 mb-2">Cargar Estructura</h2>
+                <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-8">Registrar o actualizar estructura en PDF</p>
+                
+                <form action="{% url 'guardar_organigrama' %}" method="POST" enctype="multipart/form-data" class="space-y-6">
+                    {% csrf_token %}
+                    
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Estado</label>
+                        <select name="estado_id" required class="block w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-inm-verde-100 transition-all outline-none font-bold text-gray-700">
+                            {% for estado in estados_list %}
+                            <option value="{{ estado.id }}">{{ estado.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Fecha de Vigencia</label>
+                        <input type="date" name="vigencia" required class="block w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-inm-verde-100 transition-all outline-none font-bold text-gray-700">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Archivo PDF</label>
+                        <div class="bg-gray-50 border border-dashed border-gray-200 rounded-2xl p-6 text-center hover:border-emerald-400 transition-colors group cursor-pointer relative">
+                            <input type="file" name="archivo" accept=".pdf" required class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="updateFileName(this)">
+                            <div class="flex flex-col items-center">
+                                <div class="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600 mb-3 group-hover:scale-110 transition-transform">
+                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                                </div>
+                                <p class="text-xs font-bold text-gray-700 mb-1" id="file-label">Seleccionar PDF</p>
+                                <p class="text-[9px] font-bold text-gray-400 uppercase tracking-wider" id="file-name">Formato permitido: .pdf</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="w-full py-4 bg-stone-800 text-white rounded-2xl font-bold shadow-xl shadow-stone-900/10 hover:bg-stone-900 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center">
+                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                        Guardar Estructura
+                    </button>
+                </form>
+            </div>
+
+            <!-- Listado de Organigramas Registrados -->
+            <div class="lg:col-span-2 bg-white border border-gray-100 rounded-[2.5rem] shadow-sm overflow-hidden animate-slide-up" style="animation-delay: 0.1s;">
+                <div class="p-8 border-b border-gray-50">
+                    <h2 class="text-xl font-bold text-gray-900">Estructuras Registradas</h2>
+                    <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">Estructuras y organigramas vigentes por representación</p>
+                </div>
+                
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead>
+                            <tr class="bg-gray-50/50">
+                                <th class="px-8 py-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Oficina de Representación</th>
+                                <th class="px-8 py-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Fecha Vigencia</th>
+                                <th class="px-8 py-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Archivo</th>
+                                <th class="px-8 py-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-right">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-50">
+                            {% for org in organigramas_list %}
+                            <tr class="hover:bg-gray-50/80 transition-colors group">
+                                <td class="px-8 py-6 font-bold text-gray-900 text-sm">
+                                    {{ org.estado.nombre }}
+                                </td>
+                                <td class="px-8 py-6 text-xs text-gray-600 font-bold">
+                                    {{ org.vigencia|date:"d/m/Y"|default:"Sin fecha" }}
+                                </td>
+                                <td class="px-8 py-6">
+                                    {% if org.archivo %}
+                                    <a href="{{ org.archivo.url }}" target="_blank" class="inline-flex items-center text-xs font-bold text-emerald-600 hover:text-emerald-700 transition-colors">
+                                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                        Ver PDF Estructura
+                                    </a>
+                                    {% else %}
+                                    <span class="text-xs text-gray-400 font-bold">Sin archivo</span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-8 py-6 text-right">
+                                    <a href="{% url 'eliminar_organigrama' org.id %}" onclick="return confirm('¿Está seguro de eliminar esta Estructura Orgánica?')" class="p-2.5 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-100 transition-colors shadow-sm inline-block">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="px-8 py-16 text-center">
+                                    <div class="flex flex-col items-center">
+                                        <p class="text-sm font-bold text-gray-400 uppercase tracking-widest">Sin Estructuras</p>
+                                        <p class="text-xs text-gray-400 mt-1">Aún no se ha registrado ninguna estructura orgánica.</p>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<script>
+    function updateFileName(input) {
+        const label = document.getElementById('file-label');
+        const filename = document.getElementById('file-name');
+        if (input.files && input.files.length > 0) {
+            label.innerText = 'Archivo seleccionado';
+            filename.innerText = input.files[0].name;
+            filename.classList.remove('text-gray-400');
+            filename.classList.add('text-emerald-600', 'font-bold');
+        } else {
+            label.innerText = 'Seleccionar PDF';
+            filename.innerText = 'Formato permitido: .pdf';
+            filename.classList.remove('text-emerald-600', 'font-bold');
+            filename.classList.add('text-gray-400');
+        }
+    }
+</script>
+{% endblock content %}

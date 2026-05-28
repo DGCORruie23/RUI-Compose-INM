@@ -8,7 +8,7 @@ from .models import (
     CorreoTitular, TipoNombramiento, TipoProcendencia,
     Comodato, FiguraOcupacion, TipoInmueble, SituacionActual,
     TipoActividad, Inmueble, HistoricoComentarios, TipoOficina,
-    ProgramaIPC
+    ProgramaIPC, PersonalINM, OrganigramaF
 )
 
 @admin.register(Estado)
@@ -202,5 +202,20 @@ class ProgramaIPCAdmin(admin.ModelAdmin):
     list_display = ('inmueble', 'inm_pipc', 'fecha_inm', 'comodante_pipc', 'fecha_comodante', 'plan_emergencia', 'fecha_inicio_plan')
     list_filter = ('inm_pipc', 'comodante_pipc', 'plan_emergencia')
     search_fields = ('inmueble__nombre_inmueble',)
+
+
+@admin.register(PersonalINM)
+class PersonalINMAdmin(admin.ModelAdmin):
+    list_display = ('nombre', 'apellido', 'num_empleado', 'estado', 'lugar_asignado', 'tipo_plaza', 'codigo_plaza', 'puesto_especifico', 'jefe_oficina', 'estatus')
+    list_filter = ('estado', 'lugar_asignado', 'tipo_plaza', 'jefe_oficina', 'estatus', 'tipo_movimiento')
+    search_fields = ('nombre', 'apellido', 'num_empleado', 'codigo_plaza', 'puesto_especifico')
+
+
+@admin.register(OrganigramaF)
+class OrganigramaFAdmin(admin.ModelAdmin):
+    list_display = ('estado', 'archivo', 'vigencia')
+    list_filter = ('estado', 'vigencia')
+    search_fields = ('estado__nombre',)
+
 
 

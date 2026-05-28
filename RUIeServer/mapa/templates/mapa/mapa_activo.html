@@ -282,9 +282,17 @@
                             <span class="text-[10px] font-semibold text-gray-500 group-hover:text-inm-verde-100">Internación Terrestre</span>
                             <span id="infra_terrestre" class="text-xs font-bold text-inm-verde-100">0</span>
                         </div>
-                        <div id="btn_infra_prh" onclick="filterInfraPoints('PRH')" class="bg-white p-3 rounded-xl border border-gray-100 flex items-center justify-between cursor-pointer hover:border-inm-verde-100 hover:shadow-sm transition-all group col-span-2">
+                        <div id="btn_infra_prh" onclick="filterInfraPoints('PRH')" class="bg-white p-3 rounded-xl border border-gray-100 flex items-center justify-between cursor-pointer hover:border-inm-verde-100 hover:shadow-sm transition-all group">
                             <span class="text-[10px] font-semibold text-gray-500 group-hover:text-inm-verde-100">Puntos de Rescate (PRH)</span>
                             <span id="infra_prh" class="text-xs font-bold text-inm-verde-100 text-[#7E1D36]">0</span>
+                        </div>
+                        <div id="btn_organigrama" onclick="showStateOrganigrama()" class="bg-white p-3 rounded-xl border border-gray-100 flex items-center justify-between cursor-pointer hover:border-emerald-600 hover:shadow-sm transition-all group">
+                            <span class="text-[10px] font-semibold text-gray-500 group-hover:text-emerald-600">Estructura Orgánica</span>
+                            <span class="text-xs font-bold text-emerald-600 flex items-center">
+                                <svg class="w-4 h-4 transition-transform group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                            </span>
                         </div>
                     </div>
                 </div>
@@ -1530,9 +1538,15 @@
                 .addTo(map);
                 
               el.addEventListener('click', (e) => { 
-                  e.stopPropagation(); // Prevenir selección de estado
-                  marker.togglePopup();
-              });
+                   e.stopPropagation(); // Prevenir selección de estado
+                   if (typeCategory === 'inmuebles') {
+                       if (window.openInmuebleDetailModal) {
+                           window.openInmuebleDetailModal(item.id);
+                       }
+                   } else {
+                       marker.togglePopup();
+                   }
+               });
                 
               window.mapMarkers.push({ 
                   marker: marker, 
@@ -1667,6 +1681,10 @@
             document.getElementById('cvPuesto').innerText = data.tipo_nombramiento || 'RESPONSABLE';
             document.getElementById('cvEstado').innerText = `OFICINA DE REPRESENTACIÓN EN EL ESTADO DE ${data.estado}`;
             
+            const birthdate = data.fecha_nacimiento ? new Date(data.fecha_nacimiento + "T12:00:00").toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' }).toUpperCase() : 'NO DISPONIBLE';
+            document.getElementById('cvFechaNacimiento').innerText = birthdate;
+            document.getElementById('cvProcedencia').innerText = data.procedencia ? data.procedencia.toUpperCase() : 'NO DISPONIBLE';
+            
             const photoImg = document.getElementById('cvFoto');
             const photoPlaceholder = document.getElementById('cvFotoPlaceholder');
             if (data.foto_url) {
@@ -1773,6 +1791,224 @@
     document.getElementById('cvModal').classList.add('hidden');
     document.body.style.overflow = 'auto';
   };
+
+  window.showStateOrganigrama = async function() {
+    if (!window.selectedStateData) return;
+    
+    if (window.selectedStateData.name === "Total Nacional" || window.selectedStateData.name === "NACIONAL" || window.selectedStateData.name === "Total nacional") {
+        alert("Por favor, seleccione un estado en el mapa para visualizar su estructura orgánica.");
+        return;
+    }
+    
+    const stateName = window.selectedStateData.name;
+    const key = normalizar_nombre(stateName);
+    const estadoId = window.infraData[key]?.estado_id;
+    
+    if (!estadoId) {
+        alert("No se pudo identificar el identificador del estado.");
+        return;
+    }
+    
+    const modal = document.getElementById('organigramaModal');
+    const stateTitle = document.getElementById('orgStateName');
+    const vigenciaLabel = document.getElementById('orgVigenciaLabel');
+    const iframe = document.getElementById('orgPdfViewer');
+    const noPdfDiv = document.getElementById('orgNoPdf');
+    
+    stateTitle.innerText = `OFICINA DE REPRESENTACIÓN: ${stateName}`;
+    modal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+    
+    try {
+        const response = await fetch(`/mapa/api/get-organigrama/${estadoId}`);
+        const result = await response.json();
+        
+        if (result.status === 'success') {
+            const data = result.data;
+            vigenciaLabel.innerText = `Vigencia: ${data.vigencia}`;
+            vigenciaLabel.classList.remove('bg-rose-50', 'text-rose-700', 'border-rose-100');
+            vigenciaLabel.classList.add('bg-emerald-50', 'text-emerald-700', 'border-emerald-100');
+            
+            iframe.src = data.pdf_url;
+            iframe.classList.remove('hidden');
+            noPdfDiv.classList.add('hidden');
+        } else {
+            vigenciaLabel.innerText = "Estado Sin Estructura Orgánica";
+            vigenciaLabel.classList.remove('bg-emerald-50', 'text-emerald-700', 'border-emerald-100');
+            vigenciaLabel.classList.add('bg-rose-50', 'text-rose-700', 'border-rose-100');
+            
+            iframe.src = '';
+            iframe.classList.add('hidden');
+            noPdfDiv.classList.remove('hidden');
+        }
+    } catch (err) {
+        vigenciaLabel.innerText = "Error de conexión";
+        iframe.src = '';
+        iframe.classList.add('hidden');
+        noPdfDiv.classList.remove('hidden');
+    }
+  };
+
+  window.closeOrganigramaModal = function() {
+    const modal = document.getElementById('organigramaModal');
+    const iframe = document.getElementById('orgPdfViewer');
+    modal.classList.add('hidden');
+    iframe.src = '';
+    document.body.style.overflow = 'auto';
+  };
+
+  window.openInmuebleDetailModal = async function(inmuebleId) {
+    if (!inmuebleId) return;
+    const modal = document.getElementById('inmuebleDetailModal');
+    if (!modal) return;
+    
+    modal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+    
+    try {
+        const response = await fetch(`/mapa/api/get-inmueble-detalle/${inmuebleId}`);
+        const result = await response.json();
+        
+        if (result.status === 'success') {
+            const data = result.data;
+            
+            document.getElementById('inmStateName').innerText = `OFICINA DE REPRESENTACIÓN: ${data.estado_nombre || 'S/D'}`;
+            document.getElementById('inmJefeName').innerText = `JEFE DE OFICINA: ${data.nombre_jefe || 'S/D'}`;
+            document.getElementById('inmNombreHeader').innerText = data.nombre_inmueble || 'S/D';
+            
+            document.getElementById('inmPersTotal').innerText = data.personal.total;
+            document.getElementById('inmPersActivos').innerText = data.personal.activos;
+            document.getElementById('inmPersInactivos').innerText = data.personal.inactivos;
+            
+            document.getElementById('inmVehTotal').innerText = '';
+            document.getElementById('inmVehActivos').innerText = '';
+            document.getElementById('inmVehInactivos').innerText = '';
+            
+            document.getElementById('inmPipcInm').innerText = data.pipc.fecha_inm;
+            document.getElementById('inmPipcComodante').innerText = data.pipc.fecha_comodante;
+            document.getElementById('inmPipcEmergencia').innerText = data.pipc.fecha_inicio_plan;
+            
+            document.getElementById('inmDireccion').innerText = data.direccion_completa || 'S/D';
+            
+            document.getElementById('inmMetros').innerText = `${data.superficie_utilizada} m²`;
+            document.getElementById('inmNiveles').innerText = data.numero_de_niveles;
+            document.getElementById('inmAnioConst').innerText = data.anio_construccion;
+            document.getElementById('inmFechaOcu').innerText = data.fecha_ocupacion;
+            
+            document.getElementById('inmRentaMonto').innerText = data.renta;
+            
+            const normalizar = (txt) => txt.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+            const asignadasNorm = data.oficinas_asignadas.map(o => normalizar(o));
+            
+            const staticOficinasList = [
+                { id: "of_no_aplica", keyword: "NO APLICA" },
+                { id: "of_almacen", keyword: "ALMACEN" },
+                { id: "of_caitf", keyword: "CAITF" },
+                { id: "of_repatriacion", keyword: "REPATRIACION" },
+                { id: "of_grupo_beta", keyword: "GRUPO BETA" },
+                { id: "of_estancia", keyword: "ESTANCIA PROVISIONAL" },
+                { id: "of_subrep_fed", keyword: "SUB REPRESENTACION FEDERAL" },
+                { id: "of_subrep_loc", keyword: "SUB REPRESENTACION LOCAL" },
+                { id: "of_representacion", keyword: "REPRESENTACION LOCAL" },
+                { id: "of_canalizacion", keyword: "CANALIZACION" },
+                { id: "of_estacion", keyword: "ESTACION MIGRATORIA" },
+                { id: "of_admin", keyword: "ADMINISTRATIVAS" },
+                { id: "of_regulacion", keyword: "REGULACION" },
+                { id: "of_archivo", keyword: "ARCHIVO" },
+                { id: "of_maritimo", keyword: "MARITIMO" },
+                { id: "of_terrestre", keyword: "TERRESTRE" },
+                { id: "of_aereo", keyword: "AEREO" }
+            ];
+            
+            staticOficinasList.forEach(item => {
+                const el = document.getElementById(item.id);
+                if (el) {
+                    const isAsigned = asignadasNorm.some(o => o.includes(item.keyword) || item.keyword.includes(o));
+                    if (isAsigned) {
+                        el.className = "text-[11px] font-black text-[#611232] transition-colors duration-200";
+                    } else {
+                        el.className = "text-[11px] font-bold text-gray-300 transition-colors duration-200";
+                    }
+                }
+            });
+            
+            const actContainer = document.getElementById('inmActividadesGrid');
+            actContainer.innerHTML = '';
+            
+            const getIconFilename = (name) => {
+                const n = normalizar(name);
+                if (n.includes("ADMINISTRATIVO") || n.includes("OFICINA")) return "icon_administrativos.svg";
+                if (n.includes("ALMACEN") || n.includes("BODEGA")) return "icon_almacen.svg";
+                if (n.includes("REPATRIACION")) return "icon_repatriacion.svg";
+                if (n.includes("TRAMITE")) return "icon_tramites.svg";
+                if (n.includes("JURIDICO") || n.includes("LEGAL")) return "icon_juridico.svg";
+                if (n.includes("RECURSOS HUMANOS") || n.includes("HUMANOS") || n.includes("PERSONAL")) return "icon_rec_humano.svg";
+                if (n.includes("MATERIALES") || n.includes("ADQUISICION")) return "icon_rec_materiales.svg";
+                if (n.includes("CONTROL") || n.includes("MIGRATORIO")) return "icon_control.svg";
+                if (n.includes("ESTACIONAMIENTO")) return "icon_estacionamiento.svg";
+                if (n.includes("ESTADISTICA")) return "icon_estadistica.svg";
+                if (n.includes("VEHICULO")) return "icon_vehiculo.svg";
+                if (n.includes("RENTA")) return "icon_renta.svg";
+                return "icon_personal.svg";
+            };
+            
+            data.actividades.forEach(act => {
+                const iconFile = getIconFilename(act.nombre);
+                const opacityClass = act.activo ? "opacity-100 scale-100" : "opacity-30 grayscale scale-95";
+                const borderClass = act.activo ? "border-[#611232]/30 bg-emerald-50/20" : "border-gray-100 bg-gray-50/30";
+                const textClass = act.activo ? "text-gray-900 font-extrabold" : "text-gray-400 font-semibold";
+                
+                actContainer.innerHTML += `
+                    <div class="flex flex-col items-center p-3 rounded-2xl border ${borderClass} transition-all duration-300 ${opacityClass} hover:opacity-100 hover:grayscale-0 hover:scale-105">
+                        <div class="w-10 h-10 flex items-center justify-center mb-2">
+                            <img src="/static/mapa/icons_inmueble/${iconFile}" alt="${act.nombre}" class="w-full h-full object-contain">
+                        </div>
+                        <span class="text-[9px] text-center leading-tight uppercase tracking-tight ${textClass} break-all max-w-[80px]">
+                            ${act.nombre}
+                        </span>
+                    </div>
+                `;
+            });
+            
+            const figArrendado = document.getElementById('figArrendado');
+            const figPropio = document.getElementById('figPropio');
+            const figTerreno = document.getElementById('figTerreno');
+            
+            figArrendado.className = "flex-1 flex flex-col items-center p-3 rounded-2xl border border-gray-100 bg-gray-50/50 opacity-30 grayscale transition-all duration-300";
+            figPropio.className = "flex-1 flex flex-col items-center p-3 rounded-2xl border border-gray-100 bg-gray-50/50 opacity-30 grayscale transition-all duration-300";
+            figTerreno.className = "flex-1 flex flex-col items-center p-3 rounded-2xl border border-gray-100 bg-gray-50/50 opacity-30 grayscale transition-all duration-300";
+            
+            if (data.figura_ocupacion.arrendado_activo) {
+                figArrendado.className = "flex-1 flex flex-col items-center p-3 rounded-2xl border border-[#611232]/30 bg-emerald-50/20 opacity-100 grayscale-0 transition-all duration-300 font-extrabold";
+            } else if (data.figura_ocupacion.propio_activo) {
+                figPropio.className = "flex-1 flex flex-col items-center p-3 rounded-2xl border border-[#611232]/30 bg-emerald-50/20 opacity-100 grayscale-0 transition-all duration-300 font-extrabold";
+            } else if (data.figura_ocupacion.terreno_activo) {
+                figTerreno.className = "flex-1 flex flex-col items-center p-3 rounded-2xl border border-[#611232]/30 bg-emerald-50/20 opacity-100 grayscale-0 transition-all duration-300 font-extrabold";
+            }
+            
+            const rentaCard = document.getElementById('inmRentaCard');
+            if (data.figura_ocupacion.arrendado_activo) {
+                rentaCard.classList.remove('opacity-30', 'grayscale');
+            } else {
+                rentaCard.classList.add('opacity-30', 'grayscale');
+            }
+            
+        } else {
+            alert("Error al obtener los detalles del inmueble: " + result.message);
+            closeInmuebleDetailModal();
+        }
+    } catch (err) {
+        console.error(err);
+        alert("Error de conexión al cargar los detalles del inmueble.");
+        closeInmuebleDetailModal();
+    }
+  };
+  
+  window.closeInmuebleDetailModal = function() {
+    const modal = document.getElementById('inmuebleDetailModal');
+    if (modal) modal.classList.add('hidden');
+    document.body.style.overflow = 'auto';
+  };
 </script>
 
     <!-- Modal Curriculum Titular -->
@@ -1855,6 +2091,17 @@
                     <p id="cvPuesto" class="text-[9px] font-bold text-white uppercase tracking-widest mb-2 bg-inm-verde-200 px-3 py-1 rounded-full"></p>
                     <div class="w-full h-px bg-gray-100 mb-4"></div>
                     <p id="cvEstado" class="text-[14px] font-bold text-gray-600 uppercase tracking-tighter px-4 leading-relaxed"></p>
+                    <div class="w-full h-px bg-gray-100 my-4"></div>
+                    <div class="text-left w-full px-6 space-y-3">
+                        <div>
+                            <span class="block text-[8px] font-black text-gray-400 uppercase tracking-widest mb-0.5">Fecha de Nacimiento</span>
+                            <span id="cvFechaNacimiento" class="text-xs font-bold text-gray-800 leading-tight"></span>
+                        </div>
+                        <div>
+                            <span class="block text-[8px] font-black text-gray-400 uppercase tracking-widest mb-0.5">Procedencia</span>
+                            <span id="cvProcedencia" class="text-xs font-bold text-[#611232] leading-tight"></span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -1867,6 +2114,279 @@
             <div class="hidden absolute bottom-1 left-[18%] -translate-x-1/2 h-28 flex items-center bg-[#611232] rounded-2xl px-8 py-3 shadow-xl shadow-maroon-900/40 z-10">
                  <img src="{% static 'mapa/fondos/logo_anual.png' %}" alt="Logo Anual" class="h-full object-contain">
             </div>
+        </div>
+    </div>
+
+    <!-- Modal Estructura Orgánica (PDF) -->
+    <div id="organigramaModal" class="hidden fixed inset-0 z-[10000] flex items-center justify-center p-4">
+        <!-- Fondo Oscuro -->
+        <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity duration-300" onclick="closeOrganigramaModal()"></div>
+        
+        <!-- Contenido Modal -->
+        <div class="relative w-full max-w-4xl bg-white rounded-[2.5rem] overflow-hidden shadow-2xl animate-fade-in flex flex-col h-[85vh]">
+            <!-- Botón Cerrar -->
+            <button onclick="closeOrganigramaModal()" class="absolute top-6 right-6 text-gray-400 hover:text-gray-600 z-10 bg-white/80 p-2 rounded-2xl shadow-sm hover:shadow-md transition-all">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+
+            <!-- Cabecera -->
+            <div class="p-8 border-b border-gray-100 flex-shrink-0 bg-gray-50/50">
+                <span class="text-[9px] font-black text-emerald-600 uppercase tracking-[0.2em]">Estructura Orgánica</span>
+                <h2 id="orgStateName" class="text-3xl font-extrabold text-gray-900 mt-1 uppercase">ESTADO</h2>
+                <div class="flex items-center space-x-2 mt-2">
+                    <span class="px-2 py-0.5 inline-block text-[9px] font-black rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 uppercase" id="orgVigenciaLabel">
+                        Vigencia: Sin vigencia
+                    </span>
+                </div>
+            </div>
+
+            <!-- Cuerpo (Visor de PDF) -->
+            <div class="flex-grow p-4 bg-gray-100 flex items-center justify-center relative">
+                <iframe id="orgPdfViewer" class="w-full h-full rounded-2xl border-0 hidden" src=""></iframe>
+                <div id="orgNoPdf" class="flex flex-col items-center justify-center text-center p-8 bg-white rounded-3xl shadow-sm max-w-md">
+                    <div class="w-16 h-16 bg-rose-50 text-rose-500 rounded-2xl flex items-center justify-center mb-4">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                    </div>
+                    <h3 class="text-lg font-bold text-gray-900 mb-1">Sin Estructura</h3>
+                    <p class="text-xs text-gray-400 leading-relaxed mb-6">Aún no se ha cargado una estructura orgánica en formato PDF para esta Oficina de Representación.</p>
+                    <a href="{% url 'organigramas_list' %}" class="px-6 py-3 bg-stone-800 text-white text-xs font-bold rounded-xl shadow-lg hover:bg-stone-900 transition-all">Cargar Estructura</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Detalle del Inmueble -->
+    <div id="inmuebleDetailModal" class="hidden fixed inset-0 z-[10000] flex items-center justify-center p-4">
+        <!-- Backdrop Blur overlay -->
+        <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity duration-300" onclick="closeInmuebleDetailModal()"></div>
+        
+        <!-- Main Modal Container -->
+        <div class="relative w-full max-w-6xl bg-white rounded-[2.5rem] overflow-hidden shadow-2xl animate-fade-in flex flex-col" style="max-height: 90vh;">
+            
+            <!-- Pattern Background -->
+            <div class="absolute inset-0 pointer-events-none opacity-[0.25]" 
+                 style="background-image: url('{% static 'mapa/fondos/patron_.svg' %}'); background-size: 50%; background-position: center; z-index: 0;">
+            </div>
+
+            <!-- Header Section -->
+            <div class="relative z-10 px-10 pt-8 pb-6 border-b border-gray-100 flex flex-col md:flex-row md:items-center md:justify-between bg-white/90 backdrop-blur-md">
+                <div class="flex-grow">
+                    <span id="inmStateName" class="text-[10px] font-black text-[#611232] uppercase tracking-[0.25em] block mb-1">
+                        OFICINA DE REPRESENTACIÓN: -
+                    </span>
+                    <h2 id="inmNombreHeader" class="text-2xl font-black text-gray-900 uppercase leading-none">
+                        -
+                    </h2>
+                    <span id="inmJefeName" class="inline-block mt-2 px-3 py-1 text-[9px] font-bold tracking-widest text-[#10312B] bg-[#10312B]/10 rounded-lg uppercase">
+                        JEFE DE OFICINA: -
+                    </span>
+                </div>
+                
+                <!-- Close Button -->
+                <button onclick="closeInmuebleDetailModal()" class="absolute top-6 right-6 md:static text-gray-400 hover:text-gray-600 bg-gray-50 hover:bg-gray-100 p-2.5 rounded-2xl shadow-sm hover:shadow-md transition-all">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+
+            <!-- Body Content Section: 3-column scrollable grid -->
+            <div class="relative z-10 p-10 flex-grow overflow-y-auto custom-scrollbar flex flex-col lg:flex-row gap-8" style="background-color: rgba(255, 255, 255, 0.45);">
+                
+                <!-- COLUMN 1: Operaciones (Personal, Vehículos, PIPC) -->
+                <div class="flex-1 space-y-6">
+                    <!-- Tarjeta de Personal -->
+                    <div class="bg-white/80 backdrop-blur-md p-6 rounded-[2rem] border border-gray-100 shadow-sm relative overflow-hidden flex items-center gap-5">
+                        <div class="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center flex-shrink-0 border border-emerald-100 shadow-inner">
+                            <img src="/static/mapa/icons_inmueble/icon_personal.svg" alt="Personal" class="w-8 h-8 object-contain">
+                        </div>
+                        <div class="flex-grow">
+                            <h3 class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Personal Asignado</h3>
+                            <div class="flex items-baseline gap-4">
+                                <div>
+                                    <span id="inmPersTotal" class="text-3xl font-black text-gray-900 leading-none">-</span>
+                                    <span class="text-[9px] text-gray-400 font-bold uppercase tracking-wider block mt-1">Total</span>
+                                </div>
+                                <div class="w-px h-8 bg-gray-100"></div>
+                                <div>
+                                    <span id="inmPersActivos" class="text-lg font-black text-emerald-600 leading-none">-</span>
+                                    <span class="text-[9px] text-emerald-500/70 font-bold uppercase tracking-wider block mt-1">Activos</span>
+                                </div>
+                                <div class="w-px h-8 bg-gray-100"></div>
+                                <div>
+                                    <span id="inmPersInactivos" class="text-lg font-black text-[#611232] leading-none">-</span>
+                                    <span class="text-[9px] text-[#611232]/70 font-bold uppercase tracking-wider block mt-1">Vacantes</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tarjeta de Vehículos -->
+                    <div class="bg-white/80 backdrop-blur-md p-6 rounded-[2rem] border border-gray-100 shadow-sm relative overflow-hidden flex items-center gap-5">
+                        <div class="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center flex-shrink-0 border border-emerald-100 shadow-inner">
+                            <img src="/static/mapa/icons_inmueble/icon_vehiculo.svg" alt="Vehículos" class="w-8 h-8 object-contain">
+                        </div>
+                        <div class="flex-grow">
+                            <h3 class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Vehículos</h3>
+                            <div class="flex items-baseline gap-4">
+                                <div>
+                                    <span id="inmVehTotal" class="text-3xl font-black text-gray-900 leading-none">-</span>
+                                    <span class="text-[9px] text-gray-400 font-bold uppercase tracking-wider block mt-1">Total</span>
+                                </div>
+                                <div class="w-px h-8 bg-gray-100"></div>
+                                <div>
+                                    <span id="inmVehActivos" class="text-lg font-black text-emerald-600 leading-none">-</span>
+                                    <span class="text-[9px] text-emerald-500/70 font-bold uppercase tracking-wider block mt-1">Activos</span>
+                                </div>
+                                <div class="w-px h-8 bg-gray-100"></div>
+                                <div>
+                                    <span id="inmVehInactivos" class="text-lg font-black text-[#611232] leading-none">-</span>
+                                    <span class="text-[9px] text-[#611232]/70 font-bold uppercase tracking-wider block mt-1">Inactivos</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tarjeta de PIPC -->
+                    <div class="bg-white/80 backdrop-blur-md p-6 rounded-[2rem] border border-gray-100 shadow-sm relative overflow-hidden">
+                        <div class="flex items-center gap-4 mb-4">
+                            <div class="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center border border-emerald-100">
+                                <img src="/static/mapa/icons_inmueble/icon_pipc.svg" alt="PIPC" class="w-6 h-6 object-contain">
+                            </div>
+                            <h3 class="text-[11px] font-black text-gray-800 uppercase tracking-[0.1em]">Programa Interno PC (PIPC)</h3>
+                        </div>
+                        
+                        <div class="space-y-3 pl-2">
+                            <div class="flex justify-between items-center border-b border-gray-50 pb-2">
+                                <span class="text-[10px] font-bold text-gray-400 uppercase tracking-tight">PIPC INM</span>
+                                <span id="inmPipcInm" class="text-[11px] font-extrabold text-[#10312B] uppercase">-</span>
+                            </div>
+                            <div class="flex justify-between items-center border-b border-gray-50 pb-2">
+                                <span class="text-[10px] font-bold text-gray-400 uppercase tracking-tight">PIPC COMODANTE</span>
+                                <span id="inmPipcComodante" class="text-[11px] font-extrabold text-[#10312B] uppercase">-</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-[10px] font-bold text-gray-400 uppercase tracking-tight">PLAN DE EMERGENCIA</span>
+                                <span id="inmPipcEmergencia" class="text-[11px] font-extrabold text-[#10312B] uppercase">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- COLUMN 2: Clasificación (Tipos de Oficina y Actividades) -->
+                <div class="flex-1 space-y-6">
+                    <!-- Tipos de Oficina (17 categorías estáticas) -->
+                    <div class="bg-white/80 backdrop-blur-md p-6 rounded-[2rem] border border-gray-100 shadow-sm">
+                        <h3 class="text-[11px] font-black text-gray-800 uppercase tracking-[0.1em] mb-4 flex items-center">
+                            <span class="w-1.5 h-1.5 bg-[#611232] rounded-full mr-2"></span>
+                            Tipos de Oficina
+                        </h3>
+                        <div class="grid grid-cols-2 gap-x-4 gap-y-2 max-h-[160px] overflow-y-auto custom-scrollbar pr-2">
+                            <div id="of_no_aplica" class="text-[11px] font-bold text-gray-300">NO APLICA</div>
+                            <div id="of_almacen" class="text-[11px] font-bold text-gray-300">BODEGA/ALMACÉN</div>
+                            <div id="of_caitf" class="text-[11px] font-bold text-gray-300">CAITF</div>
+                            <div id="of_repatriacion" class="text-[11px] font-bold text-gray-300">REPATRIACIÓN</div>
+                            <div id="of_grupo_beta" class="text-[11px] font-bold text-gray-300">GRUPO BETA</div>
+                            <div id="of_estancia" class="text-[11px] font-bold text-gray-300">ESTANCIA PROVISIONAL A/B</div>
+                            <div id="of_subrep_fed" class="text-[11px] font-bold text-gray-300">SUB REPRESENTACIÓN FEDERAL</div>
+                            <div id="of_subrep_loc" class="text-[11px] font-bold text-gray-300">SUB REPRESENTACIÓN LOCAL</div>
+                            <div id="of_representacion" class="text-[11px] font-bold text-gray-300">REPRESENTACIÓN LOCAL</div>
+                            <div id="of_canalizacion" class="text-[11px] font-bold text-gray-300">OFICINA DE CANALIZACIÓN NNA</div>
+                            <div id="of_estacion" class="text-[11px] font-bold text-gray-300">ESTACIÓN MIGRATORIA</div>
+                            <div id="of_admin" class="text-[11px] font-bold text-gray-300">OFICINAS ADMINISTRATIVAS</div>
+                            <div id="of_regulacion" class="text-[11px] font-bold text-gray-300">REGULACIÓN MIGRATORIA</div>
+                            <div id="of_archivo" class="text-[11px] font-bold text-gray-300">ARCHIVO MIGRATORIO</div>
+                            <div id="of_maritimo" class="text-[11px] font-bold text-gray-300">PT. INTERNACIÓN MARÍTIMO</div>
+                            <div id="of_terrestre" class="text-[11px] font-bold text-gray-300">PT. INTERNACIÓN TERRESTRE</div>
+                            <div id="of_aereo" class="text-[11px] font-bold text-gray-300">PT. INTERNACIÓN AÉREO</div>
+                        </div>
+                    </div>
+
+                    <!-- Actividades (12 iconos) -->
+                    <div class="bg-white/80 backdrop-blur-md p-6 rounded-[2rem] border border-gray-100 shadow-sm">
+                        <h3 class="text-[11px] font-black text-gray-800 uppercase tracking-[0.1em] mb-4 flex items-center">
+                            <span class="w-1.5 h-1.5 bg-[#611232] rounded-full mr-2"></span>
+                            Actividades
+                        </h3>
+                        <div id="inmActividadesGrid" class="grid grid-cols-4 gap-3 max-h-[180px] overflow-y-auto custom-scrollbar pr-2">
+                            <!-- Items de actividades dinámicos -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- COLUMN 3: Especificaciones y Financiera (Dirección, Info Gral, Figura Ocupación, Renta) -->
+                <div class="flex-1 space-y-6">
+                    <!-- Dirección -->
+                    <div class="bg-white/80 backdrop-blur-md p-5 rounded-[2rem] border border-gray-100 shadow-sm">
+                        <h3 class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Dirección</h3>
+                        <p id="inmDireccion" class="text-[12px] font-extrabold text-gray-800 leading-relaxed uppercase">
+                            -
+                        </p>
+                    </div>
+
+                    <!-- Información General (Badges de 4 elementos) -->
+                    <div class="grid grid-cols-2 gap-4">
+                        <!-- Metros Utilizados -->
+                        <div class="bg-[#10312B] text-white p-4 rounded-2xl shadow-sm border border-[#10312B]/30 flex flex-col justify-between">
+                            <span class="text-[8px] font-black uppercase tracking-widest text-emerald-400/80 mb-2">Metros Útiles</span>
+                            <span id="inmMetros" class="text-base font-black truncate leading-none">-</span>
+                        </div>
+                        <!-- Niveles -->
+                        <div class="bg-white/80 backdrop-blur-md p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
+                            <span class="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-2">Niveles</span>
+                            <span id="inmNiveles" class="text-base font-black text-gray-800 leading-none">-</span>
+                        </div>
+                        <!-- Año de Construcción -->
+                        <div class="bg-white/80 backdrop-blur-md p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
+                            <span class="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-2">Año Construcción</span>
+                            <span id="inmAnioConst" class="text-base font-black text-[#611232] leading-none">-</span>
+                        </div>
+                        <!-- Fecha de Ocupación -->
+                        <div class="bg-[#611232] text-white p-4 rounded-2xl shadow-sm border border-[#611232]/30 flex flex-col justify-between">
+                            <span class="text-[8px] font-black uppercase tracking-widest text-rose-300/80 mb-2">Fecha Ocupación</span>
+                            <span id="inmFechaOcu" class="text-xs font-black truncate leading-none">-</span>
+                        </div>
+                    </div>
+
+                    <!-- Figura de Ocupación -->
+                    <div class="bg-white/80 backdrop-blur-md p-5 rounded-[2rem] border border-gray-100 shadow-sm">
+                        <h3 class="text-[11px] font-black text-gray-800 uppercase tracking-[0.1em] mb-3 flex items-center">
+                            <span class="w-1.5 h-1.5 bg-[#611232] rounded-full mr-2"></span>
+                            Figura de Ocupación
+                        </h3>
+                        <div class="flex gap-3">
+                            <div id="figArrendado" class="flex-1 flex flex-col items-center p-3 rounded-2xl border border-gray-100 bg-gray-50/50 opacity-30 grayscale transition-all duration-300">
+                                <img src="/static/mapa/icons_inmueble/icon_arrendado.svg" alt="Arrendado" class="w-8 h-8 object-contain mb-1.5">
+                                <span class="text-[8px] uppercase tracking-wider">ARRENDADO</span>
+                            </div>
+                            <div id="figPropio" class="flex-1 flex flex-col items-center p-3 rounded-2xl border border-gray-100 bg-gray-50/50 opacity-30 grayscale transition-all duration-300">
+                                <img src="/static/mapa/icons_inmueble/icon_propio.svg" alt="Propio" class="w-8 h-8 object-contain mb-1.5">
+                                <span class="text-[8px] uppercase tracking-wider">PROPIO</span>
+                            </div>
+                            <div id="figTerreno" class="flex-1 flex flex-col items-center p-3 rounded-2xl border border-gray-100 bg-gray-50/50 opacity-30 grayscale transition-all duration-300">
+                                <img src="/static/mapa/icons_inmueble/icon_terreno.svg" alt="Terreno" class="w-8 h-8 object-contain mb-1.5">
+                                <span class="text-[8px] uppercase tracking-wider">TERRENO</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Monto de Renta -->
+                    <div id="inmRentaCard" class="bg-white/80 backdrop-blur-md p-4 rounded-[2rem] border border-gray-100 shadow-sm flex items-center gap-4 transition-all duration-300">
+                        <div class="w-11 h-11 bg-emerald-50 rounded-xl flex items-center justify-center border border-emerald-100 flex-shrink-0">
+                            <img src="/static/mapa/icons_inmueble/icon_renta.svg" alt="Renta" class="w-6 h-6 object-contain">
+                        </div>
+                        <div class="flex-grow">
+                            <h4 class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-0.5">Monto de Renta</h4>
+                            <span id="inmRentaMonto" class="text-lg font-black text-emerald-600 leading-none">-</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Footer Logo Pattern -->
+            <div class="relative z-10 w-full h-8 pointer-events-none mt-auto" 
+                 style="background-image: url('{% static 'mapa/fondos/patron_cere.svg' %}'); background-size: cover; background-position: bottom;">
+            </div>
+
         </div>
     </div>
 </main>

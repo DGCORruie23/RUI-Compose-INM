@@ -10,7 +10,7 @@ from .models import (Estado, Nacionalidad, Repatriados, Recibidos,
                     PRHs, Titular, Estudio, GradoAcademico, TelefonoTitular, CorreoTitular, 
                     TipoNombramiento, TrayectoriaLaboral, ExperienciaProfesional, TipoProcendencia,
                     Comodato, FiguraOcupacion, TipoInmueble, SituacionActual, TipoActividad, Inmueble, HistoricoComentarios, TipoOficina,
-                    ProgramaIPC)
+                    ProgramaIPC, PersonalINM, OrganigramaF)
 from usuarioL.models import usuarioL
 
 from datetime import datetime
@@ -665,6 +665,438 @@ def eliminar_titular(request, titular_id):
         messages.error(request, f"Error al eliminar titular: {str(e)}")
     
     return redirect('titulares_list')
+
+
+def personal_list(request):
+    """Vista para la gestión independiente del Personal INM."""
+    user_state = get_user_state(request)
+    
+    if user_state:
+        estados_list = [user_state]
+        personal_list = PersonalINM.objects.filter(estado=user_state).order_by('estado__nombre', 'nombre')
+        inmuebles_list = Inmueble.objects.filter(estado=user_state).order_by('nombre_inmueble')
+    else:
+        estados_list = Estado.objects.all().order_by('nombre')
+        personal_list = PersonalINM.objects.all().order_by('estado__nombre', 'nombre')
+        inmuebles_list = Inmueble.objects.all().order_by('nombre_inmueble')
+
+    return render(request, 'mapa/personal_list.html', {
+        'estados_list': estados_list,
+        'actividades_list': TipoActividad.objects.all().order_by('nombre'),
+        'inmuebles_list': inmuebles_list,
+        'personal_list': personal_list,
+    })
+
+
+def api_get_personal(request, personal_id):
+    """Retorna los datos de un personal en formato JSON para edición."""
+    try:
+        user_state = get_user_state(request)
+        personal = PersonalINM.objects.get(id=personal_id)
+        
+        # Validación de seguridad
+        if user_state and personal.estado != user_state:
+            return JsonResponse({'status': 'error', 'message': 'Sin permisos'}, status=403)
+            
+        data = {
+            'id': personal.id,
+            'estado_id': personal.estado_id,
+            'estatus': personal.estatus,
+            'tipo_plaza': personal.tipo_plaza,
+            'codigo_plaza': personal.codigo_plaza,
+            'nivel': personal.nivel,
+            'num_empleado': personal.num_empleado or '',
+            'nombre': personal.nombre or '',
+            'apellido': personal.apellido or '',
+            'tipo_movimiento': personal.tipo_movimiento,
+            'fecha_ingreso_inm': personal.fecha_ingreso_inm.isoformat() if personal.fecha_ingreso_inm else None,
+            'fecha_ingreso_plaza': personal.fecha_ingreso_plaza.isoformat() if personal.fecha_ingreso_plaza else None,
+            'vig_inicio_mov': personal.vig_inicio_mov.isoformat() if personal.vig_inicio_mov else None,
+            'vig_termino_mov': personal.vig_termino_mov.isoformat() if personal.vig_termino_mov else None,
+            'puesto_especifico': personal.puesto_especifico,
+            'sueldo_bruto': personal.sueldo_bruto,
+            'sueldo_neto': personal.sueldo_neto,
+            'actividad_id': personal.actividad_id or '',
+            'jefe_oficina': personal.jefe_oficina,
+            'lugar_asignado_id': personal.lugar_asignado_id or '',
+        }
+        return JsonResponse({'status': 'success', 'data': data})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
+
+@transaction.atomic
+def eliminar_personal(request, personal_id):
+    """Elimina un registro de personal."""
+    try:
+        user_state = get_user_state(request)
+        personal = PersonalINM.objects.get(id=personal_id)
+        
+        # Validación de seguridad
+        if user_state and personal.estado != user_state:
+            messages.error(request, "No tienes permisos para eliminar este registro.")
+            return redirect('personal_list')
+            
+        nombre = f"{personal.nombre or ''} {personal.apellido or ''}"
+        personal.delete()
+        messages.success(request, f"Registro de {nombre} eliminado correctamente.")
+    except Exception as e:
+        messages.error(request, f"Error al eliminar registro: {str(e)}")
+    
+    return redirect('personal_list')
+
+
+@transaction.atomic
+def guardar_personal(request):
+    if request.method != 'POST':
+        return redirect('personal_list')
+    
+    user_state = get_user_state(request)
+    
+    try:
+        personal_id = request.POST.get('personal_id')
+        estado_id = request.POST.get('estado_id')
+        
+        # Validación de seguridad: el estado enviado debe coincidir con el del usuario
+        if user_state and str(user_state.id) != str(estado_id):
+            raise PermissionError("No tienes permisos para registrar personal en este estado.")
+
+        # Parsear floats y fechas opcionales
+        sueldo_bruto = request.POST.get('sueldo_bruto') or None
+        if sueldo_bruto:
+            sueldo_bruto = float(sueldo_bruto)
+            
+        sueldo_neto = request.POST.get('sueldo_neto') or None
+        if sueldo_neto:
+            sueldo_neto = float(sueldo_neto)
+
+        defaults = {
+            'estado_id': estado_id,
+            'estatus': request.POST.get('estatus') == 'on',
+            'tipo_plaza': request.POST.get('tipo_plaza'),
+            'codigo_plaza': request.POST.get('codigo_plaza', '').strip().upper(),
+            'nivel': request.POST.get('nivel', '').strip().upper(),
+            'num_empleado': request.POST.get('num_empleado', '').strip().upper() or None,
+            'nombre': normalizar_nombre(request.POST.get('nombre', '')),
+            'apellido': normalizar_nombre(request.POST.get('apellido', '')),
+            'tipo_movimiento': request.POST.get('tipo_movimiento') == 'on',
+            'fecha_ingreso_inm': request.POST.get('fecha_ingreso_inm') or None,
+            'fecha_ingreso_plaza': request.POST.get('fecha_ingreso_plaza') or None,
+            'vig_inicio_mov': request.POST.get('vig_inicio_mov') or None,
+            'vig_termino_mov': request.POST.get('vig_termino_mov') or None,
+            'puesto_especifico': normalizar_nombre(request.POST.get('puesto_especifico', '')),
+            'sueldo_bruto': sueldo_bruto,
+            'sueldo_neto': sueldo_neto,
+            'actividad_id': request.POST.get('actividad_id') or None,
+            'jefe_oficina': request.POST.get('jefe_oficina') == 'on',
+            'lugar_asignado_id': request.POST.get('lugar_asignado_id') or None,
+        }
+
+        if personal_id:
+            personal = PersonalINM.objects.get(id=personal_id)
+            if user_state and personal.estado != user_state:
+                raise PermissionError("No tienes permisos para modificar este registro.")
+            for key, val in defaults.items():
+                setattr(personal, key, val)
+            personal.save()
+            messages.success(request, "Registro de personal actualizado correctamente.")
+        else:
+            PersonalINM.objects.create(**defaults)
+            messages.success(request, "Nuevo personal registrado correctamente.")
+            
+    except Exception as e:
+        messages.error(request, f"Error al guardar personal: {str(e)}")
+        
+    return redirect('personal_list')
+
+
+@transaction.atomic
+def carga_rapida_personal(request):
+    if request.method != 'POST':
+        return redirect('personal_list')
+        
+    excel_file = request.FILES.get('excel_file')
+    if not excel_file:
+        messages.error(request, "No se ha proporcionado ningún archivo.")
+        return redirect('personal_list')
+        
+    if not excel_file.name.endswith(('.xlsx', '.xls')):
+        messages.error(request, "El archivo debe ser un Excel (.xlsx o .xls).")
+        return redirect('personal_list')
+        
+    user_state = get_user_state(request)
+    
+    try:
+        wb = openpyxl.load_workbook(excel_file, data_only=True)
+        sheet = wb.active
+        
+        # Encontrar la fila de encabezados. Buscaremos la primera fila que contenga 'STATUS' o 'CODIGO-PLAZA'
+        headers = []
+        header_row_idx = None
+        
+        # Recorremos las primeras 20 filas para encontrar los encabezados
+        for r in range(1, 21):
+            row_vals = [str(cell.value or '').strip().upper() for cell in sheet[r]]
+            if 'STATUS' in row_vals or 'CODIGO-PLAZA\nNUEVO' in row_vals or 'CODIGO-PLAZA NUEVO' in row_vals or 'CODIGO-PLAZA' in row_vals:
+                headers = [str(cell.value or '').strip() for cell in sheet[r]]
+                header_row_idx = r
+                break
+                
+        if not header_row_idx:
+            # Fallback a la fila 8, que era el estándar observado
+            header_row_idx = 8
+            headers = [str(cell.value or '').strip() for cell in sheet[8]]
+            
+        # Normalizar nombres de columnas a claves consistentes
+        col_mapping = {}
+        for idx, h in enumerate(headers):
+            h_norm = normalizar_nombre(h).replace('\n', ' ').strip()
+            if 'STATUS' in h_norm:
+                col_mapping['status'] = idx
+            elif 'TIPO DE PLAZA' in h_norm:
+                col_mapping['tipo_plaza'] = idx
+            elif 'ADSCRIPCION' in h_norm or 'ESTADO' in h_norm:
+                col_mapping['adscripcion'] = idx
+            elif 'CODIGO' in h_norm or 'PLAZA' in h_norm:
+                col_mapping['codigo_plaza'] = idx
+            elif 'NIVEL' in h_norm:
+                col_mapping['nivel'] = idx
+            elif 'NUM EMP' in h_norm or 'NUM_EMP' in h_norm or 'EMPLEADO' in h_norm:
+                col_mapping['num_empleado'] = idx
+            elif 'NOMBRE' in h_norm:
+                col_mapping['nombre'] = idx
+            elif 'MOVIMIENTO' in h_norm:
+                col_mapping['tipo_movimiento'] = idx
+            elif 'FECHA DE ING. INM' in h_norm or 'FECHA ING INM' in h_norm or 'ING. INM' in h_norm:
+                col_mapping['fecha_ingreso_inm'] = idx
+            elif 'FECHA DE ING A LA PLAZA' in h_norm or 'FECHA ING PLAZA' in h_norm or 'ING A LA PLAZA' in h_norm or 'FECHA_INGRESO_PLAZA' in h_norm or 'FECHA INGRESO PLAZA' in h_norm:
+                col_mapping['fecha_ingreso_plaza'] = idx
+            elif 'VIG. DE INICIO' in h_norm or 'INICIO MOV' in h_norm:
+                col_mapping['vig_inicio_mov'] = idx
+            elif 'VIG. DE TERMINO' in h_norm or 'TERMINO MOV' in h_norm:
+                col_mapping['vig_termino_mov'] = idx
+            elif 'PUESTO' in h_norm:
+                col_mapping['puesto_especifico'] = idx
+            elif 'SUELDO BRUTO' in h_norm:
+                col_mapping['sueldo_bruto'] = idx
+            elif 'SUELDO NETO' in h_norm:
+                col_mapping['sueldo_neto'] = idx
+            elif 'JEFE' in h_norm:
+                col_mapping['jefe_oficina'] = idx
+            elif 'LUGAR' in h_norm or 'INMUEBLE' in h_norm or 'UBICACION' in h_norm or 'ASIGNADO' in h_norm:
+                col_mapping['lugar_asignado'] = idx
+                
+        # Asegurarnos de que tenemos las columnas críticas
+        if 'codigo_plaza' not in col_mapping:
+            messages.error(request, "No se encontró la columna de Código de Plaza en el Excel.")
+            return redirect('personal_list')
+            
+        # Helpers para limpiar y parsear datos de celda
+        def parse_str(val):
+            if val is None: return None
+            val_s = str(val).strip()
+            if val_s in ('...', '..', '-', '', 'None'): return None
+            return val_s
+            
+        def parse_date(val):
+            if not val: return None
+            if isinstance(val, (datetime, date)):
+                return val if isinstance(val, date) else val.date()
+            val_s = str(val).strip()
+            if val_s in ('...', '..', '-', '', 'None'): return None
+            for fmt in ('%Y-%m-%d %H:%M:%S', '%Y-%m-%d', '%d/%m/%Y', '%d-%m-%Y'):
+                try:
+                    return datetime.strptime(val_s, fmt).date()
+                except ValueError:
+                    continue
+            return None
+            
+        def parse_float(val):
+            if val is None: return None
+            val_s = str(val).strip()
+            if val_s in ('...', '..', '-', '', 'None'): return None
+            try:
+                return float(val_s)
+            except ValueError:
+                return None
+
+        # Pre-cargar Estados para optimizar
+        estados_dict = {normalizar_nombre(e.nombre): e for e in Estado.objects.all()}
+        
+        def find_estado(adscripcion_val):
+            if not adscripcion_val: return None
+            clean = adscripcion_val.strip().upper()
+            for prefix in ["O.R. ", "O.R.", "OR.", "OR "]:
+                if clean.startswith(prefix):
+                    clean = clean[len(prefix):].strip()
+            if clean in ("DISTRITO FEDERAL", "DF"):
+                clean = "CIUDAD DE MEXICO"
+            clean_norm = normalizar_nombre(clean)
+            if clean_norm in estados_dict:
+                return estados_dict[clean_norm]
+            for est_norm, est in estados_dict.items():
+                if est_norm in clean_norm or clean_norm in est_norm:
+                    return est
+            return None
+
+        creados = 0
+        actualizados = 0
+        omitidos = 0
+        
+        for r in range(header_row_idx + 1, sheet.max_row + 1):
+            row_cells = list(sheet[r])
+            if not any(cell.value for cell in row_cells):
+                continue
+                
+            def get_cell_val(key):
+                if key in col_mapping:
+                    idx = col_mapping[key]
+                    if idx < len(row_cells):
+                        return row_cells[idx].value
+                return None
+                
+            codigo_plaza = parse_str(get_cell_val('codigo_plaza'))
+            if not codigo_plaza:
+                continue
+                
+            codigo_plaza = codigo_plaza.upper()
+            
+            adscripcion = parse_str(get_cell_val('adscripcion'))
+            row_estado = find_estado(adscripcion)
+            
+            if user_state:
+                if row_estado and row_estado != user_state:
+                    omitidos += 1
+                    continue
+                row_estado = user_state
+            
+            if not row_estado:
+                omitidos += 1
+                continue
+                
+            estatus_raw = str(get_cell_val('status') or '').strip().upper()
+            if estatus_raw == 'ACTIVO':
+                estatus = True
+            elif estatus_raw == 'VACANTE':
+                estatus = False
+            else:
+                estatus = None
+                
+            tipo_plaza = parse_str(get_cell_val('tipo_plaza'))
+            if tipo_plaza:
+                tipo_plaza = tipo_plaza.upper()
+                if tipo_plaza not in ['CONFIANZA', 'BASE']:
+                    tipo_plaza = 'CONFIANZA'
+            else:
+                tipo_plaza = 'CONFIANZA'
+                
+            nivel = parse_str(get_cell_val('nivel')) or 'N/A'
+            nivel = nivel.upper()
+            
+            puesto_especifico = parse_str(get_cell_val('puesto_especifico')) or 'SIN PUESTO'
+            puesto_especifico = normalizar_nombre(puesto_especifico)
+            
+            sueldo_bruto = parse_float(get_cell_val('sueldo_bruto'))
+            sueldo_neto = parse_float(get_cell_val('sueldo_neto'))
+            
+            num_empleado = None
+            nombre = None
+            apellido = None
+            tipo_movimiento = None
+            fecha_ingreso_inm = None
+            fecha_ingreso_plaza = None
+            vig_inicio_mov = None
+            vig_termino_mov = None
+            
+            if estatus is not False:
+                num_empleado = parse_str(get_cell_val('num_empleado'))
+                
+                full_name = parse_str(get_cell_val('nombre'))
+                if full_name:
+                    parts = full_name.split()
+                    if len(parts) >= 3:
+                        apellido = " ".join(parts[:2])
+                        nombre = " ".join(parts[2:])
+                    elif len(parts) == 2:
+                        apellido = parts[0]
+                        nombre = parts[1]
+                    else:
+                        nombre = full_name
+                        apellido = ""
+                    nombre = normalizar_nombre(nombre)
+                    apellido = normalizar_nombre(apellido)
+                
+                mov_raw = parse_str(get_cell_val('tipo_movimiento'))
+                if mov_raw:
+                    mov_norm = mov_raw.strip().upper()
+                    if mov_norm == 'DEFINITIVO':
+                        tipo_movimiento = True
+                    elif mov_norm == 'INTERINO':
+                        tipo_movimiento = False
+                    else:
+                        tipo_movimiento = None
+                else:
+                    tipo_movimiento = None
+                    
+                fecha_ingreso_inm = parse_date(get_cell_val('fecha_ingreso_inm'))
+                fecha_ingreso_plaza = parse_date(get_cell_val('fecha_ingreso_plaza'))
+                vig_inicio_mov = parse_date(get_cell_val('vig_inicio_mov'))
+                vig_termino_mov = parse_date(get_cell_val('vig_termino_mov'))
+                
+            # jefe_oficina se mantiene en False en la carga de Excel, preservando el valor si el registro ya existe
+            existing_pers = PersonalINM.objects.filter(codigo_plaza=codigo_plaza).first()
+            if existing_pers:
+                jefe_oficina = existing_pers.jefe_oficina
+            else:
+                jefe_oficina = False
+                    
+            lugar_asignado = None
+            if 'lugar_asignado' in col_mapping:
+                lugar_raw = parse_str(get_cell_val('lugar_asignado'))
+                if lugar_raw:
+                    lugar_asignado = Inmueble.objects.filter(estado=row_estado, nombre_inmueble__icontains=lugar_raw).first()
+            
+            if not lugar_asignado:
+                lugar_asignado = Inmueble.objects.filter(estado=row_estado).first()
+            if not lugar_asignado:
+                lugar_asignado = Inmueble.objects.first()
+
+            defaults = {
+                'estado': row_estado,
+                'estatus': estatus,
+                'tipo_plaza': tipo_plaza,
+                'nivel': nivel,
+                'num_empleado': num_empleado,
+                'nombre': nombre,
+                'apellido': apellido,
+                'tipo_movimiento': tipo_movimiento,
+                'fecha_ingreso_inm': fecha_ingreso_inm,
+                'fecha_ingreso_plaza': fecha_ingreso_plaza,
+                'vig_inicio_mov': vig_inicio_mov,
+                'vig_termino_mov': vig_termino_mov,
+                'puesto_especifico': puesto_especifico,
+                'sueldo_bruto': sueldo_bruto,
+                'sueldo_neto': sueldo_neto,
+                'jefe_oficina': jefe_oficina,
+                'lugar_asignado': lugar_asignado,
+            }
+            
+            personal_obj, created = PersonalINM.objects.update_or_create(
+                codigo_plaza=codigo_plaza,
+                defaults=defaults
+            )
+            
+            if created:
+                creados += 1
+            else:
+                actualizados += 1
+                
+        messages.success(request, f"Carga rápida completada: {creados} creados, {actualizados} actualizados, {omitidos} omitidos.")
+    except Exception as e:
+        messages.error(request, f"Error al procesar el archivo Excel: {str(e)}")
+        
+    return redirect('personal_list')
+
 
 @transaction.atomic
 def guardar_titular(request):
@@ -1652,6 +2084,7 @@ def mapa_interactivo(request):
     # Estructura base para todos los estados
     for edo in Estado.objects.all():
         infra_data[normalizar_nombre(edo.nombre)] = {
+            'estado_id': edo.id,
             'AEREO': 0, 'MARITIMO': 0, 'TERRESTRE': 0, 'ESTACION': 0,
             'PRH': 0,
             'titular': 'Sin titular asignado',
@@ -1684,6 +2117,7 @@ def mapa_interactivo(request):
 
     # Totales Nacionales
     infra_data[LABEL_NACIONAL] = {
+        'estado_id': None,
         'AEREO': PuntosInternacionEstacion.objects.filter(tipo='AEREO').count(),
         'MARITIMO': PuntosInternacionEstacion.objects.filter(tipo='MARITIMO').count(),
         'TERRESTRE': PuntosInternacionEstacion.objects.filter(tipo='TERRESTRE').count(),
@@ -1768,6 +2202,7 @@ def mapa_interactivo(request):
     inmuebles_pts_data = []
     for pt in inmuebles_objs:
         inmuebles_pts_data.append({
+            'id': pt.id,
             'x': float(pt.longitud) if pt.longitud else 0,
             'y': float(pt.latitud) if pt.latitud else 0,
             'nombre': pt.nombre_inmueble,
@@ -2036,5 +2471,224 @@ def api_guardar_comodato(request):
         return JsonResponse({'status': 'success', 'data': {'id': comodato.id, 'nombre': comodato.nombre}})
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
+
+def organigramas_list(request):
+    """Vista para la gestión de Organigramas por Estado."""
+    user_state = get_user_state(request)
+    
+    if user_state:
+        estados_list = [user_state]
+        organigramas = OrganigramaF.objects.filter(estado=user_state).order_by('estado__nombre')
+    else:
+        estados_list = Estado.objects.all().order_by('nombre')
+        organigramas = OrganigramaF.objects.all().order_by('estado__nombre')
+
+    return render(request, 'mapa/organigramas.html', {
+        'estados_list': estados_list,
+        'organigramas_list': organigramas,
+    })
+
+
+@transaction.atomic
+def guardar_organigrama(request):
+    """Crea o actualiza la Estructura Orgánica para un Estado."""
+    if request.method != 'POST':
+        return redirect('organigramas_list')
+        
+    user_state = get_user_state(request)
+    
+    try:
+        estado_id = request.POST.get('estado_id')
+        vigencia = request.POST.get('vigencia') or None
+        archivo = request.FILES.get('archivo')
+        
+        # Seguridad: verificar que coincida con el estado del usuario si no es superusuario
+        if user_state and str(user_state.id) != str(estado_id):
+            raise PermissionError("No tienes permisos para registrar la Estructura Orgánica en este estado.")
+            
+        defaults = {
+            'vigencia': vigencia,
+        }
+        if archivo:
+            defaults['archivo'] = archivo
+            
+        OrganigramaF.objects.update_or_create(
+            estado_id=estado_id,
+            defaults=defaults
+        )
+        
+        messages.success(request, "Estructura Orgánica guardada correctamente.")
+    except Exception as e:
+        messages.error(request, f"Error al guardar la Estructura Orgánica: {str(e)}")
+        
+    return redirect('organigramas_list')
+
+
+@transaction.atomic
+def eliminar_organigrama(request, org_id):
+    """Elimina la Estructura Orgánica de un Estado."""
+    try:
+        user_state = get_user_state(request)
+        org = OrganigramaF.objects.get(id=org_id)
+        
+        if user_state and org.estado != user_state:
+            messages.error(request, "No tienes permisos para eliminar este registro.")
+            return redirect('organigramas_list')
+            
+        estado_nombre = org.estado.nombre
+        org.delete()
+        messages.success(request, f"Estructura Orgánica de {estado_nombre} eliminada correctamente.")
+    except Exception as e:
+        messages.error(request, f"Error al eliminar registro: {str(e)}")
+        
+    return redirect('organigramas_list')
+
+
+def api_get_organigrama(request, estado_id):
+    """Retorna la información del organigrama de un estado en formato JSON."""
+    try:
+        org = OrganigramaF.objects.get(estado_id=estado_id)
+        return JsonResponse({
+            'status': 'success',
+            'data': {
+                'pdf_url': org.archivo.url if org.archivo else '',
+                'vigencia': org.vigencia.strftime('%d/%m/%Y') if org.vigencia else 'Sin vigencia'
+            }
+        })
+    except OrganigramaF.DoesNotExist:
+        return JsonResponse({
+            'status': 'error',
+            'message': 'No hay organigrama cargado para este estado.'
+        })
+
+
+def api_get_inmueble_detalle(request, inmueble_id):
+    """Retorna toda la información detallada de un inmueble en formato JSON para el modal interactivo."""
+    try:
+        inmueble = Inmueble.objects.select_related('estado', 'figura_ocupacion', 'comodato').get(id=inmueble_id)
+        
+        # 1. Jefe de Oficina
+        jefe = PersonalINM.objects.filter(lugar_asignado=inmueble, jefe_oficina=True).first()
+        if jefe:
+            nombre_jefe = f"{jefe.nombre or ''} {jefe.apellido or ''}".strip()
+            if not nombre_jefe:
+                nombre_jefe = "S/D"
+        else:
+            nombre_jefe = "S/D"
+            
+        # 2. Personal conteo
+        personal_qs = PersonalINM.objects.filter(lugar_asignado=inmueble)
+        total_personal = personal_qs.count()
+        activos = personal_qs.filter(estatus=True).count()
+        inactivos = total_personal - activos
+        
+        # 3. PIPC (Programa IPC)
+        pipc = inmueble.pipc.first()
+        fecha_inm_str = "sin programa"
+        fecha_comodante_str = "sin programa"
+        fecha_inicio_plan_str = "sin programa"
+        
+        if pipc:
+            if pipc.inm_pipc and pipc.fecha_inm:
+                fecha_inm_str = pipc.fecha_inm.strftime('%d/%m/%Y')
+            if pipc.comodante_pipc and pipc.fecha_comodante:
+                fecha_comodante_str = pipc.fecha_comodante.strftime('%d/%m/%Y')
+            if pipc.plan_emergencia and pipc.fecha_inicio_plan:
+                fecha_inicio_plan_str = pipc.fecha_inicio_plan.strftime('%d/%m/%Y')
+
+        # 4. Dirección completa
+        num_ext = f"No. {inmueble.numero_exterior}" if inmueble.numero_exterior else "S/N"
+        num_int = f" Int. {inmueble.numero_interior}" if inmueble.numero_interior and inmueble.numero_interior.strip() != "" else ""
+        colonia = f", Col. {inmueble.colonia}" if inmueble.colonia else ""
+        municipio = f", {inmueble.municipio}" if inmueble.municipio else ""
+        cp = f", C.P. {inmueble.codigo_postal}" if inmueble.codigo_postal else ""
+        estado_nombre = inmueble.estado.nombre
+        
+        direccion_completa = f"{inmueble.calle or ''} {num_ext}{num_int}{colonia}{municipio}{cp}, {estado_nombre}".strip()
+        
+        # 5. General info
+        superficie_util = inmueble.superficie_utilizada if inmueble.superficie_utilizada else 0.0
+        niveles = inmueble.numero_de_niveles if inmueble.numero_de_niveles is not None else 0
+        anio_const = inmueble.anio_construccion.strftime('%Y') if inmueble.anio_construccion else "S/D"
+        fecha_ocu = inmueble.fecha_ocupacion.strftime('%d/%m/%Y') if inmueble.fecha_ocupacion else "S/D"
+        
+        # 6. Figura de Ocupación
+        figura_tipo = inmueble.figura_ocupacion.tipo.upper() if inmueble.figura_ocupacion else ""
+        
+        arrendado_activo = "ARRENDADO" in figura_tipo
+        propio_activo = "PROPIO" in figura_tipo
+        terreno_activo = "TERRENO" in figura_tipo
+        
+        # 7. Renta
+        renta_str = "S/D"
+        if arrendado_activo and inmueble.monto_renta is not None:
+            renta_str = f"${inmueble.monto_renta:,.2f}"
+            
+        # 8. Tipos de Oficina (las que tiene asignadas el inmueble)
+        oficinas_asignadas = list(inmueble.tipo_oficina.values_list('nombre', flat=True))
+        
+        # 9. Actividades (todas y marcar activas)
+        actividades_all = TipoActividad.objects.all().order_by('nombre')
+        actividades_data = []
+        for act in actividades_all:
+            is_active = inmueble.tipo_actividad.filter(id=act.id).exists()
+            actividades_data.append({
+                'id': act.id,
+                'nombre': act.nombre,
+                'activo': is_active
+            })
+            
+        data = {
+            'id': inmueble.id,
+            'nombre_inmueble': inmueble.nombre_inmueble,
+            'estado_nombre': estado_nombre,
+            'nombre_jefe': nombre_jefe,
+            'personal': {
+                'total': total_personal,
+                'activos': activos,
+                'inactivos': inactivos
+            },
+            'vehiculos': {
+                'total': "S/D",
+                'activos': "S/D",
+                'inactivos': "S/D"
+            },
+            'pipc': {
+                'fecha_inm': fecha_inm_str,
+                'fecha_comodante': fecha_comodante_str,
+                'fecha_inicio_plan': fecha_inicio_plan_str
+            },
+            'direccion_completa': direccion_completa,
+            'superficie_utilizada': f"{superficie_util:,.2f}" if superficie_util else "0.00",
+            'numero_de_niveles': niveles,
+            'anio_construccion': anio_const,
+            'fecha_ocupacion': fecha_ocu,
+            'figura_ocupacion': {
+                'tipo': figura_tipo,
+                'arrendado_activo': arrendado_activo,
+                'propio_activo': propio_activo,
+                'terreno_activo': terreno_activo
+            },
+            'renta': renta_str,
+            'oficinas_asignadas': oficinas_asignadas,
+            'actividades': actividades_data
+        }
+        
+        return JsonResponse({
+            'status': 'success',
+            'data': data
+        })
+    except Inmueble.DoesNotExist:
+        return JsonResponse({
+            'status': 'error',
+            'message': 'El inmueble solicitado no existe.'
+        }, status=404)
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
+
 
 
