@@ -2619,6 +2619,7 @@ def api_get_inmueble_detalle(request, inmueble_id):
         arrendado_activo = "ARRENDADO" in figura_tipo
         propio_activo = "PROPIO" in figura_tipo
         terreno_activo = "TERRENO" in figura_tipo
+        comodato_activo = "COMODATO" in figura_tipo
         
         # 7. Renta
         renta_str = "S/D"
@@ -2668,7 +2669,8 @@ def api_get_inmueble_detalle(request, inmueble_id):
                 'tipo': figura_tipo,
                 'arrendado_activo': arrendado_activo,
                 'propio_activo': propio_activo,
-                'terreno_activo': terreno_activo
+                'terreno_activo': terreno_activo,
+                'comodato_activo': comodato_activo
             },
             'renta': renta_str,
             'oficinas_asignadas': oficinas_asignadas,

@@ -23,15 +23,16 @@ urlpatterns = [
     path('guardar-personal', views.guardar_personal, name="guardar_personal"),
     path('eliminar-personal/<int:personal_id>', views.eliminar_personal, name="eliminar_personal"),
     path('api/get-personal/<int:personal_id>', views.api_get_personal, name="api_get_personal"),
+
     path('inmuebles', views.inmuebles_list, name="inmuebles_list"),
     path('guardar-inmueble', views.guardar_inmueble, name="guardar_inmueble"),
     path('eliminar-inmueble/<int:inmueble_id>', views.eliminar_inmueble, name="eliminar_inmueble"),
     path('api/get-inmueble/<int:inmueble_id>', views.api_get_inmueble, name="api_get_inmueble"),
     path('api/guardar-comodato', views.api_guardar_comodato, name="api_guardar_comodato"),
+    path('api/get-inmueble-detalle/<int:inmueble_id>', views.api_get_inmueble_detalle, name="api_get_inmueble_detalle"),
     
     path('organigramas', views.organigramas_list, name="organigramas_list"),
     path('guardar-organigrama', views.guardar_organigrama, name="guardar_organigrama"),
     path('eliminar-organigrama/<int:org_id>', views.eliminar_organigrama, name="eliminar_organigrama"),
     path('api/get-organigrama/<int:estado_id>', views.api_get_organigrama, name="api_get_organigrama"),
-    path('api/get-inmueble-detalle/<int:inmueble_id>', views.api_get_inmueble_detalle, name="api_get_inmueble_detalle"),
 ]
