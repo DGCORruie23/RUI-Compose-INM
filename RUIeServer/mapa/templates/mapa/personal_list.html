@@ -6,6 +6,22 @@
 {% block scripts %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
+    function excelSerialToDateString(serial) {
+        if (isNaN(serial) || serial === null || serial === undefined || serial === '') return null;
+        const s = parseFloat(serial);
+        const baseDate = new Date(Date.UTC(1899, 11, 30));
+        const date = new Date(baseDate.getTime() + s * 86400000);
+        const yyyy = date.getUTCFullYear();
+        const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
+        const dd = String(date.getUTCDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+    }
+
+    function normalizar_nombre(text) {
+        if (!text) return "";
+        return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+    }
+
     function openPersonalModal() {
         const modal = document.getElementById('personalModal');
         modal.classList.remove('hidden');
@@ -195,14 +211,25 @@
         reader.onload = async function(e) {
             try {
                 const data = new Uint8Array(e.target.result);
-                const workbook = XLSX.read(data, { type: 'array' });
+                // Parse Excel sheets including cell dates as JS Date objects where formatted as such in Excel
+                const workbook = XLSX.read(data, { type: 'array', cellDates: true });
                 const sheetName = workbook.SheetNames[0];
                 const sheet = workbook.Sheets[sheetName];
                 
-                // Convert sheet to 2D array of rows, formatting cell values as strings exactly as displayed in Excel
-                const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false });
+                // Get range of sheet to iterate cells directly, preventing empty column index shifting!
+                const range = XLSX.utils.decode_range(sheet['!ref']);
+                const allRows = [];
+                for (let r = range.s.r; r <= range.e.r; r++) {
+                    const rowCells = [];
+                    for (let c = range.s.c; c <= range.e.c; c++) {
+                        const cellRef = XLSX.utils.encode_cell({ r: r, c: c });
+                        const cell = sheet[cellRef];
+                        rowCells.push(cell || null);
+                    }
+                    allRows.push(rowCells);
+                }
                 
-                if (rows.length === 0) {
+                if (allRows.length === 0) {
                     alert('El archivo Excel está vacío.');
                     resetUploadModal();
                     return;
@@ -212,11 +239,18 @@
                 let headers = [];
                 let headerRowIdx = -1;
                 
-                for (let r = 0; r < Math.min(20, rows.length); r++) {
-                    if (!rows[r]) continue;
-                    const rowVals = rows[r].map(v => String(v || '').trim().toUpperCase());
-                    if (rowVals.includes('STATUS') || rowVals.some(v => v.includes('PLAZA') || v.includes('CODIGO'))) {
-                        headers = rows[r].map(v => String(v || '').trim());
+                for (let r = 0; r < Math.min(20, allRows.length); r++) {
+                    const rowCells = allRows[r];
+                    if (!rowCells) continue;
+                    const rowVals = rowCells.map(cell => {
+                        const val = cell ? (cell.w !== undefined ? cell.w : cell.v) : '';
+                        return String(val || '').trim().toUpperCase();
+                    });
+                    if (rowVals.includes('STATUS') || rowVals.some(v => v.includes('CODIGO'))) {
+                        headers = rowCells.map(cell => {
+                            const val = cell ? (cell.w !== undefined ? cell.w : cell.v) : '';
+                            return String(val || '').trim();
+                        });
                         headerRowIdx = r;
                         break;
                     }
@@ -224,27 +258,107 @@
                 
                 if (headerRowIdx === -1) {
                     // Fallback to row 8 (index 7)
-                    headerRowIdx = Math.min(7, rows.length - 1);
-                    if (rows[headerRowIdx]) {
-                        headers = rows[headerRowIdx].map(v => String(v || '').trim());
+                    headerRowIdx = Math.min(7, allRows.length - 1);
+                    const rowCells = allRows[headerRowIdx];
+                    if (rowCells) {
+                        headers = rowCells.map(cell => {
+                            const val = cell ? (cell.w !== undefined ? cell.w : cell.v) : '';
+                            return String(val || '').trim();
+                        });
                     } else {
                         headers = [];
                     }
                 }
                 
-                const dataRows = rows.slice(headerRowIdx + 1).filter(r => r && r.some(cell => cell !== null && cell !== undefined && cell !== ''));
+                // Create column mapping
+                const colMapping = {};
+                headers.forEach((h, idx) => {
+                    const hNorm = normalizar_nombre(h).replace(/\n/g, ' ').trim();
+                    if (hNorm.includes('STATUS')) colMapping['status'] = idx;
+                    else if (hNorm.includes('TIPO DE PLAZA')) colMapping['tipo_plaza'] = idx;
+                    else if (hNorm.includes('ADSCRIPCION') || hNorm.includes('ESTADO')) colMapping['adscripcion'] = idx;
+                    else if (hNorm.includes('CODIGO')) colMapping['codigo_plaza'] = idx;
+                    else if (hNorm.includes('NIVEL')) colMapping['nivel'] = idx;
+                    else if (hNorm.includes('NUM EMP') || hNorm.includes('NUM_EMP') || hNorm.includes('EMPLEADO')) colMapping['num_empleado'] = idx;
+                    else if (hNorm.includes('NOMBRE')) colMapping['nombre'] = idx;
+                    else if (hNorm.includes('MOVIMIENTO')) colMapping['tipo_movimiento'] = idx;
+                    else if (hNorm.includes('FECHA DE ING. INM') || hNorm.includes('FECHA ING INM') || hNorm.includes('ING. INM')) colMapping['fecha_ingreso_inm'] = idx;
+                    else if (hNorm.includes('FECHA DE ING A LA PLAZA') || hNorm.includes('FECHA ING PLAZA') || hNorm.includes('ING A LA PLAZA') || hNorm.includes('FECHA_INGRESO_PLAZA') || hNorm.includes('FECHA INGRESO PLAZA')) colMapping['fecha_ingreso_plaza'] = idx;
+                    else if (hNorm.includes('VIG. DE INICIO') || hNorm.includes('INICIO MOV')) colMapping['vig_inicio_mov'] = idx;
+                    else if (hNorm.includes('VIG. DE TERMINO') || hNorm.includes('TERMINO MOV')) colMapping['vig_termino_mov'] = idx;
+                    else if (hNorm.includes('PUESTO')) colMapping['puesto_especifico'] = idx;
+                    else if (hNorm.includes('SUELDO BRUTO')) colMapping['sueldo_bruto'] = idx;
+                    else if (hNorm.includes('SUELDO NETO')) colMapping['sueldo_neto'] = idx;
+                    else if (hNorm.includes('JEFE')) colMapping['jefe_oficina'] = idx;
+                    else if (hNorm.includes('LUGAR') || hNorm.includes('INMUEBLE') || hNorm.includes('UBICACION') || hNorm.includes('ASIGNADO')) colMapping['lugar_asignado'] = idx;
+                });
                 
-                if (dataRows.length === 0) {
+                // Clean and format all data rows using cell object raw/formatted properties
+                const cleanDataRows = [];
+                for (let r = headerRowIdx + 1; r < allRows.length; r++) {
+                    const rowCells = allRows[r];
+                    if (!rowCells) continue;
+                    
+                    // Skip completely empty rows
+                    const hasVal = rowCells.some(cell => cell && cell.v !== null && cell.v !== undefined && cell.v !== '');
+                    if (!hasVal) continue;
+                    
+                    const cleanRow = [];
+                    for (let c = 0; c < rowCells.length; c++) {
+                        const cell = rowCells[c];
+                        if (!cell) {
+                            cleanRow.push(null);
+                            continue;
+                        }
+                        
+                        // Find if this column has a key
+                        const colKey = Object.keys(colMapping).find(key => colMapping[key] === c);
+                        
+                        if (colKey === 'codigo_plaza') {
+                            // ALWAYS use the formatted text 'w' if available to prevent date conversion, e.g. "12-05-89"
+                            const plazaStr = cell.w !== undefined ? String(cell.w).trim() : String(cell.v).trim();
+                            cleanRow.push(plazaStr);
+                        } else if (colKey === 'sueldo_bruto' || colKey === 'sueldo_neto') {
+                            // ALWAYS extract raw number from 'v' if it is numeric
+                            if (typeof cell.v === 'number') {
+                                cleanRow.push(cell.v);
+                            } else {
+                                // Fallback: strip currency formatting from formatted text 'w'
+                                const cleanNumStr = String(cell.w || cell.v || '').replace(/[^0-9.-]/g, '');
+                                const parsedNum = parseFloat(cleanNumStr);
+                                cleanRow.push(isNaN(parsedNum) ? null : parsedNum);
+                            }
+                        } else if (colKey === 'fecha_ingreso_inm' || colKey === 'fecha_ingreso_plaza' || colKey === 'vig_inicio_mov' || colKey === 'vig_termino_mov') {
+                            // For date columns, format JS Date objects to YYYY-MM-DD
+                            if (cell.v instanceof Date) {
+                                const d = cell.v;
+                                const yyyy = d.getUTCFullYear();
+                                const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+                                const dd = String(d.getUTCDate()).padStart(2, '0');
+                                cleanRow.push(`${yyyy}-${mm}-${dd}`);
+                            } else {
+                                // Fallback: use formatted text
+                                cleanRow.push(cell.w !== undefined ? String(cell.w).trim() : String(cell.v).trim());
+                            }
+                        } else {
+                            // Standard columns: use raw value 'v'
+                            cleanRow.push(cell.v !== undefined ? cell.v : null);
+                        }
+                    }
+                    cleanDataRows.push(cleanRow);
+                }
+                
+                if (cleanDataRows.length === 0) {
                     alert('No se encontraron registros de datos válidos para cargar.');
                     resetUploadModal();
                     return;
                 }
                 
-                // Split dataRows into chunks (e.g. 50 rows per chunk)
+                // Split cleanDataRows into chunks of 50
                 const chunkSize = 50;
                 const chunks = [];
-                for (let i = 0; i < dataRows.length; i += chunkSize) {
-                    chunks.push(dataRows.slice(i, i + chunkSize));
+                for (let i = 0; i < cleanDataRows.length; i += chunkSize) {
+                    chunks.push(cleanDataRows.slice(i, i + chunkSize));
                 }
                 
                 const totalChunks = chunks.length;
@@ -257,7 +371,7 @@
                 
                 for (let c = 0; c < totalChunks; c++) {
                     const chunkRows = chunks[c];
-                    statusText.innerText = `Procesando bloque ${c + 1} de ${totalChunks} (Registros ${processedRows + 1} a ${Math.min(processedRows + chunkRows.length, dataRows.length)})...`;
+                    statusText.innerText = `Procesando bloque ${c + 1} de ${totalChunks} (Registros ${processedRows + 1} a ${Math.min(processedRows + chunkRows.length, cleanDataRows.length)})...`;
                     
                     try {
                         const response = await fetch("{% url 'carga_rapida_personal' %}", {
@@ -288,7 +402,7 @@
                             processedRows += chunkRows.length;
                             
                             // Calculate percentage
-                            const progressPercentage = Math.round((processedRows / dataRows.length) * 100);
+                            const progressPercentage = Math.round((processedRows / cleanDataRows.length) * 100);
                             percentText.innerText = `${progressPercentage}%`;
                             progressFill.style.width = `${progressPercentage}%`;
                         } else {
@@ -701,8 +815,8 @@
                 <!-- Contenedor del Formulario de Subida -->
                 <div id="uploadFormContent" class="space-y-6">
                     <div class="bg-gray-50/50 border border-dashed border-gray-200 rounded-3xl p-8 text-center hover:border-emerald-400 transition-colors group cursor-pointer relative">
-                        <input type="file" name="excel_file" id="excel_file" accept=".xlsx, .xls" required class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="updateFastFileName(this)">
-                        <div class="flex flex-col items-center">
+                        <input type="file" name="excel_file" id="excel_file" accept=".xlsx, .xls" required class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onchange="updateFastFileName(this)">
+                        <div class="flex flex-col items-center pointer-events-none">
                             <div class="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 mb-4 group-hover:scale-110 transition-transform">
                                 <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                             </div>

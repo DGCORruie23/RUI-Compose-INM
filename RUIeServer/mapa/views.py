@@ -873,12 +873,14 @@ def carga_rapida_personal(request):
             h_norm = normalizar_nombre(h).replace('\n', ' ').strip()
             if 'STATUS' in h_norm:
                 col_mapping['status'] = idx
+                # print(f"status {idx}")
             elif 'TIPO DE PLAZA' in h_norm:
                 col_mapping['tipo_plaza'] = idx
             elif 'ADSCRIPCION' in h_norm or 'ESTADO' in h_norm:
                 col_mapping['adscripcion'] = idx
-            elif 'CODIGO' in h_norm or 'PLAZA' in h_norm:
+            elif 'CODIGO' in h_norm:
                 col_mapping['codigo_plaza'] = idx
+                # print(f"codigo_plaza {idx}")
             elif 'NIVEL' in h_norm:
                 col_mapping['nivel'] = idx
             elif 'NUM EMP' in h_norm or 'NUM_EMP' in h_norm or 'EMPLEADO' in h_norm:
@@ -889,12 +891,16 @@ def carga_rapida_personal(request):
                 col_mapping['tipo_movimiento'] = idx
             elif 'FECHA DE ING. INM' in h_norm or 'FECHA ING INM' in h_norm or 'ING. INM' in h_norm:
                 col_mapping['fecha_ingreso_inm'] = idx
+                # print(f"fecha_ingreso_inm {idx}")
             elif 'FECHA DE ING A LA PLAZA' in h_norm or 'FECHA ING PLAZA' in h_norm or 'ING A LA PLAZA' in h_norm or 'FECHA_INGRESO_PLAZA' in h_norm or 'FECHA INGRESO PLAZA' in h_norm:
                 col_mapping['fecha_ingreso_plaza'] = idx
+                # print(f"fecha_ingreso_plaza {idx}")
             elif 'VIG. DE INICIO' in h_norm or 'INICIO MOV' in h_norm:
                 col_mapping['vig_inicio_mov'] = idx
+                # print(f"vig_inicio_mov {idx}")
             elif 'VIG. DE TERMINO' in h_norm or 'TERMINO MOV' in h_norm:
                 col_mapping['vig_termino_mov'] = idx
+                # print(f"vig_termino_mov {idx}")
             elif 'PUESTO' in h_norm:
                 col_mapping['puesto_especifico'] = idx
             elif 'SUELDO BRUTO' in h_norm:
@@ -968,6 +974,7 @@ def carga_rapida_personal(request):
         omitidos = 0
         
         for row_vals in rows_data:
+            
             def get_cell_val(key):
                 if key in col_mapping:
                     idx = col_mapping[key]
