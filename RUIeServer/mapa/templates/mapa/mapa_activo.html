@@ -213,7 +213,11 @@
       <!-- Main Content (Scrollable Area) -->
       <div class="flex-1 overflow-y-auto p-6 pt-4 custom-scrollbar">
         <!-- Nombre del Estado (Debajo del periodo según solicitud) -->
-        <div class="mb-4 text-center">
+        <div class="mb-4 text-center flex items-center justify-center gap-3">
+          <!-- Button with OR_ACTIVO.svg icon, initially hidden -->
+          <button id="btnStateDetailModal" onclick="openStateDetailModal()" class="hidden hover:scale-110 active:scale-95 transition-all p-1 bg-[#611232]/5 hover:bg-[#611232]/10 rounded-xl border border-[#611232]/15 shadow-sm" title="Ver detalle consolidado del Estado">
+             <img src="/static/mapa/icons/OR_ACTIVO.svg" alt="Detalle del Estado" class="w-6 h-6 object-contain">
+          </button>
           <h2 id="stateNameDisplay" class="text-2xl font-bold text-gray-800 tracking-tight leading-tight">Seleccione un Estado</h2>
         </div>
 
@@ -409,6 +413,8 @@
     return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
   }
 
+  const normalizar = normalizar_nombre;
+
   window.addEventListener("DOMContentLoaded", () => {
     const main = document.getElementById("main-section");
     if (main) {
@@ -474,6 +480,19 @@
         nameHtml = `${nameArr[0]} <span class="font-bold">${nameArr.slice(1).join(' ')}</span>`;
     }
     document.getElementById('stateNameDisplay').innerHTML = nameHtml;
+    
+    // Toggle State Detail Button (hide if National, show otherwise)
+    const btn = document.getElementById('btnStateDetailModal');
+    if (btn) {
+        const isNational = window.selectedStateData.name === LABEL_NACIONAL || 
+                           window.selectedStateData.name === "Total Nacional" || 
+                           window.selectedStateData.name === "NACIONAL";
+        if (isNational) {
+            btn.classList.add('hidden');
+        } else {
+            btn.classList.remove('hidden');
+        }
+    }
     
     updateCards();
     updateRankingChart();
@@ -1951,13 +1970,10 @@
                 activeActividades.forEach(act => {
                     const iconFile = getIconFilename(act.nombre);
                     actContainer.innerHTML += `
-                        <div class="flex flex-col items-center p-3 rounded-2xl border border-[#611232]/30 bg-emerald-50/20 transition-all duration-300 hover:scale-105">
-                            <div class="w-10 h-10 flex items-center justify-center mb-2">
+                        <div class="flex flex-col items-center p-3 rounded-2xl border border-[#611232]/30 bg-emerald-50/20 transition-all duration-300 hover:scale-105 cursor-help" title="${act.nombre}">
+                            <div class="w-10 h-10 flex items-center justify-center">
                                 <img src="/static/mapa/icons_inmueble/${iconFile}" alt="${act.nombre}" class="w-full h-full object-contain">
                             </div>
-                            <span class="text-[9px] text-center leading-tight uppercase tracking-tight text-gray-900 font-extrabold break-all max-w-[80px]">
-                                ${act.nombre}
-                            </span>
                         </div>
                     `;
                 });
@@ -2003,6 +2019,169 @@
   
   window.closeInmuebleDetailModal = function() {
     const modal = document.getElementById('inmuebleDetailModal');
+    if (modal) modal.classList.add('hidden');
+    document.body.style.overflow = 'auto';
+  };
+
+  window.openStateDetailModal = async function() {
+    if (!window.selectedStateData) {
+        alert("Por favor seleccione un estado en el mapa para visualizar sus detalles.");
+        return;
+    }
+    
+    const stateName = window.selectedStateData.name;
+    const key = normalizar_nombre(stateName);
+    const estadoId = window.infraData[key]?.estado_id;
+    
+    if (!estadoId) {
+        alert("No se pudo identificar el identificador del estado.");
+        return;
+    }
+    
+    const modal = document.getElementById('estadoDetailModal');
+    if (!modal) return;
+    
+    modal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+    
+    try {
+        const response = await fetch(`/mapa/api/get-estado-detalle/${estadoId}`);
+        const result = await response.json();
+        
+        if (result.status === 'success') {
+            const data = result.data;
+            
+            // Header
+            document.getElementById('estStateName').innerText = `OFICINA DE REPRESENTACIÓN: ${data.estado_nombre || 'S/D'}`;
+            document.getElementById('estNombreHeader').innerText = data.estado_nombre || 'S/D';
+            
+            // Personal
+            document.getElementById('estPersTotal').innerText = data.personal.total;
+            document.getElementById('estPersActivos').innerText = data.personal.activos;
+            document.getElementById('estPersInactivos').innerText = data.personal.inactivos;
+            
+            // Vehículos (se dejan en blanco/SD)
+            document.getElementById('estVehTotal').innerText = '';
+            document.getElementById('estVehActivos').innerText = '';
+            document.getElementById('estVehInactivos').innerText = '';
+            
+            // PIPC counts
+            document.getElementById('estPipcInm').innerText = data.pipc.inm_pipc_count;
+            document.getElementById('estPipcComodante').innerText = data.pipc.comodante_pipc_count;
+            document.getElementById('estPipcEmergencia').innerText = data.pipc.plan_emergencia_count;
+            
+            // Inmuebles Totales
+            document.getElementById('estInmueblesTotal').innerText = data.inmueble_count;
+            
+            // Superficies
+            document.getElementById('estConstruida').innerText = `${data.superficie_construida} m²`;
+            document.getElementById('estUtilizada').innerText = `${data.superficie_utilizada} m²`;
+            
+            // Renta total
+            document.getElementById('estRentaMonto').innerText = data.renta + " MXN";
+            
+            // 8. Tipos de Oficina (Mostrar únicamente las activas con su conteo)
+            const ofContainer = document.getElementById('estOficinasGrid');
+            ofContainer.innerHTML = '';
+            
+            document.getElementById('estOficinaCount').innerText = `(${data.oficinas.length})`;
+            
+            if (data.oficinas.length === 0) {
+                ofContainer.innerHTML = '<div class="text-[11px] font-bold text-gray-300 italic text-center w-full py-4">SIN OFICINAS REGISTRADAS</div>';
+            } else {
+                data.oficinas.forEach(of => {
+                    ofContainer.innerHTML += `
+                        <div class="text-[10px] font-black text-[#611232] bg-[#611232]/5 px-3 py-2 rounded-xl border border-[#611232]/10 uppercase tracking-tight flex items-center gap-2 whitespace-normal break-words">
+                            <span class="w-6 h-6 bg-[#611232] text-white text-[9px] font-black rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm">${of.total}</span>
+                            <span>${of.nombre}</span>
+                        </div>
+                    `;
+                });
+            }
+            
+            // 9. Actividades (Mostrar únicamente las activas con su conteo)
+            const actContainer = document.getElementById('estActividadesGrid');
+            actContainer.innerHTML = '';
+            
+            document.getElementById('estActividadCount').innerText = `(${data.actividades.length})`;
+            
+            const getIconFilename = (name) => {
+                const n = normalizar(name);
+                if (n.includes("ADMINISTRATIVO") || n.includes("OFICINA")) return "icon_administrativos.svg";
+                if (n.includes("ALMACEN") || n.includes("BODEGA")) return "icon_almacen.svg";
+                if (n.includes("REPATRIACION")) return "icon_repatriacion.svg";
+                if (n.includes("TRAMITE")) return "icon_tramites.svg";
+                if (n.includes("JURIDICO") || n.includes("LEGAL")) return "icon_juridico.svg";
+                if (n.includes("RECURSOS HUMANOS") || n.includes("HUMANOS") || n.includes("PERSONAL")) return "icon_rec_humano.svg";
+                if (n.includes("MATERIALES") || n.includes("ADQUISICION")) return "icon_rec_materiales.svg";
+                if (n.includes("CONTROL") || n.includes("MIGRATORIO")) return "icon_control.svg";
+                if (n.includes("ESTACIONAMIENTO")) return "icon_estacionamiento.svg";
+                if (n.includes("FINANCIEROS")) return "icon_rec_financieros.svg";
+                if (n.includes("BETA")) return "icon_beta.svg";
+                if (n.includes("ESTADISTICA")) return "icon_estadistica.svg";
+                if (n.includes("VEHICULO")) return "icon_vehiculo.svg";
+                if (n.includes("RENTA")) return "icon_renta.svg";
+                return "icon_personal.svg";
+            };
+            
+            if (data.actividades.length === 0) {
+                actContainer.innerHTML = '<div class="col-span-4 text-[11px] font-bold text-gray-300 italic text-center w-full py-4">SIN ACTIVIDADES REGISTRADAS</div>';
+            } else {
+                data.actividades.forEach(act => {
+                    const iconFile = getIconFilename(act.nombre);
+                    actContainer.innerHTML += `
+                        <div class="flex flex-col items-center p-3 rounded-2xl border border-[#611232]/30 bg-emerald-50/20 transition-all duration-300 hover:scale-105 relative cursor-help" title="${act.nombre}">
+                            <span class="absolute -top-2 -right-2 w-5 h-5 bg-[#611232] text-white text-[9px] font-black rounded-full flex items-center justify-center border border-white shadow-md">${act.total}</span>
+                            <div class="w-10 h-10 flex items-center justify-center">
+                                <img src="/static/mapa/icons_inmueble/${iconFile}" alt="${act.nombre}" class="w-full h-full object-contain">
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+            
+            // 10. Figura de Ocupación con conteos dinámicos
+            document.getElementById('estFigArrendadoVal').innerText = data.figura_ocupacion.ARRENDADO;
+            document.getElementById('estFigPropioVal').innerText = data.figura_ocupacion.PROPIO;
+            document.getElementById('estFigTerrenoVal').innerText = data.figura_ocupacion.TERRENO;
+            document.getElementById('estFigComodatoVal').innerText = data.figura_ocupacion.COMODATO;
+            
+            // Activar/Opacar según existencia de elementos
+            const toggleFigBadge = (id, total) => {
+                const el = document.getElementById(id);
+                if (total > 0) {
+                    el.className = "flex-1 flex flex-col items-center p-3 rounded-2xl border border-[#611232]/30 bg-emerald-50/20 opacity-100 grayscale-0 transition-all duration-300 font-extrabold";
+                } else {
+                    el.className = "flex-1 flex flex-col items-center p-3 rounded-2xl border border-gray-100 bg-gray-50/50 opacity-30 grayscale transition-all duration-300";
+                }
+            };
+            
+            toggleFigBadge('estFigArrendado', data.figura_ocupacion.ARRENDADO);
+            toggleFigBadge('estFigPropio', data.figura_ocupacion.PROPIO);
+            toggleFigBadge('estFigTerreno', data.figura_ocupacion.TERRENO);
+            toggleFigBadge('estFigComodato', data.figura_ocupacion.COMODATO);
+            
+            // Renta Card opacity based on ARRENDADO count
+            const rentaCard = document.getElementById('estRentaCard');
+            if (data.figura_ocupacion.ARRENDADO > 0) {
+                rentaCard.classList.remove('opacity-30', 'grayscale');
+            } else {
+                rentaCard.classList.add('opacity-30', 'grayscale');
+            }
+            
+        } else {
+            alert("Error al obtener los detalles del estado: " + result.message);
+            closeStateDetailModal();
+        }
+    } catch (err) {
+        console.error(err);
+        alert("Error de conexión al cargar los detalles del estado.");
+        closeStateDetailModal();
+    }
+  };
+  
+  window.closeStateDetailModal = function() {
+    const modal = document.getElementById('estadoDetailModal');
     if (modal) modal.classList.add('hidden');
     document.body.style.overflow = 'auto';
   };
@@ -2292,7 +2471,7 @@
                             <span class="w-1.5 h-1.5 bg-[#611232] rounded-full mr-2"></span>
                             Actividades <span id="inmActividadCount" class="ml-1 text-[#611232] font-black font-mono"></span>
                         </h3>
-                        <div id="inmActividadesGrid" class="grid grid-cols-4 gap-3 max-h-[180px] overflow-y-auto custom-scrollbar pr-2">
+                        <div id="inmActividadesGrid" class="grid grid-cols-4 gap-3 max-h-[220px] overflow-y-auto custom-scrollbar p-3">
                             <!-- Items de actividades dinámicos activos -->
                         </div>
                     </div>
@@ -2312,22 +2491,22 @@
                     <div class="grid grid-cols-2 gap-4">
                         <!-- Metros Utilizados -->
                         <div class="bg-[#10312B] text-white p-4 rounded-2xl shadow-sm border border-[#10312B]/30 flex flex-col justify-between">
-                            <span class="text-[8px] font-black uppercase tracking-widest text-emerald-400/80 mb-2">Metros Útiles</span>
+                            <span class="text-[10px] font-black uppercase tracking-widest text-emerald-400/80 mb-2">Metros Útiles</span>
                             <span id="inmMetros" class="text-base font-black truncate leading-none">-</span>
                         </div>
                         <!-- Niveles -->
-                        <div class="bg-inm-marron-100/80 backdrop-blur-md p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
-                            <span class="text-[8px] font-black text-gray-600 uppercase tracking-widest mb-2">Niveles</span>
+                        <div class="bg-inm-marron-200/80 backdrop-blur-md p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
+                            <span class="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-2">Niveles</span>
                             <span id="inmNiveles" class="text-base font-black text-gray-800 leading-none">-</span>
                         </div>
                         <!-- Año de Construcción -->
-                        <div class="bg-inm-marron-100/80 backdrop-blur-md p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
-                            <span class="text-[8px] font-black text-gray-600 uppercase tracking-widest mb-2">Año Construcción</span>
+                        <div class="bg-inm-marron-100 backdrop-blur-md p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
+                            <span class="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-2">Año Construcción</span>
                             <span id="inmAnioConst" class="text-base font-black text-[#611232] leading-none">-</span>
                         </div>
                         <!-- Fecha de Ocupación -->
                         <div class="bg-[#611232] text-white p-4 rounded-2xl shadow-sm border border-[#611232]/30 flex flex-col justify-between">
-                            <span class="text-[8px] font-black uppercase tracking-widest text-rose-300/80 mb-2">Fecha Ocupación</span>
+                            <span class="text-[10px] font-black uppercase tracking-widest text-rose-300/80 mb-2">Fecha Ocupación</span>
                             <span id="inmFechaOcu" class="text-xs font-black truncate leading-none">-</span>
                         </div>
                     </div>
@@ -2366,6 +2545,231 @@
                         <div class="flex-grow">
                             <h4 class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-0.5">Monto de Renta</h4>
                             <span id="inmRentaMonto" class="text-lg font-black text-emerald-600 leading-none">-</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Footer Logo Pattern -->
+            <div class="relative z-10 w-full h-8 pointer-events-none mt-auto" 
+                 style="background-image: url('{% static 'mapa/fondos/patron_cere.svg' %}'); background-size: cover; background-position: bottom;">
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Modal Detalle General del Estado -->
+    <div id="estadoDetailModal" class="hidden fixed inset-0 z-[10000] flex items-center justify-center p-4">
+        <!-- Backdrop Blur overlay -->
+        <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity duration-300" onclick="closeStateDetailModal()"></div>
+        
+        <!-- Main Modal Container -->
+        <div class="relative w-full max-w-6xl bg-white rounded-[2.5rem] overflow-hidden shadow-2xl animate-fade-in flex flex-col" style="max-height: 90vh;">
+            
+            <!-- Pattern Background -->
+            <div class="absolute inset-0 pointer-events-none opacity-[0.25]" 
+                 style="background-image: url('{% static 'mapa/fondos/patron_.svg' %}'); background-size: 50%; background-position: center; z-index: 0;">
+            </div>
+
+            <!-- Header Section -->
+            <div class="relative z-10 px-10 pt-8 pb-6 border-b border-gray-100 flex flex-col md:flex-row md:items-center md:justify-between bg-white/90 backdrop-blur-md">
+                <div class="flex-grow">
+                    <span id="estStateName" class="text-[10px] font-black text-[#611232] uppercase tracking-[0.25em] block mb-1">
+                        OFICINA DE REPRESENTACIÓN: -
+                    </span>
+                    <h2 id="estNombreHeader" class="text-2xl font-black text-gray-900 uppercase leading-none">
+                        -
+                    </h2>
+                    <span class="inline-block mt-2 px-3 py-1 text-[9px] font-bold tracking-widest text-[#10312B] bg-[#10312B]/10 rounded-lg uppercase">
+                        VISTA CONSOLIDADA ESTATAL
+                    </span>
+                </div>
+                
+                <!-- Right Header Actions (Close Button and Logo) -->
+                <div class="flex flex-col items-end gap-3 mt-4 md:mt-0">
+                    <!-- Close Button -->
+                    <button onclick="closeStateDetailModal()" class="text-gray-400 hover:text-gray-600 bg-gray-50 hover:bg-gray-100 p-2 rounded-2xl shadow-sm hover:shadow-md transition-all self-end z-10">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                    <!-- Gob Logo -->
+                    <img src="{% static 'mapa/fondos/logo_gob.png' %}" alt="Gobierno de México" class="h-10 object-contain bg-inm-verde-100 ">
+                </div>
+            </div>
+
+            <!-- Body Content Section: 3-column scrollable grid -->
+            <div class="relative z-10 p-10 flex-grow overflow-y-auto custom-scrollbar flex flex-col lg:flex-row gap-8" style="background-color: rgba(255, 255, 255, 0.45);">
+                
+                <!-- COLUMN 1: Operaciones (Personal, Vehículos, PIPC) -->
+                <div class="flex-1 space-y-6">
+                    <!-- Tarjeta de Personal -->
+                    <div class="bg-white/80 backdrop-blur-md p-6 rounded-[2rem] border border-gray-100 shadow-sm relative overflow-hidden flex items-center gap-5">
+                        <div class="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center flex-shrink-0 border border-emerald-100 shadow-inner">
+                            <img src="/static/mapa/icons_inmueble/icon_personal.svg" alt="Personal" class="w-8 h-8 object-contain">
+                        </div>
+                        <div class="flex-grow">
+                            <h3 class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Personal del Estado</h3>
+                            <div class="flex items-baseline gap-4">
+                                <div>
+                                    <span id="estPersTotal" class="text-3xl font-black text-gray-900 leading-none">-</span>
+                                    <span class="text-[9px] text-gray-400 font-bold uppercase tracking-wider block mt-1">Total</span>
+                                </div>
+                                <div class="w-px h-8 bg-gray-100"></div>
+                                <div>
+                                    <span id="estPersActivos" class="text-lg font-black text-emerald-600 leading-none">-</span>
+                                    <span class="text-[9px] text-emerald-500/70 font-bold uppercase tracking-wider block mt-1">Activos</span>
+                                </div>
+                                <div class="w-px h-8 bg-gray-100"></div>
+                                <div>
+                                    <span id="estPersInactivos" class="text-lg font-black text-[#611232] leading-none">-</span>
+                                    <span class="text-[9px] text-[#611232]/70 font-bold uppercase tracking-wider block mt-1">Vacantes</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tarjeta de Vehículos -->
+                    <div class="bg-white/80 backdrop-blur-md p-6 rounded-[2rem] border border-gray-100 shadow-sm relative overflow-hidden flex items-center gap-5">
+                        <div class="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center flex-shrink-0 border border-emerald-100 shadow-inner">
+                            <img src="/static/mapa/icons_inmueble/icon_vehiculo.svg" alt="Vehículos" class="w-8 h-8 object-contain">
+                        </div>
+                        <div class="flex-grow">
+                            <h3 class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Vehículos del Estado</h3>
+                            <div class="flex items-baseline gap-4">
+                                <div>
+                                    <span id="estVehTotal" class="text-3xl font-black text-gray-900 leading-none">-</span>
+                                    <span class="text-[9px] text-gray-400 font-bold uppercase tracking-wider block mt-1">Total</span>
+                                </div>
+                                <div class="w-px h-8 bg-gray-100"></div>
+                                <div>
+                                    <span id="estVehActivos" class="text-lg font-black text-emerald-600 leading-none">-</span>
+                                    <span class="text-[9px] text-emerald-500/70 font-bold uppercase tracking-wider block mt-1">Activos</span>
+                                </div>
+                                <div class="w-px h-8 bg-gray-100"></div>
+                                <div>
+                                    <span id="estVehInactivos" class="text-lg font-black text-[#611232] leading-none">-</span>
+                                    <span class="text-[9px] text-[#611232]/70 font-bold uppercase tracking-wider block mt-1">Inactivos</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tarjeta de PIPC -->
+                    <div class="bg-white/80 backdrop-blur-md p-6 rounded-[2rem] border border-gray-100 shadow-sm relative overflow-hidden">
+                        <div class="flex items-center gap-4 mb-4">
+                            <div class="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center border border-emerald-100">
+                                <img src="/static/mapa/icons_inmueble/icon_pipc.svg" alt="PIPC" class="w-6 h-6 object-contain">
+                            </div>
+                            <h3 class="text-[11px] font-black text-gray-800 uppercase tracking-[0.1em]">Inmuebles con Protección Civil</h3>
+                        </div>
+                        
+                        <div class="space-y-3 pl-2">
+                            <div class="flex justify-between items-center border-b border-gray-50 pb-2">
+                                <span class="text-[10px] font-bold text-gray-400 uppercase tracking-tight">PIPC INM ACTIVO</span>
+                                <span class="text-[11px] font-extrabold text-[#10312B] uppercase"><span id="estPipcInm" class="text-sm font-black">0</span> Inmuebles</span>
+                            </div>
+                            <div class="flex justify-between items-center border-b border-gray-50 pb-2">
+                                <span class="text-[10px] font-bold text-gray-400 uppercase tracking-tight">PIPC COMODANTE ACTIVO</span>
+                                <span class="text-[11px] font-extrabold text-[#10312B] uppercase"><span id="estPipcComodante" class="text-sm font-black">0</span> Inmuebles</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-[10px] font-bold text-gray-400 uppercase tracking-tight">PLAN DE EMERGENCIA ACTIVO</span>
+                                <span class="text-[11px] font-extrabold text-[#10312B] uppercase"><span id="estPipcEmergencia" class="text-sm font-black">0</span> Inmuebles</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- COLUMN 2: Clasificación (Tipos de Oficina y Actividades) -->
+                <div class="flex-1 space-y-6">
+                    <!-- Tipos de Oficina -->
+                    <div class="bg-white/80 backdrop-blur-md p-6 rounded-[2rem] border border-gray-100 shadow-sm">
+                        <h3 class="text-[11px] font-black text-gray-800 uppercase tracking-[0.1em] mb-4 flex items-center">
+                            <span class="w-1.5 h-1.5 bg-[#611232] rounded-full mr-2"></span>
+                            Tipos de Oficina <span id="estOficinaCount" class="ml-1 text-[#611232] font-black font-mono"></span>
+                        </h3>
+                        <div id="estOficinasGrid" class="flex flex-col gap-2 max-h-[160px] overflow-y-auto custom-scrollbar pr-2">
+                            <!-- Items de oficinas dinámicos activos con conteo -->
+                        </div>
+                    </div>
+
+                    <!-- Actividades -->
+                    <div class="bg-white/80 backdrop-blur-md p-6 rounded-[2rem] border border-gray-100 shadow-sm">
+                        <h3 class="text-[11px] font-black text-gray-800 uppercase tracking-[0.1em] mb-4 flex items-center">
+                            <span class="w-1.5 h-1.5 bg-[#611232] rounded-full mr-2"></span>
+                            Actividades <span id="estActividadCount" class="ml-1 text-[#611232] font-black font-mono"></span>
+                        </h3>
+                        <div id="estActividadesGrid" class="grid grid-cols-4 gap-3 max-h-[220px] overflow-y-auto custom-scrollbar p-3">
+                            <!-- Items de actividades dinámicos activos con conteo -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- COLUMN 3: Especificaciones y Financiera (Total Inmuebles, Info Gral, Figura Ocupación, Renta) -->
+                <div class="flex-1 space-y-6">
+                    <!-- Total Inmuebles -->
+                    <div class="bg-white/80 backdrop-blur-md p-5 rounded-[2rem] border border-gray-100 shadow-sm flex items-center justify-between">
+                        <div>
+                            <h3 class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Total de Inmuebles</h3>
+                            <span class="text-[11px] font-black uppercase text-[#611232]">En la Oficina de Representación</span>
+                        </div>
+                        <div class="text-right">
+                            <span id="estInmueblesTotal" class="text-4xl font-black text-[#611232] leading-none">-</span>
+                        </div>
+                    </div>
+
+                    <!-- Información General Consolidada -->
+                    <div class="grid grid-cols-2 gap-4">
+                        <!-- Superficie Construida (Suma) -->
+                        <div class="bg-[#10312B] text-white p-5 rounded-2xl shadow-sm border border-[#10312B]/30 flex flex-col justify-between">
+                            <span class="text-[8px] font-black uppercase tracking-widest text-emerald-400/80 mb-2">Superficie Construida</span>
+                            <span id="estConstruida" class="text-base font-black truncate leading-none">-</span>
+                        </div>
+                        <!-- Superficie Utilizada (Suma) -->
+                        <div class="bg-[#611232] text-white p-5 rounded-2xl shadow-sm border border-[#611232]/30 flex flex-col justify-between">
+                            <span class="text-[8px] font-black uppercase tracking-widest text-rose-300/80 mb-2">Superficie Utilizada</span>
+                            <span id="estUtilizada" class="text-base font-black truncate leading-none">-</span>
+                        </div>
+                    </div>
+
+                    <!-- Figura de Ocupación con Conteos -->
+                    <div class="bg-white/80 backdrop-blur-md p-5 rounded-[2rem] border border-gray-100 shadow-sm">
+                        <h3 class="text-[11px] font-black text-gray-800 uppercase tracking-[0.1em] mb-3 flex items-center">
+                            <span class="w-1.5 h-1.5 bg-[#611232] rounded-full mr-2"></span>
+                            Figura de Ocupación (Inmuebles)
+                        </h3>
+                        <div class="flex gap-3">
+                            <div id="estFigArrendado" class="flex-1 flex flex-col items-center p-3 rounded-2xl border border-gray-100 bg-gray-50/50 opacity-30 grayscale transition-all duration-300">
+                                <span id="estFigArrendadoVal" class="text-sm font-black text-[#611232] mb-1">0</span>
+                                <img src="/static/mapa/icons_inmueble/icon_arrendado.svg" alt="Arrendado" class="w-8 h-8 object-contain mb-1.5">
+                                <span class="text-[7px] uppercase tracking-wider font-extrabold">ARRENDADOS</span>
+                            </div>
+                            <div id="estFigPropio" class="flex-1 flex flex-col items-center p-3 rounded-2xl border border-gray-100 bg-gray-50/50 opacity-30 grayscale transition-all duration-300">
+                                <span id="estFigPropioVal" class="text-sm font-black text-[#611232] mb-1">0</span>
+                                <img src="/static/mapa/icons_inmueble/icon_propio.svg" alt="Propio" class="w-8 h-8 object-contain mb-1.5">
+                                <span class="text-[7px] uppercase tracking-wider font-extrabold">PROPIOS</span>
+                            </div>
+                            <div id="estFigTerreno" class="flex-1 flex flex-col items-center p-3 rounded-2xl border border-gray-100 bg-gray-50/50 opacity-30 grayscale transition-all duration-300">
+                                <span id="estFigTerrenoVal" class="text-sm font-black text-[#611232] mb-1">0</span>
+                                <img src="/static/mapa/icons_inmueble/icon_terreno.svg" alt="Terreno" class="w-8 h-8 object-contain mb-1.5">
+                                <span class="text-[7px] uppercase tracking-wider font-extrabold">TERRENOS</span>
+                            </div>
+                            <div id="estFigComodato" class="flex-1 flex flex-col items-center p-3 rounded-2xl border border-gray-100 bg-gray-50/50 opacity-30 grayscale transition-all duration-300">
+                                <span id="estFigComodatoVal" class="text-sm font-black text-[#611232] mb-1">0</span>
+                                <img src="/static/mapa/icons_inmueble/icon_comodato.svg" alt="Comodato" class="w-8 h-8 object-contain mb-1.5">
+                                <span class="text-[7px] uppercase tracking-wider font-extrabold">COMODATOS</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Monto de Renta Total del Estado -->
+                    <div id="estRentaCard" class="bg-white/80 backdrop-blur-md p-4 rounded-[2rem] border border-gray-100 shadow-sm flex items-center gap-4 transition-all duration-300">
+                        <div class="w-11 h-11 bg-emerald-50 rounded-xl flex items-center justify-center border border-emerald-100 flex-shrink-0">
+                            <img src="/static/mapa/icons_inmueble/icon_renta.svg" alt="Renta" class="w-6 h-6 object-contain">
+                        </div>
+                        <div class="flex-grow">
+                            <h4 class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-0.5">Renta Mensual Total</h4>
+                            <span id="estRentaMonto" class="text-lg font-black text-emerald-600 leading-none">-</span>
                         </div>
                     </div>
                 </div>

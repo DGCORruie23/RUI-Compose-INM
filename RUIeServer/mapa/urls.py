@@ -30,6 +30,7 @@ urlpatterns = [
     path('api/get-inmueble/<int:inmueble_id>', views.api_get_inmueble, name="api_get_inmueble"),
     path('api/guardar-comodato', views.api_guardar_comodato, name="api_guardar_comodato"),
     path('api/get-inmueble-detalle/<int:inmueble_id>', views.api_get_inmueble_detalle, name="api_get_inmueble_detalle"),
+    path('api/get-estado-detalle/<int:estado_id>', views.api_get_estado_detalle, name="api_get_estado_detalle"),
     
     path('organigramas', views.organigramas_list, name="organigramas_list"),
     path('guardar-organigrama', views.guardar_organigrama, name="guardar_organigrama"),

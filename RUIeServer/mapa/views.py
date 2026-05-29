@@ -815,38 +815,58 @@ def carga_rapida_personal(request):
     if request.method != 'POST':
         return redirect('personal_list')
         
-    excel_file = request.FILES.get('excel_file')
-    if not excel_file:
-        messages.error(request, "No se ha proporcionado ningún archivo.")
-        return redirect('personal_list')
-        
-    if not excel_file.name.endswith(('.xlsx', '.xls')):
-        messages.error(request, "El archivo debe ser un Excel (.xlsx o .xls).")
-        return redirect('personal_list')
-        
     user_state = get_user_state(request)
     
-    try:
-        wb = openpyxl.load_workbook(excel_file, data_only=True)
-        sheet = wb.active
-        
-        # Encontrar la fila de encabezados. Buscaremos la primera fila que contenga 'STATUS' o 'CODIGO-PLAZA'
-        headers = []
-        header_row_idx = None
-        
-        # Recorremos las primeras 20 filas para encontrar los encabezados
-        for r in range(1, 21):
-            row_vals = [str(cell.value or '').strip().upper() for cell in sheet[r]]
-            if 'STATUS' in row_vals or 'CODIGO-PLAZA\nNUEVO' in row_vals or 'CODIGO-PLAZA NUEVO' in row_vals or 'CODIGO-PLAZA' in row_vals:
-                headers = [str(cell.value or '').strip() for cell in sheet[r]]
-                header_row_idx = r
-                break
-                
-        if not header_row_idx:
-            # Fallback a la fila 8, que era el estándar observado
-            header_row_idx = 8
-            headers = [str(cell.value or '').strip() for cell in sheet[8]]
+    # Check if request is JSON (AJAX chunks)
+    is_json = False
+    if request.content_type == 'application/json':
+        try:
+            import json
+            payload = json.loads(request.body)
+            is_json = payload.get('is_ajax_chunk', False)
+        except Exception:
+            is_json = False
             
+    try:
+        if is_json:
+            headers = payload.get('headers', [])
+            rows_data = payload.get('rows', [])
+        else:
+            excel_file = request.FILES.get('excel_file')
+            if not excel_file:
+                messages.error(request, "No se ha proporcionado ningún archivo.")
+                return redirect('personal_list')
+                
+            if not excel_file.name.endswith(('.xlsx', '.xls')):
+                messages.error(request, "El archivo debe ser un Excel (.xlsx o .xls).")
+                return redirect('personal_list')
+                
+            wb = openpyxl.load_workbook(excel_file, data_only=True)
+            sheet = wb.active
+            
+            # Encontrar la fila de encabezados. Buscaremos la primera fila que contenga 'STATUS' o 'CODIGO-PLAZA'
+            headers = []
+            header_row_idx = None
+            
+            for r in range(1, 21):
+                row_vals = [str(cell.value or '').strip().upper() for cell in sheet[r]]
+                if 'STATUS' in row_vals or 'CODIGO-PLAZA\nNUEVO' in row_vals or 'CODIGO-PLAZA NUEVO' in row_vals or 'CODIGO-PLAZA' in row_vals:
+                    headers = [str(cell.value or '').strip() for cell in sheet[r]]
+                    header_row_idx = r
+                    break
+                    
+            if not header_row_idx:
+                header_row_idx = 8
+                headers = [str(cell.value or '').strip() for cell in sheet[8]]
+                
+            rows_data = []
+            for r in range(header_row_idx + 1, sheet.max_row + 1):
+                row_cells = list(sheet[r])
+                if not any(cell.value for cell in row_cells):
+                    continue
+                row_vals = [cell.value for cell in row_cells]
+                rows_data.append(row_vals)
+
         # Normalizar nombres de columnas a claves consistentes
         col_mapping = {}
         for idx, h in enumerate(headers):
@@ -886,8 +906,10 @@ def carga_rapida_personal(request):
             elif 'LUGAR' in h_norm or 'INMUEBLE' in h_norm or 'UBICACION' in h_norm or 'ASIGNADO' in h_norm:
                 col_mapping['lugar_asignado'] = idx
                 
-        # Asegurarnos de que tenemos las columnas críticas
         if 'codigo_plaza' not in col_mapping:
+            if is_json:
+                from django.http import JsonResponse
+                return JsonResponse({'status': 'error', 'message': 'No se encontró la columna de Código de Plaza en el Excel.'}, status=400)
             messages.error(request, "No se encontró la columna de Código de Plaza en el Excel.")
             return redirect('personal_list')
             
@@ -904,6 +926,8 @@ def carga_rapida_personal(request):
                 return val if isinstance(val, date) else val.date()
             val_s = str(val).strip()
             if val_s in ('...', '..', '-', '', 'None'): return None
+            if 'T' in val_s:
+                val_s = val_s.split('T')[0]
             for fmt in ('%Y-%m-%d %H:%M:%S', '%Y-%m-%d', '%d/%m/%Y', '%d-%m-%Y'):
                 try:
                     return datetime.strptime(val_s, fmt).date()
@@ -943,16 +967,12 @@ def carga_rapida_personal(request):
         actualizados = 0
         omitidos = 0
         
-        for r in range(header_row_idx + 1, sheet.max_row + 1):
-            row_cells = list(sheet[r])
-            if not any(cell.value for cell in row_cells):
-                continue
-                
+        for row_vals in rows_data:
             def get_cell_val(key):
                 if key in col_mapping:
                     idx = col_mapping[key]
-                    if idx < len(row_cells):
-                        return row_cells[idx].value
+                    if idx < len(row_vals):
+                        return row_vals[idx]
                 return None
                 
             codigo_plaza = parse_str(get_cell_val('codigo_plaza'))
@@ -1043,23 +1063,11 @@ def carga_rapida_personal(request):
                 vig_inicio_mov = parse_date(get_cell_val('vig_inicio_mov'))
                 vig_termino_mov = parse_date(get_cell_val('vig_termino_mov'))
                 
-            # jefe_oficina se mantiene en False en la carga de Excel, preservando el valor si el registro ya existe
-            existing_pers = PersonalINM.objects.filter(codigo_plaza=codigo_plaza).first()
-            if existing_pers:
-                jefe_oficina = existing_pers.jefe_oficina
-            else:
-                jefe_oficina = False
-                    
-            lugar_asignado = None
-            if 'lugar_asignado' in col_mapping:
-                lugar_raw = parse_str(get_cell_val('lugar_asignado'))
-                if lugar_raw:
-                    lugar_asignado = Inmueble.objects.filter(estado=row_estado, nombre_inmueble__icontains=lugar_raw).first()
+            # jefe_oficina se mantiene siempre en False por solicitud del usuario
+            jefe_oficina = False
             
-            if not lugar_asignado:
-                lugar_asignado = Inmueble.objects.filter(estado=row_estado).first()
-            if not lugar_asignado:
-                lugar_asignado = Inmueble.objects.first()
+            # lugar_asignado (Inmueble) se mantiene siempre en None (blank) por solicitud del usuario
+            lugar_asignado = None
 
             defaults = {
                 'estado': row_estado,
@@ -1091,8 +1099,20 @@ def carga_rapida_personal(request):
             else:
                 actualizados += 1
                 
+        if is_json:
+            from django.http import JsonResponse
+            return JsonResponse({
+                'status': 'success',
+                'creados': creados,
+                'actualizados': actualizados,
+                'omitidos': omitidos
+            })
+            
         messages.success(request, f"Carga rápida completada: {creados} creados, {actualizados} actualizados, {omitidos} omitidos.")
     except Exception as e:
+        if is_json:
+            from django.http import JsonResponse
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
         messages.error(request, f"Error al procesar el archivo Excel: {str(e)}")
         
     return redirect('personal_list')
@@ -2691,6 +2711,125 @@ def api_get_inmueble_detalle(request, inmueble_id):
             'status': 'error',
             'message': str(e)
         }, status=500)
+
+
+def api_get_estado_detalle(request, estado_id):
+    """Retorna la información agregada de todos los inmuebles de un estado en formato JSON para el modal interactivo de estado."""
+    try:
+        estado = Estado.objects.get(id=estado_id)
+        
+        # Inmuebles en este estado
+        inmuebles = Inmueble.objects.filter(estado=estado)
+        inmuebles_ids = list(inmuebles.values_list('id', flat=True))
+        inmueble_count = inmuebles.count()
+        
+        # 1. Personal
+        personal_qs = PersonalINM.objects.filter(lugar_asignado_id__in=inmuebles_ids)
+        total_personal = personal_qs.count()
+        activos = personal_qs.filter(estatus=True).count()
+        inactivos = total_personal - activos
+        
+        # 2. PIPC (Programa IPC) - Cuenta de inmuebles con programas activos
+        from .models import ProgramaIPC
+        pipc_qs = ProgramaIPC.objects.filter(inmueble_id__in=inmuebles_ids)
+        count_inm_pipc = pipc_qs.filter(inm_pipc=True).count()
+        count_comodante_pipc = pipc_qs.filter(comodante_pipc=True).count()
+        count_plan_emergencia = pipc_qs.filter(plan_emergencia=True).count()
+        
+        # 3. Tipos de Oficina (Suma de inmuebles por tipo de oficina)
+        from django.db.models import Count
+        from .models import TipoOficina
+        oficinas_conteo = TipoOficina.objects.filter(inmueble__estado=estado).annotate(total=Count('inmueble')).filter(total__gt=0).order_by('-total')
+        oficinas_data = []
+        for of in oficinas_conteo:
+            oficinas_data.append({
+                'nombre': of.nombre,
+                'total': of.total
+            })
+            
+        # 4. Actividades (Suma de inmuebles por tipo de actividad)
+        from .models import TipoActividad
+        actividades_conteo = TipoActividad.objects.filter(inmueble__estado=estado).annotate(total=Count('inmueble')).filter(total__gt=0).order_by('-total')
+        actividades_data = []
+        for act in actividades_conteo:
+            actividades_data.append({
+                'nombre': act.nombre,
+                'total': act.total
+            })
+            
+        # 5. Superficies y Renta
+        from django.db.models import Sum
+        sums = inmuebles.aggregate(
+            total_construida=Sum('superficie_construida'),
+            total_utilizada=Sum('superficie_utilizada'),
+            total_renta=Sum('monto_renta')
+        )
+        
+        superficie_const = sums['total_construida'] or 0.0
+        superficie_util = sums['total_utilizada'] or 0.0
+        total_renta = sums['total_renta'] or 0.0
+        
+        # 6. Figura de Ocupación (Conteo por figura de ocupación)
+        from .models import FiguraOcupacion
+        figuras_conteo = FiguraOcupacion.objects.filter(inmueble__estado=estado).annotate(total=Count('inmueble')).filter(total__gt=0)
+        figuras_dict = {
+            'ARRENDADO': 0,
+            'PROPIO': 0,
+            'TERRENO': 0,
+            'COMODATO': 0
+        }
+        for fig in figuras_conteo:
+            fig_tipo = fig.tipo.upper()
+            if 'ARRENDADO' in fig_tipo:
+                figuras_dict['ARRENDADO'] += fig.total
+            elif 'PROPIO' in fig_tipo:
+                figuras_dict['PROPIO'] += fig.total
+            elif 'TERRENO' in fig_tipo:
+                figuras_dict['TERRENO'] += fig.total
+            elif 'COMODATO' in fig_tipo:
+                figuras_dict['COMODATO'] += fig.total
+                
+        data = {
+            'estado_nombre': estado.nombre,
+            'inmueble_count': inmueble_count,
+            'personal': {
+                'total': total_personal,
+                'activos': activos,
+                'inactivos': inactivos
+            },
+            'vehiculos': {
+                'total': "S/D",
+                'activos': "S/D",
+                'inactivos': "S/D"
+            },
+            'pipc': {
+                'inm_pipc_count': count_inm_pipc,
+                'comodante_pipc_count': count_comodante_pipc,
+                'plan_emergencia_count': count_plan_emergencia
+            },
+            'superficie_construida': f"{superficie_const:,.2f}" if superficie_const else "0.00",
+            'superficie_utilizada': f"{superficie_util:,.2f}" if superficie_util else "0.00",
+            'figura_ocupacion': figuras_dict,
+            'renta': f"${total_renta:,.2f}" if total_renta else "S/D",
+            'oficinas': oficinas_data,
+            'actividades': actividades_data
+        }
+        
+        return JsonResponse({
+            'status': 'success',
+            'data': data
+        })
+    except Estado.DoesNotExist:
+        return JsonResponse({
+            'status': 'error',
+            'message': 'El estado solicitado no existe.'
+        }, status=404)
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
+
 
 
 

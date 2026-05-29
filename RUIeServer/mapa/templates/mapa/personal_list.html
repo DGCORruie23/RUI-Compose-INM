@@ -4,6 +4,7 @@
 {% block title %}Personal INM - RUIE{% endblock title %}
 
 {% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
     function openPersonalModal() {
         const modal = document.getElementById('personalModal');
@@ -21,6 +22,7 @@
         const modal = document.getElementById('cargaRapidaModal');
         modal.classList.add('hidden');
         document.body.style.overflow = 'auto';
+        resetUploadModal();
     }
 
     function updateFastFileName(input) {
@@ -164,6 +166,183 @@
             if (emptyRow) emptyRow.classList.remove('hidden');
         } else {
             if (emptyRow) emptyRow.classList.add('hidden');
+        }
+    }
+
+    async function handleCargaRapidaSubmit(event) {
+        event.preventDefault();
+        
+        const fileInput = document.getElementById('excel_file');
+        if (!fileInput.files || fileInput.files.length === 0) {
+            alert('Por favor seleccione un archivo Excel.');
+            return;
+        }
+        
+        const file = fileInput.files[0];
+        
+        // Hide upload form content, show progress container
+        document.getElementById('uploadFormContent').classList.add('hidden');
+        const progressContent = document.getElementById('progressContent');
+        progressContent.classList.remove('hidden');
+        
+        const statusText = document.getElementById('progressStatusText');
+        const percentText = document.getElementById('progressPercent');
+        const progressFill = document.getElementById('progressBarFill');
+        
+        statusText.innerText = 'Leyendo y preparando el archivo Excel...';
+        
+        const reader = new FileReader();
+        reader.onload = async function(e) {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheetName = workbook.SheetNames[0];
+                const sheet = workbook.Sheets[sheetName];
+                
+                // Convert sheet to 2D array of rows, formatting cell values as strings exactly as displayed in Excel
+                const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false });
+                
+                if (rows.length === 0) {
+                    alert('El archivo Excel está vacío.');
+                    resetUploadModal();
+                    return;
+                }
+                
+                // Find headers (first 20 rows, checking for STATUS or CODIGO-PLAZA)
+                let headers = [];
+                let headerRowIdx = -1;
+                
+                for (let r = 0; r < Math.min(20, rows.length); r++) {
+                    if (!rows[r]) continue;
+                    const rowVals = rows[r].map(v => String(v || '').trim().toUpperCase());
+                    if (rowVals.includes('STATUS') || rowVals.some(v => v.includes('PLAZA') || v.includes('CODIGO'))) {
+                        headers = rows[r].map(v => String(v || '').trim());
+                        headerRowIdx = r;
+                        break;
+                    }
+                }
+                
+                if (headerRowIdx === -1) {
+                    // Fallback to row 8 (index 7)
+                    headerRowIdx = Math.min(7, rows.length - 1);
+                    if (rows[headerRowIdx]) {
+                        headers = rows[headerRowIdx].map(v => String(v || '').trim());
+                    } else {
+                        headers = [];
+                    }
+                }
+                
+                const dataRows = rows.slice(headerRowIdx + 1).filter(r => r && r.some(cell => cell !== null && cell !== undefined && cell !== ''));
+                
+                if (dataRows.length === 0) {
+                    alert('No se encontraron registros de datos válidos para cargar.');
+                    resetUploadModal();
+                    return;
+                }
+                
+                // Split dataRows into chunks (e.g. 50 rows per chunk)
+                const chunkSize = 50;
+                const chunks = [];
+                for (let i = 0; i < dataRows.length; i += chunkSize) {
+                    chunks.push(dataRows.slice(i, i + chunkSize));
+                }
+                
+                const totalChunks = chunks.length;
+                let processedRows = 0;
+                let totalCreados = 0;
+                let totalActualizados = 0;
+                let totalOmitidos = 0;
+                
+                const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+                
+                for (let c = 0; c < totalChunks; c++) {
+                    const chunkRows = chunks[c];
+                    statusText.innerText = `Procesando bloque ${c + 1} de ${totalChunks} (Registros ${processedRows + 1} a ${Math.min(processedRows + chunkRows.length, dataRows.length)})...`;
+                    
+                    try {
+                        const response = await fetch("{% url 'carga_rapida_personal' %}", {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json",
+                                "X-CSRFToken": csrfToken
+                            },
+                            body: JSON.stringify({
+                                is_ajax_chunk: true,
+                                headers: headers,
+                                rows: chunkRows
+                            })
+                        });
+                        
+                        const result = await response.json();
+                        
+                        if (result.status === 'success') {
+                            totalCreados += result.creados;
+                            totalActualizados += result.actualizados;
+                            totalOmitidos += result.omitidos;
+                            
+                            // Update dynamic stats
+                            document.getElementById('statCreados').innerText = totalCreados;
+                            document.getElementById('statActualizados').innerText = totalActualizados;
+                            document.getElementById('statOmitidos').innerText = totalOmitidos;
+                            
+                            processedRows += chunkRows.length;
+                            
+                            // Calculate percentage
+                            const progressPercentage = Math.round((processedRows / dataRows.length) * 100);
+                            percentText.innerText = `${progressPercentage}%`;
+                            progressFill.style.width = `${progressPercentage}%`;
+                        } else {
+                            throw new Error(result.message || 'Error del servidor.');
+                        }
+                    } catch (chunkError) {
+                        console.error('Error in chunk:', chunkError);
+                        alert(`Error al procesar bloque: ${chunkError.message}. Se abortó la carga.`);
+                        resetUploadModal();
+                        return;
+                    }
+                }
+                
+                statusText.innerText = '¡Carga rápida completada exitosamente! Recargando listado...';
+                setTimeout(() => {
+                    location.reload();
+                }, 1500);
+                
+            } catch (err) {
+                console.error(err);
+                alert(`Error al procesar el archivo: ${err.message}`);
+                resetUploadModal();
+            }
+        };
+        
+        reader.readAsArrayBuffer(file);
+    }
+    
+    function resetUploadModal() {
+        const uploadContent = document.getElementById('uploadFormContent');
+        const progressContent = document.getElementById('progressContent');
+        if (uploadContent) uploadContent.classList.remove('hidden');
+        if (progressContent) progressContent.classList.add('hidden');
+        
+        const progressFill = document.getElementById('progressBarFill');
+        const progressPercent = document.getElementById('progressPercent');
+        const progressStatusText = document.getElementById('progressStatusText');
+        
+        if (progressFill) progressFill.style.width = '0%';
+        if (progressPercent) progressPercent.innerText = '0%';
+        if (progressStatusText) progressStatusText.innerText = '';
+        
+        const statC = document.getElementById('statCreados');
+        const statA = document.getElementById('statActualizados');
+        const statO = document.getElementById('statOmitidos');
+        
+        if (statC) statC.innerText = '0';
+        if (statA) statA.innerText = '0';
+        if (statO) statO.innerText = '0';
+        
+        const fileInput = document.getElementById('excel_file');
+        if (fileInput) {
+            fileInput.value = '';
+            updateFastFileName(fileInput);
         }
     }
 </script>
@@ -516,35 +695,77 @@
             </div>
 
             <!-- Cuerpo Modal -->
-            <form action="{% url 'carga_rapida_personal' %}" method="POST" enctype="multipart/form-data" class="space-y-6">
+            <form id="cargaRapidaForm" onsubmit="handleCargaRapidaSubmit(event)" class="space-y-6">
                 {% csrf_token %}
-                <div class="bg-gray-50/50 border border-dashed border-gray-200 rounded-3xl p-8 text-center hover:border-emerald-400 transition-colors group cursor-pointer relative">
-                    <input type="file" name="excel_file" id="excel_file" accept=".xlsx, .xls" required class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="updateFastFileName(this)">
-                    <div class="flex flex-col items-center">
-                        <div class="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 mb-4 group-hover:scale-110 transition-transform">
-                            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                
+                <!-- Contenedor del Formulario de Subida -->
+                <div id="uploadFormContent" class="space-y-6">
+                    <div class="bg-gray-50/50 border border-dashed border-gray-200 rounded-3xl p-8 text-center hover:border-emerald-400 transition-colors group cursor-pointer relative">
+                        <input type="file" name="excel_file" id="excel_file" accept=".xlsx, .xls" required class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="updateFastFileName(this)">
+                        <div class="flex flex-col items-center">
+                            <div class="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 mb-4 group-hover:scale-110 transition-transform">
+                                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                            </div>
+                            <p class="text-sm font-bold text-gray-700 mb-1" id="upload-label">Seleccionar Plantilla Excel</p>
+                            <p class="text-xs font-bold text-gray-400 uppercase tracking-wider" id="upload-filename">Formatos permitidos: .xlsx, .xls</p>
                         </div>
-                        <p class="text-sm font-bold text-gray-700 mb-1" id="upload-label">Seleccionar Plantilla Excel</p>
-                        <p class="text-xs font-bold text-gray-400 uppercase tracking-wider" id="upload-filename">Formatos permitidos: .xlsx, .xls</p>
+                    </div>
+
+                    <div class="bg-amber-50/60 border border-amber-100 rounded-2xl p-4 flex items-start space-x-3">
+                        <svg class="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        <div class="text-xs font-semibold text-amber-800 leading-relaxed">
+                            <p class="font-bold mb-1">Notas importantes:</p>
+                            <ul class="list-disc list-inside space-y-1">
+                                <li>El sistema identificará si debe actualizar o crear a partir del <strong>Código de Plaza</strong>.</li>
+                                <li>El <strong>Inmueble Asignado</strong> se dejará en blanco y el estatus de <strong>Jefe de Oficina</strong> se configurará en <code>FALSO</code> para todo el personal importado.</li>
+                                <li>Si el estatus es <code>VACANTE</code>, se limpiarán los datos demográficos y de fechas automáticamente.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Botones Acción -->
+                    <div class="pt-6 border-t border-gray-100 flex justify-end space-x-4">
+                        <button type="button" onclick="closeCargaRapidaModal()" class="px-6 py-3 bg-gray-100 text-gray-500 rounded-xl font-bold hover:bg-gray-200 transition-all focus:outline-none">Cancelar</button>
+                        <button type="submit" class="px-8 py-3 bg-emerald-600 text-white rounded-xl font-bold shadow-lg shadow-emerald-950/20 hover:bg-emerald-700 transition-all focus:outline-none">Iniciar Carga</button>
                     </div>
                 </div>
 
-                <div class="bg-amber-50/60 border border-amber-100 rounded-2xl p-4 flex items-start space-x-3">
-                    <svg class="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                    <div class="text-xs font-semibold text-amber-800 leading-relaxed">
-                        <p class="font-bold mb-1">Notas importantes:</p>
-                        <ul class="list-disc list-inside space-y-1">
-                            <li>El sistema identificará si debe actualizar o crear a partir del <strong>Código de Plaza</strong>.</li>
-                            <li>Si el estatus es diferente a <code class="bg-amber-100 px-1 rounded">ACTIVO</code> o <code class="bg-amber-100 px-1 rounded">VACANTE</code>, se guardará en blanco.</li>
-                            <li>Si el estatus es <code class="bg-amber-100 px-1 rounded">VACANTE</code>, se limpiarán los datos demográficos y de fechas de forma automática.</li>
-                        </ul>
+                <!-- Contenedor de la Barra de Carga (Asíncrono) -->
+                <div id="progressContent" class="hidden space-y-6 py-4 text-center">
+                    <div class="flex flex-col items-center">
+                        <!-- Spinner Circular Premium -->
+                        <div class="relative w-24 h-24 mb-4">
+                            <div class="absolute inset-0 rounded-full border-4 border-emerald-100"></div>
+                            <div class="absolute inset-0 rounded-full border-4 border-emerald-600 border-t-transparent animate-spin"></div>
+                            <div class="absolute inset-0 flex items-center justify-center">
+                                <span id="progressPercent" class="text-lg font-black text-emerald-800">0%</span>
+                            </div>
+                        </div>
+                        
+                        <h3 class="text-base font-black text-gray-800 uppercase tracking-tight">Procesando Importación...</h3>
+                        <p id="progressStatusText" class="text-xs font-bold text-gray-400 mt-1">Preparando archivo Excel...</p>
+                        
+                        <!-- Barra de Progreso Lineal -->
+                        <div class="w-full bg-gray-100 rounded-full h-3 mt-6 relative overflow-hidden border border-gray-200/50">
+                            <div id="progressBarFill" class="bg-gradient-to-r from-emerald-500 to-teal-600 h-full rounded-full w-0 transition-all duration-300"></div>
+                        </div>
+                        
+                        <!-- Estadísticas de procesamiento -->
+                        <div class="grid grid-cols-3 gap-2 w-full mt-6 bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                            <div class="text-center">
+                                <span id="statCreados" class="text-lg font-black text-emerald-600 block">0</span>
+                                <span class="text-[8px] font-bold text-gray-400 uppercase tracking-wider">Creados</span>
+                            </div>
+                            <div class="text-center border-x border-gray-200">
+                                <span id="statActualizados" class="text-lg font-black text-blue-600 block">0</span>
+                                <span class="text-[8px] font-bold text-gray-400 uppercase tracking-wider">Actualizados</span>
+                            </div>
+                            <div class="text-center">
+                                <span id="statOmitidos" class="text-lg font-black text-amber-600 block">0</span>
+                                <span class="text-[8px] font-bold text-gray-400 uppercase tracking-wider">Omitidos</span>
+                            </div>
+                        </div>
                     </div>
-                </div>
-
-                <!-- Botones Acción -->
-                <div class="pt-6 border-t border-gray-100 flex justify-end space-x-4">
-                    <button type="button" onclick="closeCargaRapidaModal()" class="px-6 py-3 bg-gray-100 text-gray-500 rounded-xl font-bold hover:bg-gray-200 transition-all focus:outline-none">Cancelar</button>
-                    <button type="submit" class="px-8 py-3 bg-emerald-600 text-white rounded-xl font-bold shadow-lg shadow-emerald-950/20 hover:bg-emerald-700 transition-all focus:outline-none">Iniciar Carga</button>
                 </div>
             </form>
         </div>
