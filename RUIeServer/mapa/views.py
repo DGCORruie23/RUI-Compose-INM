@@ -668,23 +668,64 @@ def eliminar_titular(request, titular_id):
 
 
 def personal_list(request):
-    """Vista para la gestión independiente del Personal INM."""
+    """Vista para la gestión independiente del Personal INM con paginación y filtros en el servidor."""
     user_state = get_user_state(request)
     
+    # 1. Obtener filtros de la solicitud GET
+    nombre_query = request.GET.get('nombre', '').strip()
+    estado_id_query = request.GET.get('estado_id', '').strip()
+    puesto_query = request.GET.get('puesto', '').strip()
+    page_number = request.GET.get('page', 1)
+    
+    # 2. Filtrar queryset de personal
+    personal_qs = PersonalINM.objects.all().select_related('estado', 'lugar_asignado')
+    
+    if user_state:
+        personal_qs = personal_qs.filter(estado=user_state)
+        estados_list_all = [user_state]
+    else:
+        estados_list_all = Estado.objects.all().order_by('nombre')
+        if estado_id_query:
+            personal_qs = personal_qs.filter(estado_id=estado_id_query)
+            
+    if nombre_query:
+        from django.db.models import Q
+        personal_qs = personal_qs.filter(
+            Q(nombre__icontains=nombre_query) | 
+            Q(apellido__icontains=nombre_query) | 
+            Q(num_empleado__icontains=nombre_query) |
+            Q(codigo_plaza__icontains=nombre_query)
+        )
+        
+    if puesto_query:
+        personal_qs = personal_qs.filter(puesto_especifico__icontains=puesto_query)
+        
+    personal_qs = personal_qs.order_by('estado__nombre', 'nombre')
+    total_matched = personal_qs.count()
+    
+    # 3. Paginación de resultados (50 por página)
+    from django.core.paginator import Paginator
+    paginator = Paginator(personal_qs, 50)
+    page_obj = paginator.get_page(page_number)
+    
+    # 4. Listados para formularios de creación/edición
     if user_state:
         estados_list = [user_state]
-        personal_list = PersonalINM.objects.filter(estado=user_state).order_by('estado__nombre', 'nombre')
         inmuebles_list = Inmueble.objects.filter(estado=user_state).order_by('nombre_inmueble')
     else:
         estados_list = Estado.objects.all().order_by('nombre')
-        personal_list = PersonalINM.objects.all().order_by('estado__nombre', 'nombre')
         inmuebles_list = Inmueble.objects.all().order_by('nombre_inmueble')
-
+        
     return render(request, 'mapa/personal_list.html', {
         'estados_list': estados_list,
+        'estados_list_all': estados_list_all,
         'actividades_list': TipoActividad.objects.all().order_by('nombre'),
         'inmuebles_list': inmuebles_list,
-        'personal_list': personal_list,
+        'personal_list': page_obj,  # El paginador actúa como iterable en el template
+        'total_matched': total_matched,
+        'nombre_query': nombre_query,
+        'estado_id_query': estado_id_query,
+        'puesto_query': puesto_query,
     })
 
 
@@ -2736,12 +2777,16 @@ def api_get_estado_detalle(request, estado_id):
         activos = personal_qs.filter(estatus=True).count()
         inactivos = total_personal - activos
         
-        # 2. PIPC (Programa IPC) - Cuenta de inmuebles con programas activos
+        # 2. PIPC (Programa IPC) - Cuenta de inmuebles con programas activos y sus listados
         from .models import ProgramaIPC
         pipc_qs = ProgramaIPC.objects.filter(inmueble_id__in=inmuebles_ids)
         count_inm_pipc = pipc_qs.filter(inm_pipc=True).count()
         count_comodante_pipc = pipc_qs.filter(comodante_pipc=True).count()
         count_plan_emergencia = pipc_qs.filter(plan_emergencia=True).count()
+        
+        inm_pipc_list = list(Inmueble.objects.filter(estado=estado, id__in=list(pipc_qs.filter(inm_pipc=True).values_list('inmueble_id', flat=True))).values('id', 'nombre_inmueble'))
+        comodante_pipc_list = list(Inmueble.objects.filter(estado=estado, id__in=list(pipc_qs.filter(comodante_pipc=True).values_list('inmueble_id', flat=True))).values('id', 'nombre_inmueble'))
+        plan_emergencia_list = list(Inmueble.objects.filter(estado=estado, id__in=list(pipc_qs.filter(plan_emergencia=True).values_list('inmueble_id', flat=True))).values('id', 'nombre_inmueble'))
         
         # 3. Tipos de Oficina (Suma de inmuebles por tipo de oficina)
         from django.db.models import Count
@@ -2749,9 +2794,11 @@ def api_get_estado_detalle(request, estado_id):
         oficinas_conteo = TipoOficina.objects.filter(inmueble__estado=estado).annotate(total=Count('inmueble')).filter(total__gt=0).order_by('-total')
         oficinas_data = []
         for of in oficinas_conteo:
+            inms_list = list(Inmueble.objects.filter(estado=estado, tipo_oficina=of).values('id', 'nombre_inmueble'))
             oficinas_data.append({
                 'nombre': of.nombre,
-                'total': of.total
+                'total': of.total,
+                'inmuebles': inms_list
             })
             
         # 4. Actividades (Suma de inmuebles por tipo de actividad)
@@ -2759,9 +2806,11 @@ def api_get_estado_detalle(request, estado_id):
         actividades_conteo = TipoActividad.objects.filter(inmueble__estado=estado).annotate(total=Count('inmueble')).filter(total__gt=0).order_by('-total')
         actividades_data = []
         for act in actividades_conteo:
+            inms_list = list(Inmueble.objects.filter(estado=estado, tipo_actividad=act).values('id', 'nombre_inmueble'))
             actividades_data.append({
                 'nombre': act.nombre,
-                'total': act.total
+                'total': act.total,
+                'inmuebles': inms_list
             })
             
         # 5. Superficies y Renta
@@ -2811,12 +2860,21 @@ def api_get_estado_detalle(request, estado_id):
             },
             'pipc': {
                 'inm_pipc_count': count_inm_pipc,
+                'inm_pipc_inmuebles': inm_pipc_list,
                 'comodante_pipc_count': count_comodante_pipc,
-                'plan_emergencia_count': count_plan_emergencia
+                'comodante_pipc_inmuebles': comodante_pipc_list,
+                'plan_emergencia_count': count_plan_emergencia,
+                'plan_emergencia_inmuebles': plan_emergencia_list
             },
             'superficie_construida': f"{superficie_const:,.2f}" if superficie_const else "0.00",
             'superficie_utilizada': f"{superficie_util:,.2f}" if superficie_util else "0.00",
             'figura_ocupacion': figuras_dict,
+            'figura_ocupacion_inmuebles': {
+                'ARRENDADO': list(Inmueble.objects.filter(estado=estado, figura_ocupacion__tipo__icontains='ARRENDADO').values('id', 'nombre_inmueble')),
+                'PROPIO': list(Inmueble.objects.filter(estado=estado, figura_ocupacion__tipo__icontains='PROPIO').values('id', 'nombre_inmueble')),
+                'TERRENO': list(Inmueble.objects.filter(estado=estado, figura_ocupacion__tipo__icontains='TERRENO').values('id', 'nombre_inmueble')),
+                'COMODATO': list(Inmueble.objects.filter(estado=estado, figura_ocupacion__tipo__icontains='COMODATO').values('id', 'nombre_inmueble')),
+            },
             'renta': f"${total_renta:,.2f}" if total_renta else "S/D",
             'oficinas': oficinas_data,
             'actividades': actividades_data

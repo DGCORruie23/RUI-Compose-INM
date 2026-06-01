@@ -1534,6 +1534,14 @@
           const initialSize = Math.max(10, Math.min(35, 12 + (currentZoom - 4.5) * 2));
 
           dataList.forEach(item => {
+              const lng = parseFloat(item.x);
+              const lat = parseFloat(item.y);
+              
+              if (isNaN(lng) || isNaN(lat) || lng < -180 || lng > 180 || lat < -90 || lat > 90) {
+                  console.warn(`Coordenadas LngLat inválidas omitidas para: ${item.nombre} (lng: ${item.x}, lat: ${item.y})`);
+                  return; // Saltar este punto corrupto sin tumbar la ejecución del script del mapa
+              }
+
               const el = document.createElement('img');
               el.src = item.url;
               el.style.width = initialSize + 'px';
@@ -1552,7 +1560,7 @@
               `);
               
               const marker = new maplibregl.Marker({ element: el })
-                .setLngLat([item.x, item.y])
+                .setLngLat([lng, lat])
                 .setPopup(mPopup)
                 .addTo(map);
                 
@@ -1848,9 +1856,17 @@
             vigenciaLabel.classList.remove('bg-rose-50', 'text-rose-700', 'border-rose-100');
             vigenciaLabel.classList.add('bg-emerald-50', 'text-emerald-700', 'border-emerald-100');
             
-            iframe.src = data.pdf_url;
+            iframe.src = data.pdf_url + '#toolbar=0';
             iframe.classList.remove('hidden');
             noPdfDiv.classList.add('hidden');
+            
+            // Revelar botón y enlazar URL
+            const actionsContainer = document.getElementById('orgActionsContainer');
+            const openBtn = document.getElementById('btnOpenPdfNewTab');
+            if (actionsContainer && openBtn) {
+                openBtn.href = data.pdf_url;
+                actionsContainer.classList.remove('hidden');
+            }
         } else {
             vigenciaLabel.innerText = "Estado Sin Estructura Orgánica";
             vigenciaLabel.classList.remove('bg-emerald-50', 'text-emerald-700', 'border-emerald-100');
@@ -1859,12 +1875,24 @@
             iframe.src = '';
             iframe.classList.add('hidden');
             noPdfDiv.classList.remove('hidden');
+            
+            // Ocultar botón de nueva ventana
+            const actionsContainer = document.getElementById('orgActionsContainer');
+            if (actionsContainer) {
+                actionsContainer.classList.add('hidden');
+            }
         }
     } catch (err) {
         vigenciaLabel.innerText = "Error de conexión";
         iframe.src = '';
         iframe.classList.add('hidden');
         noPdfDiv.classList.remove('hidden');
+        
+        // Ocultar botón
+        const actionsContainer = document.getElementById('orgActionsContainer');
+        if (actionsContainer) {
+            actionsContainer.classList.add('hidden');
+        }
     }
   };
 
@@ -1874,6 +1902,12 @@
     modal.classList.add('hidden');
     iframe.src = '';
     document.body.style.overflow = 'auto';
+    
+    // Ocultar botón al cerrar modal
+    const actionsContainer = document.getElementById('orgActionsContainer');
+    if (actionsContainer) {
+        actionsContainer.classList.add('hidden');
+    }
   };
 
   window.openInmuebleDetailModal = async function(inmuebleId) {
@@ -2065,10 +2099,24 @@
             document.getElementById('estVehActivos').innerText = '';
             document.getElementById('estVehInactivos').innerText = '';
             
-            // PIPC counts
-            document.getElementById('estPipcInm').innerText = data.pipc.inm_pipc_count;
-            document.getElementById('estPipcComodante').innerText = data.pipc.comodante_pipc_count;
-            document.getElementById('estPipcEmergencia').innerText = data.pipc.plan_emergencia_count;
+            // PIPC counts con Tooltips interactivos
+            const bindPipcTooltip = (id, count, inmueblesList) => {
+                const el = document.getElementById(id);
+                el.innerText = count;
+                if (count > 0) {
+                    el.className = "text-sm font-black cursor-help hover:text-[#611232] hover:scale-110 inline-block transition-all text-[#10312B]";
+                    const inmsJson = encodeURIComponent(JSON.stringify(inmueblesList || []));
+                    el.setAttribute('onmouseenter', `window.showInmueblesTooltip(event, this, '${inmsJson}')`);
+                    el.setAttribute('onmouseleave', 'window.hideInmueblesTooltip()');
+                } else {
+                    el.className = "text-sm font-black text-gray-400";
+                    el.removeAttribute('onmouseenter');
+                    el.removeAttribute('onmouseleave');
+                }
+            };
+            bindPipcTooltip('estPipcInm', data.pipc.inm_pipc_count, data.pipc.inm_pipc_inmuebles);
+            bindPipcTooltip('estPipcComodante', data.pipc.comodante_pipc_count, data.pipc.comodante_pipc_inmuebles);
+            bindPipcTooltip('estPipcEmergencia', data.pipc.plan_emergencia_count, data.pipc.plan_emergencia_inmuebles);
             
             // Inmuebles Totales
             document.getElementById('estInmueblesTotal').innerText = data.inmueble_count;
@@ -2090,9 +2138,12 @@
                 ofContainer.innerHTML = '<div class="text-[11px] font-bold text-gray-300 italic text-center w-full py-4">SIN OFICINAS REGISTRADAS</div>';
             } else {
                 data.oficinas.forEach(of => {
+                    const ofInms = encodeURIComponent(JSON.stringify(of.inmuebles || []));
                     ofContainer.innerHTML += `
                         <div class="text-[10px] font-black text-[#611232] bg-[#611232]/5 px-3 py-2 rounded-xl border border-[#611232]/10 uppercase tracking-tight flex items-center gap-2 whitespace-normal break-words">
-                            <span class="w-6 h-6 bg-[#611232] text-white text-[9px] font-black rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm">${of.total}</span>
+                            <span class="w-6 h-6 bg-[#611232] text-white text-[9px] font-black rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm cursor-help hover:scale-110 active:scale-95 transition-transform"
+                                  onmouseenter="window.showInmueblesTooltip(event, this, '${ofInms}')"
+                                  onmouseleave="window.hideInmueblesTooltip()">${of.total}</span>
                             <span>${of.nombre}</span>
                         </div>
                     `;
@@ -2129,9 +2180,12 @@
             } else {
                 data.actividades.forEach(act => {
                     const iconFile = getIconFilename(act.nombre);
+                    const actInms = encodeURIComponent(JSON.stringify(act.inmuebles || []));
                     actContainer.innerHTML += `
-                        <div class="flex flex-col items-center p-3 rounded-2xl border border-[#611232]/30 bg-emerald-50/20 transition-all duration-300 hover:scale-105 relative cursor-help" title="${act.nombre}">
-                            <span class="absolute -top-2 -right-2 w-5 h-5 bg-[#611232] text-white text-[9px] font-black rounded-full flex items-center justify-center border border-white shadow-md">${act.total}</span>
+                        <div class="flex flex-col items-center p-3 rounded-2xl border border-[#611232]/30 bg-emerald-50/20 transition-all duration-300 hover:scale-105 relative">
+                            <span class="absolute -top-2 -right-2 w-5 h-5 bg-[#611232] text-white text-[9px] font-black rounded-full flex items-center justify-center border border-white shadow-md cursor-help hover:scale-110 active:scale-95 transition-transform"
+                                  onmouseenter="window.showInmueblesTooltip(event, this, '${actInms}')"
+                                  onmouseleave="window.hideInmueblesTooltip()">${act.total}</span>
                             <div class="w-10 h-10 flex items-center justify-center">
                                 <img src="/static/mapa/icons_inmueble/${iconFile}" alt="${act.nombre}" class="w-full h-full object-contain">
                             </div>
@@ -2140,26 +2194,28 @@
                 });
             }
             
-            // 10. Figura de Ocupación con conteos dinámicos
-            document.getElementById('estFigArrendadoVal').innerText = data.figura_ocupacion.ARRENDADO;
-            document.getElementById('estFigPropioVal').innerText = data.figura_ocupacion.PROPIO;
-            document.getElementById('estFigTerrenoVal').innerText = data.figura_ocupacion.TERRENO;
-            document.getElementById('estFigComodatoVal').innerText = data.figura_ocupacion.COMODATO;
-            
-            // Activar/Opacar según existencia de elementos
-            const toggleFigBadge = (id, total) => {
+            // 10. Figura de Ocupación con conteos dinámicos y Tooltips interactivos
+            const toggleFigBadge = (id, valId, total, inmueblesList) => {
                 const el = document.getElementById(id);
+                const valEl = document.getElementById(valId);
+                valEl.innerText = total;
+                
                 if (total > 0) {
-                    el.className = "flex-1 flex flex-col items-center p-3 rounded-2xl border border-[#611232]/30 bg-emerald-50/20 opacity-100 grayscale-0 transition-all duration-300 font-extrabold";
+                    el.className = "flex-1 flex flex-col items-center p-3 rounded-2xl border border-[#611232]/30 bg-emerald-50/20 opacity-100 grayscale-0 transition-all duration-300 font-extrabold cursor-help hover:scale-105";
+                    const inmsJson = encodeURIComponent(JSON.stringify(inmueblesList || []));
+                    el.setAttribute('onmouseenter', `window.showInmueblesTooltip(event, this, '${inmsJson}')`);
+                    el.setAttribute('onmouseleave', 'window.hideInmueblesTooltip()');
                 } else {
                     el.className = "flex-1 flex flex-col items-center p-3 rounded-2xl border border-gray-100 bg-gray-50/50 opacity-30 grayscale transition-all duration-300";
+                    el.removeAttribute('onmouseenter');
+                    el.removeAttribute('onmouseleave');
                 }
             };
             
-            toggleFigBadge('estFigArrendado', data.figura_ocupacion.ARRENDADO);
-            toggleFigBadge('estFigPropio', data.figura_ocupacion.PROPIO);
-            toggleFigBadge('estFigTerreno', data.figura_ocupacion.TERRENO);
-            toggleFigBadge('estFigComodato', data.figura_ocupacion.COMODATO);
+            toggleFigBadge('estFigArrendado', 'estFigArrendadoVal', data.figura_ocupacion.ARRENDADO, data.figura_ocupacion_inmuebles.ARRENDADO);
+            toggleFigBadge('estFigPropio', 'estFigPropioVal', data.figura_ocupacion.PROPIO, data.figura_ocupacion_inmuebles.PROPIO);
+            toggleFigBadge('estFigTerreno', 'estFigTerrenoVal', data.figura_ocupacion.TERRENO, data.figura_ocupacion_inmuebles.TERRENO);
+            toggleFigBadge('estFigComodato', 'estFigComodatoVal', data.figura_ocupacion.COMODATO, data.figura_ocupacion_inmuebles.COMODATO);
             
             // Renta Card opacity based on ARRENDADO count
             const rentaCard = document.getElementById('estRentaCard');
@@ -2184,7 +2240,102 @@
     const modal = document.getElementById('estadoDetailModal');
     if (modal) modal.classList.add('hidden');
     document.body.style.overflow = 'auto';
+    
+    // Ocultar tooltip al cerrar modal consolidado
+    const tooltip = document.getElementById('estadoInmueblesTooltip');
+    if (tooltip) tooltip.classList.add('hidden');
   };
+
+  let tooltipTimeout;
+  
+  window.showInmueblesTooltip = function(event, badgeElement, inmueblesJsonStr) {
+      clearTimeout(tooltipTimeout);
+      const inmuebles = JSON.parse(decodeURIComponent(inmueblesJsonStr));
+      const tooltip = document.getElementById('estadoInmueblesTooltip');
+      const listContainer = document.getElementById('estadoInmueblesTooltipList');
+      const arrow = document.getElementById('estadoInmueblesTooltipArrow');
+      
+      listContainer.innerHTML = '';
+      if (!inmuebles || inmuebles.length === 0) {
+          listContainer.innerHTML = '<div class="text-[10px] text-gray-400 font-bold italic text-center py-2">Sin inmuebles</div>';
+      } else {
+          inmuebles.forEach(inm => {
+              const a = document.createElement('a');
+              a.href = '#';
+              a.className = 'block text-[11px] font-bold text-[#611232] hover:bg-[#611232]/5 px-2.5 py-1.5 rounded-lg transition-all border-b border-gray-50 last:border-0 hover:translate-x-1 duration-150 transform text-left flex items-center gap-1.5';
+              a.innerHTML = `
+                  <svg class="w-3.5 h-3.5 text-[#611232] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                  </svg>
+                  <span class="truncate">${inm.nombre_inmueble}</span>
+              `;
+              a.onclick = function(e) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  window.openInmuebleDetailModal(inm.id);
+                  tooltip.classList.add('hidden');
+              };
+              listContainer.appendChild(a);
+          });
+      }
+      
+      tooltip.classList.remove('hidden');
+      
+      // Calcular coordenadas relativas al contenedor modal
+      const modal = document.querySelector('#estadoDetailModal > div.relative');
+      const rect = badgeElement.getBoundingClientRect();
+      const modalRect = modal.getBoundingClientRect();
+      
+      const tooltipWidth = tooltip.offsetWidth || 288;
+      const tooltipHeight = tooltip.offsetHeight || 150;
+      
+      let leftPos = rect.left - modalRect.left + (rect.width / 2) - (tooltipWidth / 2);
+      // Mantener dentro de los límites laterales del modal
+      if (leftPos < 10) leftPos = 10;
+      if (leftPos + tooltipWidth > modalRect.width - 10) {
+          leftPos = modalRect.width - tooltipWidth - 10;
+      }
+      
+      let topPos = rect.top - modalRect.top - tooltipHeight - 12;
+      let arrowTop = tooltipHeight - 6;
+      let arrowBorderStyles = 'border-r border-b';
+      
+      if (rect.top - modalRect.top < tooltipHeight + 20) {
+          // Posicionar debajo del badge
+          topPos = rect.bottom - modalRect.top + 12;
+          arrowTop = -6;
+          arrowBorderStyles = 'border-l border-t';
+      }
+      
+      tooltip.style.left = `${leftPos}px`;
+      tooltip.style.top = `${topPos}px`;
+      
+      // Centrar la flecha con respecto al badge
+      const badgeCenterRelative = rect.left - modalRect.left + (rect.width / 2) - leftPos;
+      arrow.className = `absolute w-3 h-3 bg-white ${arrowBorderStyles} border-[#611232]/10 transform rotate-45`;
+      arrow.style.left = `${badgeCenterRelative - 6}px`;
+      arrow.style.top = `${arrowTop}px`;
+  };
+  
+  window.hideInmueblesTooltip = function() {
+      tooltipTimeout = setTimeout(() => {
+          const tooltip = document.getElementById('estadoInmueblesTooltip');
+          if (tooltip) tooltip.classList.add('hidden');
+      }, 200);
+  };
+  
+  // Registrar eventos para el tooltip (evitar que se cierre al pasar el mouse por encima)
+  const setupTooltip = () => {
+      const tooltip = document.getElementById('estadoInmueblesTooltip');
+      if (tooltip) {
+          tooltip.onmouseenter = () => clearTimeout(tooltipTimeout);
+          tooltip.onmouseleave = () => {
+              tooltip.classList.add('hidden');
+          };
+      }
+  };
+  
+  setTimeout(setupTooltip, 500);
 </script>
 
     <!-- Modal Curriculum Titular -->
@@ -2306,13 +2457,24 @@
             </button>
 
             <!-- Cabecera -->
-            <div class="p-8 border-b border-gray-100 flex-shrink-0 bg-gray-50/50">
-                <span class="text-[9px] font-black text-emerald-600 uppercase tracking-[0.2em]">Estructura Orgánica</span>
-                <h2 id="orgStateName" class="text-3xl font-extrabold text-gray-900 mt-1 uppercase">ESTADO</h2>
-                <div class="flex items-center space-x-2 mt-2">
-                    <span class="px-2 py-0.5 inline-block text-[9px] font-black rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 uppercase" id="orgVigenciaLabel">
-                        Vigencia: Sin vigencia
-                    </span>
+            <div class="p-8 border-b border-gray-100 flex-shrink-0 bg-gray-50/50 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <span class="text-[9px] font-black text-emerald-600 uppercase tracking-[0.2em]">Estructura Orgánica</span>
+                    <h2 id="orgStateName" class="text-3xl font-extrabold text-gray-900 mt-1 uppercase text-left">ESTADO</h2>
+                    <div class="flex items-center space-x-2 mt-2">
+                        <span class="px-2 py-0.5 inline-block text-[9px] font-black rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 uppercase" id="orgVigenciaLabel">
+                            Vigencia: Sin vigencia
+                        </span>
+                    </div>
+                </div>
+                <!-- Botón de acción: Abrir en Nueva Ventana -->
+                <div id="orgActionsContainer" class="hidden flex-shrink-0 pr-12">
+                    <a id="btnOpenPdfNewTab" href="#" target="_blank" class="px-6 py-3.5 bg-[#611232] hover:bg-[#611232]/90 text-white text-xs font-bold rounded-xl shadow-md hover:shadow-lg transition-all flex items-center gap-2 hover:scale-[1.02] active:scale-[0.98]">
+                        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 6H6a2 2 0 00-2-2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                        </svg>
+                        <span>Abrir en Nueva Ventana</span>
+                    </a>
                 </div>
             </div>
 
@@ -2332,7 +2494,7 @@
     </div>
 
     <!-- Modal Detalle del Inmueble -->
-    <div id="inmuebleDetailModal" class="hidden fixed inset-0 z-[10000] flex items-center justify-center p-4">
+    <div id="inmuebleDetailModal" class="hidden fixed inset-0 z-[11000] flex items-center justify-center p-4">
         <!-- Backdrop Blur overlay -->
         <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity duration-300" onclick="closeInmuebleDetailModal()"></div>
         
@@ -2781,6 +2943,19 @@
                  style="background-image: url('{% static 'mapa/fondos/patron_cere.svg' %}'); background-size: cover; background-position: bottom;">
             </div>
 
+        </div>
+        
+        <!-- Contenedor Flotante Tooltip para Lista de Inmuebles Relacionados -->
+        <div id="estadoInmueblesTooltip" class="hidden absolute bg-white border border-[#611232]/15 rounded-2xl shadow-2xl p-4 w-72 z-[12000] animate-fade-in pointer-events-auto transition-all duration-200">
+            <div class="text-[10px] font-black text-[#611232] uppercase tracking-[0.15em] mb-2 pb-1.5 border-b border-gray-100 flex justify-between items-center">
+                <span>Inmuebles Relacionados</span>
+                <span class="w-1.5 h-1.5 bg-[#611232] rounded-full animate-pulse"></span>
+            </div>
+            <div id="estadoInmueblesTooltipList" class="flex flex-col gap-1 max-h-48 overflow-y-auto custom-scrollbar">
+                <!-- Los enlaces se generan dinámicamente con JS -->
+            </div>
+            <!-- Flecha indicadora -->
+            <div id="estadoInmueblesTooltipArrow" class="absolute w-3 h-3 bg-white transform rotate-45"></div>
         </div>
     </div>
 </main>

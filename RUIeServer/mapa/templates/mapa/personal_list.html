@@ -159,31 +159,7 @@
         }
     }
 
-    function filterTable() {
-        const query = document.getElementById('search-input').value.toLowerCase();
-        const rows = document.querySelectorAll('tbody tr:not(.empty-row)');
-        let visibleCount = 0;
-        
-        rows.forEach(row => {
-            const nombre = row.querySelector('.col-nombre').innerText.toLowerCase();
-            const empleado = row.querySelector('.col-empleado').innerText.toLowerCase();
-            const puesto = row.querySelector('.col-puesto').innerText.toLowerCase();
-            
-            if (nombre.includes(query) || empleado.includes(query) || puesto.includes(query)) {
-                row.classList.remove('hidden');
-                visibleCount++;
-            } else {
-                row.classList.add('hidden');
-            }
-        });
-        
-        const emptyRow = document.querySelector('tr.empty-row');
-        if (visibleCount === 0) {
-            if (emptyRow) emptyRow.classList.remove('hidden');
-        } else {
-            if (emptyRow) emptyRow.classList.add('hidden');
-        }
-    }
+
 
     async function handleCargaRapidaSubmit(event) {
         event.preventDefault();
@@ -532,18 +508,64 @@
 
         <!-- Panel de Búsqueda y Tabla -->
         <div class="bg-white border border-gray-100 rounded-[2.5rem] shadow-sm overflow-hidden mb-12 animate-slide-up" style="animation-delay: 0.1s;">
-            <div class="p-8 border-b border-gray-50 flex flex-col md:flex-row justify-between items-center gap-4">
-                <div>
-                    <h2 class="text-xl font-bold text-gray-900">Personal Registrado</h2>
-                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Gestión de personal de la representación</p>
-                </div>
-                <div class="flex items-center space-x-3 w-full md:w-auto">
-                    <input type="text" id="search-input" onkeyup="filterTable()" placeholder="Buscar por nombre, empleado o puesto..." class="w-full md:w-80 px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl outline-none text-sm font-bold text-gray-700 placeholder-gray-400 focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all">
-                    <div class="flex items-center space-x-2 px-4 py-3 bg-gray-50 rounded-xl flex-shrink-0">
+            <div class="p-8 border-b border-gray-50">
+                <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
+                    <div>
+                        <h2 class="text-xl font-bold text-gray-900">Personal Registrado</h2>
+                        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Gestión de personal de la representación</p>
+                    </div>
+                    <div class="flex items-center space-x-2 px-4 py-3 bg-gray-50 rounded-xl">
                         <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-                        <span class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{{ personal_list.count }} Empleados</span>
+                        <span class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{{ total_matched }} Empleados Coincidentes</span>
                     </div>
                 </div>
+
+                <!-- Formulario de Filtros Servidor -->
+                <form method="GET" action="{% url 'personal_list' %}" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end bg-gray-50/50 p-6 rounded-3xl border border-gray-100">
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Nombre / Empleado / Plaza</label>
+                        <div class="relative">
+                            <input type="text" name="nombre" value="{{ nombre_query }}" placeholder="Buscar por nombre, plaza, nº..." class="w-full pl-4 pr-10 py-3 bg-white border border-gray-200 rounded-xl outline-none text-xs font-bold text-gray-700 placeholder-gray-400 focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all">
+                            <span class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-400">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Estado (OR)</label>
+                        <select name="estado_id" class="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none text-xs font-bold text-gray-700 focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all appearance-none cursor-pointer">
+                            {% if estados_list_all|length > 1 %}
+                                <option value="">Todos los Estados</option>
+                            {% endif %}
+                            {% for est in estados_list_all %}
+                                <option value="{{ est.id }}" {% if estado_id_query == est.id|slugify %}selected{% endif %}>{{ est.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Puesto Específico</label>
+                        <div class="relative">
+                            <input type="text" name="puesto" value="{{ puesto_query }}" placeholder="Ej: JEFE DE DEPARTAMENTO" class="w-full pl-4 pr-10 py-3 bg-white border border-gray-200 rounded-xl outline-none text-xs font-bold text-gray-700 placeholder-gray-400 focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all">
+                            <span class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-400">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center space-x-2">
+                        <button type="submit" class="flex-1 py-3 bg-stone-800 hover:bg-stone-900 text-white text-xs font-bold rounded-xl transition-all shadow-md flex items-center justify-center space-x-2 hover:scale-[1.02] active:scale-[0.98]">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path></svg>
+                            <span>Filtrar</span>
+                        </button>
+                        {% if nombre_query or estado_id_query or puesto_query %}
+                            <a href="{% url 'personal_list' %}" class="px-4 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-bold rounded-xl transition-all flex items-center justify-center hover:scale-[1.02] active:scale-[0.98]" title="Limpiar Filtros">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+                            </a>
+                        {% endif %}
+                    </div>
+                </form>
             </div>
             
             <div class="overflow-x-auto">
@@ -630,6 +652,66 @@
                     </tbody>
                 </table>
             </div>
+
+            <!-- Paginación Servidor -->
+            {% if personal_list.has_other_pages %}
+            <div class="px-8 py-5 border-t border-gray-50 bg-gray-50/20 flex flex-col sm:flex-row justify-between items-center gap-4">
+                <div class="text-xs font-bold text-gray-500">
+                    Mostrando <span class="text-gray-900">{{ personal_list.start_index }}</span> a <span class="text-gray-900">{{ personal_list.end_index }}</span> de <span class="text-gray-900">{{ total_matched }}</span> registros
+                </div>
+                
+                <div class="flex items-center space-x-1">
+                    {% if personal_list.has_previous %}
+                        <!-- Primera página -->
+                        <a href="?page=1{% if nombre_query %}&nombre={{ nombre_query }}{% endif %}{% if estado_id_query %}&estado_id={{ estado_id_query }}{% endif %}{% if puesto_query %}&puesto={{ puesto_query }}{% endif %}" 
+                           class="p-2 text-gray-500 hover:text-inm-verde-100 hover:bg-gray-100 rounded-xl transition-all"
+                           title="Primera página">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"></path></svg>
+                        </a>
+                        <!-- Página anterior -->
+                        <a href="?page={{ personal_list.previous_page_number }}{% if nombre_query %}&nombre={{ nombre_query }}{% endif %}{% if estado_id_query %}&estado_id={{ estado_id_query }}{% endif %}{% if puesto_query %}&puesto={{ puesto_query }}{% endif %}" 
+                           class="p-2 text-gray-500 hover:text-inm-verde-100 hover:bg-gray-100 rounded-xl transition-all"
+                           title="Página anterior">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                        </a>
+                    {% endif %}
+
+                    <!-- Rango de páginas inteligentes para no saturar la pantalla -->
+                    {% for num in personal_list.paginator.page_range %}
+                        {% if num == personal_list.number %}
+                            <span class="px-3.5 py-2 bg-stone-800 text-white text-xs font-black rounded-xl shadow-sm">{{ num }}</span>
+                        {% elif num > personal_list.number|add:"-3" and num < personal_list.number|add:"3" %}
+                            <a href="?page={{ num }}{% if nombre_query %}&nombre={{ nombre_query }}{% endif %}{% if estado_id_query %}&estado_id={{ estado_id_query }}{% endif %}{% if puesto_query %}&puesto={{ puesto_query }}{% endif %}" 
+                               class="px-3.5 py-2 text-gray-600 hover:text-inm-verde-100 hover:bg-gray-100 text-xs font-bold rounded-xl transition-all">
+                                {{ num }}
+                            </a>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if personal_list.has_next %}
+                        <!-- Página siguiente -->
+                        <a href="?page={{ personal_list.next_page_number }}{% if nombre_query %}&nombre={{ nombre_query }}{% endif %}{% if estado_id_query %}&estado_id={{ estado_id_query }}{% endif %}{% if puesto_query %}&puesto={{ puesto_query }}{% endif %}" 
+                           class="p-2 text-gray-500 hover:text-inm-verde-100 hover:bg-gray-100 rounded-xl transition-all"
+                           title="Página siguiente">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                        </a>
+                        <!-- Última página -->
+                        <a href="?page={{ personal_list.paginator.num_pages }}{% if nombre_query %}&nombre={{ nombre_query }}{% endif %}{% if estado_id_query %}&estado_id={{ estado_id_query }}{% endif %}{% if puesto_query %}&puesto={{ puesto_query }}{% endif %}" 
+                           class="p-2 text-gray-500 hover:text-inm-verde-100 hover:bg-gray-100 rounded-xl transition-all"
+                           title="Última página">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"></path></svg>
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+            {% elif total_matched > 0 %}
+            <!-- Si hay registros pero es una sola página -->
+            <div class="px-8 py-5 border-t border-gray-50 bg-gray-50/20 flex justify-between items-center">
+                <div class="text-xs font-bold text-gray-500">
+                    Mostrando <span class="text-gray-900">1</span> a <span class="text-gray-900">{{ total_matched }}</span> de <span class="text-gray-900">{{ total_matched }}</span> registros
+                </div>
+            </div>
+            {% endif %}
         </div>
     </div>
 
