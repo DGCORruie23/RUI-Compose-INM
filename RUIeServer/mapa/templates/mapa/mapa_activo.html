@@ -998,6 +998,37 @@
     const selectedRadio = document.querySelector('input[name="heatmap_metric"]:checked');
     const metric = selectedRadio ? selectedRadio.value : 'todos';
     
+    if (metric === 'todos') {
+        if (selectedName) {
+            // MODO ENFOQUE (VENTANA) - Se destaca el estado seleccionado en verde claro #b3d9a5 y el resto blanco
+            map.setPaintProperty('mexico-states-fill', 'fill-color', [
+                'case',
+                ['==', ['get', 'name'], selectedName], '#b3d9a5',
+                '#ffffff'
+            ]);
+            map.setPaintProperty('mexico-states-fill', 'fill-opacity', [
+                'case',
+                ['==', ['get', 'name'], selectedName], 0.1,
+                1.0
+            ]);
+            if (map.getLayer('mexico-states-line')) {
+                map.setPaintProperty('mexico-states-line', 'line-opacity', [
+                    'case',
+                    ['==', ['get', 'name'], selectedName], 1.0,
+                    0.0
+                ]);
+            }
+        } else {
+            // VISTA NACIONAL - Todo el mapa con el mismo color #b3d9a5
+            map.setPaintProperty('mexico-states-fill', 'fill-color', '#b3d9a5');
+            map.setPaintProperty('mexico-states-fill', 'fill-opacity', 0.9);
+            if (map.getLayer('mexico-states-line')) {
+                map.setPaintProperty('mexico-states-line', 'line-opacity', 1.0);
+            }
+        }
+        return;
+    }
+    
     // Mapeo de métrica a campo de ranking
     let rankSuffix = 't';
     if (metric === 'repatriados') rankSuffix = 'rep';
@@ -1044,7 +1075,7 @@
         }
     } else {
         // VISTA NACIONAL
-        // El rango 32 se muestra blanco con 0.5 de opacidad
+        // El rango 32 se muestra blanco con 0.8 de opacidad
         map.setPaintProperty('mexico-states-fill', 'fill-color', [
             'case',
             ['==', ['get', rankFieldName], 32], '#ffffff',
@@ -1344,13 +1375,7 @@
         type: 'fill',
         source: 'mexico-states',
         paint: {
-          'fill-color': [
-            'interpolate',
-            ['linear'],
-            ['get', 'cs_todos'],
-            0, '#e5f5e0',
-            10000, '#00441b' // Verde INM oscuro
-          ],
+          'fill-color': '#b3d9a5',
           'fill-opacity': 0.9
         }
       });
@@ -1856,17 +1881,9 @@
             vigenciaLabel.classList.remove('bg-rose-50', 'text-rose-700', 'border-rose-100');
             vigenciaLabel.classList.add('bg-emerald-50', 'text-emerald-700', 'border-emerald-100');
             
-            iframe.src = data.pdf_url + '#toolbar=0';
+            iframe.src = data.pdf_url;
             iframe.classList.remove('hidden');
             noPdfDiv.classList.add('hidden');
-            
-            // Revelar botón y enlazar URL
-            const actionsContainer = document.getElementById('orgActionsContainer');
-            const openBtn = document.getElementById('btnOpenPdfNewTab');
-            if (actionsContainer && openBtn) {
-                openBtn.href = data.pdf_url;
-                actionsContainer.classList.remove('hidden');
-            }
         } else {
             vigenciaLabel.innerText = "Estado Sin Estructura Orgánica";
             vigenciaLabel.classList.remove('bg-emerald-50', 'text-emerald-700', 'border-emerald-100');
@@ -1875,24 +1892,12 @@
             iframe.src = '';
             iframe.classList.add('hidden');
             noPdfDiv.classList.remove('hidden');
-            
-            // Ocultar botón de nueva ventana
-            const actionsContainer = document.getElementById('orgActionsContainer');
-            if (actionsContainer) {
-                actionsContainer.classList.add('hidden');
-            }
         }
     } catch (err) {
         vigenciaLabel.innerText = "Error de conexión";
         iframe.src = '';
         iframe.classList.add('hidden');
         noPdfDiv.classList.remove('hidden');
-        
-        // Ocultar botón
-        const actionsContainer = document.getElementById('orgActionsContainer');
-        if (actionsContainer) {
-            actionsContainer.classList.add('hidden');
-        }
     }
   };
 
@@ -1902,12 +1907,6 @@
     modal.classList.add('hidden');
     iframe.src = '';
     document.body.style.overflow = 'auto';
-    
-    // Ocultar botón al cerrar modal
-    const actionsContainer = document.getElementById('orgActionsContainer');
-    if (actionsContainer) {
-        actionsContainer.classList.add('hidden');
-    }
   };
 
   window.openInmuebleDetailModal = async function(inmuebleId) {
@@ -2457,24 +2456,13 @@
             </button>
 
             <!-- Cabecera -->
-            <div class="p-8 border-b border-gray-100 flex-shrink-0 bg-gray-50/50 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                    <span class="text-[9px] font-black text-emerald-600 uppercase tracking-[0.2em]">Estructura Orgánica</span>
-                    <h2 id="orgStateName" class="text-3xl font-extrabold text-gray-900 mt-1 uppercase text-left">ESTADO</h2>
-                    <div class="flex items-center space-x-2 mt-2">
-                        <span class="px-2 py-0.5 inline-block text-[9px] font-black rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 uppercase" id="orgVigenciaLabel">
-                            Vigencia: Sin vigencia
-                        </span>
-                    </div>
-                </div>
-                <!-- Botón de acción: Abrir en Nueva Ventana -->
-                <div id="orgActionsContainer" class="hidden flex-shrink-0 pr-12">
-                    <a id="btnOpenPdfNewTab" href="#" target="_blank" class="px-6 py-3.5 bg-[#611232] hover:bg-[#611232]/90 text-white text-xs font-bold rounded-xl shadow-md hover:shadow-lg transition-all flex items-center gap-2 hover:scale-[1.02] active:scale-[0.98]">
-                        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 6H6a2 2 0 00-2-2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
-                        </svg>
-                        <span>Abrir en Nueva Ventana</span>
-                    </a>
+            <div class="p-8 border-b border-gray-100 flex-shrink-0 bg-gray-50/50">
+                <span class="text-[9px] font-black text-emerald-600 uppercase tracking-[0.2em]">Estructura Orgánica</span>
+                <h2 id="orgStateName" class="text-3xl font-extrabold text-gray-900 mt-1 uppercase">ESTADO</h2>
+                <div class="flex items-center space-x-2 mt-2">
+                    <span class="px-2 py-0.5 inline-block text-[9px] font-black rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 uppercase" id="orgVigenciaLabel">
+                        Vigencia: Sin vigencia
+                    </span>
                 </div>
             </div>
 
