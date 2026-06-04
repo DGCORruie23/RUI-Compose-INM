@@ -20,6 +20,7 @@ import os
 import unicodedata
 import base64
 import openpyxl
+import requests
 
 from django.contrib import messages
 from django.shortcuts import render, redirect
@@ -2128,6 +2129,76 @@ def mapa_interactivo(request):
     totals_cs = get_totals_by_period(CS_START, fecha_act)
     totals_dt = get_totals_by_period(DT_START, fecha_act)
     
+    # --- Capa de Instrucciones (Consolidado desde API externa) ---
+    import requests
+    import urllib3
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    
+    api_instrucciones = {}
+    try:
+        api_res = requests.get('https://172.16.16.167/api/mapa-datos/', verify=False, timeout=2.5)
+        if api_res.status_code == 200:
+            api_instrucciones = api_res.json()
+    except Exception as e:
+        print(f"Error al obtener instrucciones de la API: {str(e)}")
+
+    instrucciones_avance = {}
+    instrucciones_totales_dict = {}
+    
+    for edo in Estado.objects.all():
+        edo_key = normalizar_nombre(edo.nombre)
+        api_key = None
+        for key in api_instrucciones.keys():
+            if normalizar_nombre(key) == edo_key:
+                api_key = key
+                break
+        
+        visits = api_instrucciones.get(api_key, []) if api_key else []
+        active_visits = [v for v in visits if v.get('pendiente', 0) > 0]
+        
+        if active_visits:
+            avg_avance = sum(v.get('avance', 0) for v in active_visits) // len(active_visits)
+            total_pendientes = sum(v.get('pendiente', 0) for v in visits)
+            total_atendidos = sum(v.get('atendido', 0) for v in visits)
+            total_acuerdos = sum(v.get('total', 0) for v in visits)
+            
+            instrucciones_avance[edo_key] = avg_avance
+            instrucciones_totales_dict[edo_key] = {
+                'avance': avg_avance,
+                'pendiente': total_pendientes,
+                'atendido': total_atendidos,
+                'total': total_acuerdos,
+                'has_pending': True
+            }
+        else:
+            if visits:
+                total_atendidos = sum(v.get('atendido', 0) for v in visits)
+                total_acuerdos = sum(v.get('total', 0) for v in visits)
+                instrucciones_avance[edo_key] = 100
+                instrucciones_totales_dict[edo_key] = {
+                    'avance': 100,
+                    'pendiente': 0,
+                    'atendido': total_atendidos,
+                    'total': total_acuerdos,
+                    'has_pending': False
+                }
+            else:
+                instrucciones_avance[edo_key] = 100
+                instrucciones_totales_dict[edo_key] = {
+                    'avance': 100,
+                    'pendiente': 0,
+                    'atendido': 0,
+                    'total': 0,
+                    'has_pending': False
+                }
+
+    estados_para_rankear = [item for item in instrucciones_totales_dict.items() if item[1]['has_pending']]
+    estados_ordenados = sorted(estados_para_rankear, key=lambda x: x[1]['avance'])
+    
+    instrucciones_color_rank = {}
+    for rank, (edo_key, data_val) in enumerate(estados_ordenados, start=1):
+        instrucciones_color_rank[edo_key] = rank
+    
     # Etiqueta centralizada para la escala global
     LABEL_NACIONAL = "Total Nacional"
 
@@ -2141,7 +2212,8 @@ def mapa_interactivo(request):
         'tramites': 'Trámites',
         'retornados': 'Retornados',
         'inadmitidos': 'Inadmitidos',
-        'recibidos_total': 'Recibidos'
+        'recibidos_total': 'Recibidos',
+        'instrucciones': 'Supervision'
     }
 
     # --- Recopilación de Infraestructura y Titulares ---
@@ -2215,11 +2287,21 @@ def mapa_interactivo(request):
             'ingresos': 0, 'ing_aereos': 0, 'ing_maritimos': 0, 'ing_terrestres': 0,
             'tramites': 0, 'tra_res_perm': 0, 'tra_res_temp': 0, 'tra_res_est': 0, 'tra_vis_hum': 0, 'tra_vis_adop': 0, 'tra_vis_reg': 0, 'tra_vis_trab': 0,
             'retornados': 0, 'ret_deportado': 0, 'ret_retornado': 0, 'inadmitidos': 0,
+            'instrucciones': 0, 'color_ins': 32
         }
         
-        cs = totals_cs.get(name_normalized, default_vals)
-        dt = totals_dt.get(name_normalized, default_vals)
-
+        cs = totals_cs.get(name_normalized, default_vals).copy()
+        dt = totals_dt.get(name_normalized, default_vals).copy()
+        
+        # Inyectar datos de instrucciones calculados
+        ins_val = instrucciones_totales_dict.get(name_normalized, {'avance': 100, 'has_pending': False})
+        ins_rank = instrucciones_color_rank.get(name_normalized, 32)
+        
+        cs['instrucciones'] = ins_val['avance']
+        cs['color_ins'] = ins_rank
+        dt['instrucciones'] = ins_val['avance']
+        dt['color_ins'] = ins_rank
+        
         # Inyectar en GeoJSON (usamos prefijos cs_, dt_ y pe_)
         for k in default_vals:
             feature['properties'][f'cs_{k}'] = cs[k]
@@ -2227,10 +2309,15 @@ def mapa_interactivo(request):
             feature['properties'][f'pe_{k}'] = cs[k] # Inicializar PE con valores de CS
         
         # Cadenas formateadas para el Tooltip Dinámico
-        for k in ['todos', 'repatriados', 'recibidos', 'rescatados', 'ingresos', 'tramites', 'retornados', 'inadmitidos']:
-            feature['properties'][f'cs_str_{k}'] = f"{cs[k]:,}"
-            feature['properties'][f'dt_str_{k}'] = f"{dt[k]:,}"
-            feature['properties'][f'pe_str_{k}'] = f"{cs[k]:,}"
+        for k in ['todos', 'repatriados', 'recibidos', 'rescatados', 'ingresos', 'tramites', 'retornados', 'inadmitidos', 'instrucciones']:
+            if k == 'instrucciones':
+                feature['properties'][f'cs_str_{k}'] = f"{cs[k]}%"
+                feature['properties'][f'dt_str_{k}'] = f"{dt[k]}%"
+                feature['properties'][f'pe_str_{k}'] = f"{cs[k]}%"
+            else:
+                feature['properties'][f'cs_str_{k}'] = f"{cs[k]:,}"
+                feature['properties'][f'dt_str_{k}'] = f"{dt[k]:,}"
+                feature['properties'][f'pe_str_{k}'] = f"{cs[k]:,}"
         
     # --- Capa de Infraestructura (Iconos SVG) ---
     infra_points_objs = PuntosInternacionEstacion.objects.all()
@@ -2279,12 +2366,20 @@ def mapa_interactivo(request):
             'url': f"{settings.STATIC_URL}mapa/icons/OR_ACTIVO.svg"
         })
 
+    total_national_acuerdos = sum(s['total'] for s in instrucciones_totales_dict.values())
+    total_national_atendidos = sum(s['atendido'] for s in instrucciones_totales_dict.values())
+    national_avance = (total_national_atendidos * 100 // total_national_acuerdos) if total_national_acuerdos > 0 else 100
+
     national_data = {
         'name': LABEL_NACIONAL,
         'cs': calc_national(totals_cs),
         'dt': calc_national(totals_dt),
         'pe': calc_national(totals_cs) # Inicializar PE con valores de CS
     }
+    
+    national_data['cs']['instrucciones'] = national_avance
+    national_data['dt']['instrucciones'] = national_avance
+    national_data['pe']['instrucciones'] = national_avance
     
     context = {
         'geo_data_json': json.dumps(geo_data),
@@ -2297,6 +2392,7 @@ def mapa_interactivo(request):
         'metric_labels': METRIC_LABELS,
         'metric_labels_json': json.dumps(METRIC_LABELS),
         'fecha_actualizacion': fecha_act,
+        'instrucciones_api_json': json.dumps(api_instrucciones),
     }
     
     return render(request, 'mapa/mapa_activo.html', context)

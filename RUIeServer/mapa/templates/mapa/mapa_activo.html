@@ -171,6 +171,10 @@
           <input type="radio" name="heatmap_metric" value="inadmitidos" onchange="updateHeatmap()" class="w-3.5 h-3.5 text-inm-verde-100 bg-gray-50 border-gray-300 focus:ring-inm-verde-100">
           <span class="text-xs font-semibold text-gray-700 group-hover:text-inm-verde-100 transition-colors">{{ metric_labels.inadmitidos }}</span>
         </label>
+        <label class="flex items-center gap-2 cursor-pointer group">
+          <input type="radio" name="heatmap_metric" value="instrucciones" onchange="updateHeatmap()" class="w-3.5 h-3.5 text-inm-verde-100 bg-gray-50 border-gray-300 focus:ring-inm-verde-100">
+          <span class="text-xs font-semibold text-gray-700 group-hover:text-inm-verde-100 transition-colors">{{ metric_labels.instrucciones }}</span>
+        </label>
       </div>
 
       <!-- Controles de Zoom Personalizados (Flotantes) -->
@@ -1038,6 +1042,7 @@
     else if (metric === 'tramites') rankSuffix = 'tra';
     else if (metric === 'retornados') rankSuffix = 'ret';
     else if (metric === 'inadmitidos') rankSuffix = 'ina';
+    else if (metric === 'instrucciones') rankSuffix = 'ins';
 
     const rankFieldName = currentPeriod + '_color_' + rankSuffix;
 
@@ -1128,7 +1133,8 @@
 
     // MODO NACIONAL: Ranking de Estados
     if (currentStateName === LABEL_NACIONAL) {
-        label.innerText = `Ranking Nacional: ${metric}`;
+        const metricDisplayName = METRIC_LABELS[metric] || metric;
+        label.innerText = `Ranking Nacional: ${metricDisplayName}`;
         
         // Obtener datos del GeoJSON
         if (!geoDataJSON || !geoDataJSON.features) return;
@@ -1138,13 +1144,19 @@
             value: f.properties[`${currentPeriod}_${metric}`] || 0
         }));
         
-        combined.sort((a, b) => b.value - a.value);
+        if (metric === 'instrucciones') {
+            label.innerText = `Ranking Nacional: % Avance`;
+            // De menor a mayor avance (más crítico a menos crítico)
+            combined.sort((a, b) => a.value - b.value);
+        } else {
+            combined.sort((a, b) => b.value - a.value);
+        }
 
         const topData = combined.slice(0, 15);
         renderRankingChart(
             topData.map(d => d.name), 
             topData.map(d => d.value), 
-            `Total ${metric}`
+            `${metricDisplayName}`
         );
     }
     // MODO ESTADO: Ranking de Nacionalidades
@@ -1305,6 +1317,7 @@
   const infraPtsDataJSON = {{ infra_pts_data_json|safe }};
   const prhPtsDataJSON = {{ prh_pts_data_json|safe }};
   const inmueblesPtsDataJSON = {{ inmuebles_pts_data_json|safe }};
+  window.instruccionesRawData = JSON.parse('{{ instrucciones_api_json|escapejs }}');
 
   let map; // Instancia global de MapLibre
   let statePopup; // Popup global para hover
@@ -1476,6 +1489,15 @@
         if (e.features.length > 0) {
           const feature = e.features[0];
           const p = feature.properties;
+          
+          const selectedRadio = document.querySelector('input[name="heatmap_metric"]:checked');
+          const metric = selectedRadio ? selectedRadio.value : 'todos';
+          
+          if (metric === 'instrucciones') {
+              window.openInstruccionesModal(p.name);
+              return;
+          }
+          
           const newStateData = {
               name: p.name,
               cs: {}, dt: {}, pe: {}
@@ -2335,6 +2357,80 @@
   };
   
   setTimeout(setupTooltip, 500);
+
+  // --- Modal de Instrucciones (Seguimiento de Acuerdos) ---
+  window.openInstruccionesModal = function(stateName) {
+      if (!window.instruccionesRawData) {
+          alert("No hay datos de instrucciones cargados.");
+          return;
+      }
+      
+      const edoKeyNormalized = normalizar_nombre(stateName);
+      let apiStateKey = null;
+      
+      for (const key in window.instruccionesRawData) {
+          if (normalizar_nombre(key) === edoKeyNormalized) {
+              apiStateKey = key;
+              break;
+          }
+      }
+      
+      const visits = apiStateKey ? window.instruccionesRawData[apiStateKey] : [];
+      
+      // Filter active visits: pendiente > 0
+      const activeVisits = visits.filter(v => v.pendiente > 0);
+      
+      // Compute average progress
+      let avgProgress = 100;
+      if (activeVisits.length > 0) {
+          avgProgress = Math.round(activeVisits.reduce((sum, v) => sum + v.avance, 0) / activeVisits.length);
+      }
+      
+      document.getElementById('insStateName').innerText = stateName;
+      document.getElementById('insSubtitle').innerText = `Avance de Seguimiento: ${avgProgress}%`;
+      
+      const tableBody = document.getElementById('insTableBody');
+      tableBody.innerHTML = '';
+      
+      if (activeVisits.length === 0) {
+          tableBody.innerHTML = `
+              <tr>
+                  <td colspan="6" class="px-6 py-8 text-sm text-gray-400 italic">
+                      No hay visitas activas con acuerdos pendientes en este estado.
+                  </td>
+              </tr>
+          `;
+      } else {
+          activeVisits.forEach((v, index) => {
+              const tr = document.createElement('tr');
+              tr.className = 'hover:bg-gray-50 transition-colors';
+              
+              tr.innerHTML = `
+                  <td class="px-6 py-4 border border-gray-200 font-bold">${index + 1}</td>
+                  <td class="px-6 py-4 border border-gray-200">${v.fecha || '-'}</td>
+                  <td class="px-6 py-4 border border-gray-200">${v.total || 0}</td>
+                  <td class="px-6 py-4 border border-gray-200">${v.atendido || 0}</td>
+                  <td class="px-6 py-4 border border-gray-200 bg-pink-100 text-red-600 font-extrabold text-base">${v.pendiente || 0}</td>
+                  <td class="px-6 py-4 border border-gray-200 font-bold">${v.avance || 0}%</td>
+              `;
+              tableBody.appendChild(tr);
+          });
+      }
+      
+      const modal = document.getElementById('instruccionesModal');
+      if (modal) {
+          modal.classList.remove('hidden');
+          document.body.style.overflow = 'hidden';
+      }
+  };
+
+  window.closeInstruccionesModal = function() {
+      const modal = document.getElementById('instruccionesModal');
+      if (modal) {
+          modal.classList.add('hidden');
+          document.body.style.overflow = 'auto';
+      }
+  };
 </script>
 
     <!-- Modal Curriculum Titular -->
@@ -2944,6 +3040,68 @@
             </div>
             <!-- Flecha indicadora -->
             <div id="estadoInmueblesTooltipArrow" class="absolute w-3 h-3 bg-white transform rotate-45"></div>
+        </div>
+    </div>
+
+    <!-- Modal de Instrucciones (Seguimiento de Acuerdos) -->
+    <div id="instruccionesModal" class="hidden fixed inset-0 z-[12000] flex items-center justify-center p-4">
+        <!-- Backdrop Blur overlay -->
+        <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity duration-300" onclick="closeInstruccionesModal()"></div>
+        
+        <!-- Main Modal Container -->
+        <div class="relative w-full max-w-5xl bg-white rounded-[2.5rem] overflow-hidden shadow-2xl animate-fade-in flex flex-col" style="max-height: 85vh;">
+            
+            <!-- Pattern Background -->
+            <div class="absolute inset-0 pointer-events-none opacity-[0.25]" 
+                 style="background-image: url('{% static 'mapa/fondos/patron_.svg' %}'); background-size: 50%; background-position: center; z-index: 0;">
+            </div>
+
+            <!-- Header Section -->
+            <div class="relative z-10 px-10 pt-8 pb-6 border-b border-gray-100 flex flex-col items-center justify-center bg-white/90 backdrop-blur-md">
+                <div class="text-center w-full">
+                    <span class="text-[10px] font-black text-[#611232] uppercase tracking-[0.25em] block mb-1">
+                        AVANCE DE SEGUIMIENTO
+                    </span>
+                    <h2 id="insStateName" class="text-2xl font-black text-gray-900 uppercase leading-none">
+                        -
+                    </h2>
+                    <span id="insSubtitle" class="inline-block mt-2 px-3 py-1 text-[11px] font-bold tracking-widest text-[#10312B] bg-[#10312B]/10 rounded-lg uppercase">
+                        Avance de Seguimiento: -
+                    </span>
+                </div>
+                
+                <!-- Close Button -->
+                <button onclick="closeInstruccionesModal()" class="absolute right-6 top-6 text-gray-400 hover:text-gray-600 bg-gray-50 hover:bg-gray-100 p-2 rounded-2xl shadow-sm hover:shadow-md transition-all">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+
+            <!-- Body Content Section: table -->
+            <div class="relative z-10 p-10 flex-grow overflow-y-auto custom-scrollbar" style="background-color: rgba(255, 255, 255, 0.45);">
+                <div class="overflow-hidden border border-gray-200 rounded-[1.5rem] shadow-sm bg-white">
+                    <table class="w-full border-collapse text-left text-sm text-gray-500">
+                        <thead>
+                            <tr class="text-xs uppercase tracking-wider font-extrabold text-white text-center">
+                                <th class="px-6 py-4 bg-gray-500 border border-gray-200"># Visitas</th>
+                                <th class="px-6 py-4 bg-stone-900 border border-gray-200">Fecha</th>
+                                <th class="px-6 py-4 bg-gray-500 border border-gray-200"># Acuerdos</th>
+                                <th class="px-6 py-4 bg-stone-900 border border-gray-200"># Atendidos</th>
+                                <th class="px-6 py-4 bg-gray-500 border border-gray-200"># Pendientes</th>
+                                <th class="px-6 py-4 bg-gray-500 border border-gray-200">% Avance</th>
+                            </tr>
+                        </thead>
+                        <tbody id="insTableBody" class="divide-y divide-gray-200 bg-white text-center font-bold text-gray-700">
+                            <!-- Dynamic rows -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Footer Logo Pattern -->
+            <div class="relative z-10 w-full h-8 pointer-events-none mt-auto" 
+                 style="background-image: url('{% static 'mapa/fondos/patron_cere.svg' %}'); background-size: cover; background-position: bottom;">
+            </div>
+
         </div>
     </div>
 </main>
