@@ -2841,8 +2841,8 @@ def api_get_inmueble_detalle(request, inmueble_id):
         # 2. Personal conteo
         personal_qs = PersonalINM.objects.filter(lugar_asignado=inmueble)
         total_personal = personal_qs.count()
-        activos = personal_qs.filter(estatus=True).count()
-        inactivos = total_personal - activos
+        activos = personal_qs.filter(estatus__estatus__iexact='ACTIVO').count()
+        inactivos = personal_qs.filter(estatus__estatus__iexact='VACANTE').count()
         
         # 3. PIPC (Programa IPC)
         pipc = inmueble.pipc.first()
@@ -2905,6 +2905,7 @@ def api_get_inmueble_detalle(request, inmueble_id):
             'id': inmueble.id,
             'nombre_inmueble': inmueble.nombre_inmueble,
             'estado_nombre': estado_nombre,
+            'estado_id': inmueble.estado.id,
             'nombre_jefe': nombre_jefe,
             'personal': {
                 'total': total_personal,
@@ -2967,8 +2968,8 @@ def api_get_estado_detalle(request, estado_id):
         # 1. Personal
         personal_qs = PersonalINM.objects.filter(lugar_asignado_id__in=inmuebles_ids)
         total_personal = personal_qs.count()
-        activos = personal_qs.filter(estatus=True).count()
-        inactivos = total_personal - activos
+        activos = personal_qs.filter(estatus__estatus__iexact='ACTIVO').count()
+        inactivos = personal_qs.filter(estatus__estatus__iexact='VACANTE').count()
         
         # 2. PIPC (Programa IPC) - Cuenta de inmuebles con programas activos y sus listados
         from .models import ProgramaIPC
@@ -3089,5 +3090,162 @@ def api_get_estado_detalle(request, estado_id):
         }, status=500)
 
 
+def api_get_personal_stats(request, estado_id):
+    try:
+        from datetime import date
+        import unicodedata
+        today = date.today()
+        
+        estado = Estado.objects.get(id=estado_id)
+        
+        # Check if filtering by specific inmueble
+        inmueble_id = request.GET.get('inmueble_id')
+        inmueble = None
+        if inmueble_id:
+            try:
+                inmueble = Inmueble.objects.get(id=inmueble_id)
+                qs_all = PersonalINM.objects.filter(lugar_asignado=inmueble).select_related('estatus', 'tipo_plaza')
+                estado_nombre_display = f"{estado.nombre} - {inmueble.nombre_inmueble}"
+                if inmueble.estado:
+                    estado = inmueble.estado
+            except Inmueble.DoesNotExist:
+                return JsonResponse({'status': 'error', 'message': 'El inmueble solicitado no existe.'}, status=404)
+        else:
+            qs_all = PersonalINM.objects.filter(estado=estado).select_related('estatus', 'tipo_plaza')
+            estado_nombre_display = estado.nombre
+            
+        def clean_text(text):
+            if not text:
+                return ""
+            normalized = unicodedata.normalize('NFD', text)
+            cleaned = "".join(c for c in normalized if not unicodedata.combining(c))
+            return cleaned.upper().strip()
 
+        MANDOS_MEDIOS_KEYWORDS = [
+            ('SUB REPRESENTACION FEDERAL', 'SUB REPRESENTACIÓN FEDERAL'),
+            ('SUB REPRESENTACION LOCAL', 'SUB REPRESENTACIÓN LOCAL'),
+            ('REPRESENTACION LOCAL', 'REPRESENTACIÓN LOCAL'),
+            ('SUBDIRECCION', 'SUBDIRECCIÓN'),
+            ('COORDINACION', 'COORDINACIÓN'),
+            ('DEPARTAMENTO', 'DEPARTAMENTO'),
+            ('DIRECCION', 'DIRECCIÓN'),
+        ]
 
+        def get_stats_for_qs(qs):
+            total = qs.count()
+            
+            # Plaza type totals
+            base = qs.filter(tipo_plaza__plazaT__iexact='BASE').count()
+            confianza = qs.filter(tipo_plaza__plazaT__iexact='CONFIANZA').count()
+            eventual = qs.filter(tipo_plaza__plazaT__iexact='EVENTUAL').count()
+            
+            # Categories lists
+            enlace_operativo_groups = {}
+            mandos_medios_groups = {}
+            
+            enlace_levels = {'2', '3', '5', '6', '7', '11', 'P11', 'P12', 'P13'}
+            mandos_levels = {'O11', 'O21', 'O23', 'M11', 'M23', 'N11', 'N22'}
+            
+            for p in qs:
+                lvl = (p.nivel or '').strip().upper()
+                puesto_raw = p.puesto_especifico or ''
+                puesto_upper = puesto_raw.upper().strip()
+                
+                # Check if it belongs to Enlace y Operativo
+                if lvl in enlace_levels:
+                    # Group by puesto_especifico (exact upper text)
+                    if puesto_upper not in enlace_operativo_groups:
+                        enlace_operativo_groups[puesto_upper] = []
+                    enlace_operativo_groups[puesto_upper].append(p)
+                    
+                # Check if it belongs to Mandos Medios
+                elif lvl in mandos_levels:
+                    # Find keyword group
+                    puesto_clean = clean_text(puesto_raw)
+                    group_name = None
+                    for kw_clean, kw_display in MANDOS_MEDIOS_KEYWORDS:
+                        if kw_clean in puesto_clean:
+                            group_name = kw_display
+                            break
+                    if not group_name:
+                        group_name = puesto_upper if puesto_upper else "S/D"
+                    
+                    if group_name not in mandos_medios_groups:
+                        mandos_medios_groups[group_name] = []
+                    mandos_medios_groups[group_name].append(p)
+
+            def get_row_stats(group_name, plist):
+                t = len(plist)
+                b = sum(1 for p in plist if p.tipo_plaza and p.tipo_plaza.plazaT.upper() == 'BASE')
+                c = sum(1 for p in plist if p.tipo_plaza and p.tipo_plaza.plazaT.upper() == 'CONFIANZA')
+                ev = sum(1 for p in plist if p.tipo_plaza and p.tipo_plaza.plazaT.upper() == 'EVENTUAL')
+                
+                # Gender breakdown per plaza type
+                b_m = sum(1 for p in plist if p.tipo_plaza and p.tipo_plaza.plazaT.upper() == 'BASE' and p.sexo == 'F')
+                b_h = sum(1 for p in plist if p.tipo_plaza and p.tipo_plaza.plazaT.upper() == 'BASE' and p.sexo == 'M')
+                c_m = sum(1 for p in plist if p.tipo_plaza and p.tipo_plaza.plazaT.upper() == 'CONFIANZA' and p.sexo == 'F')
+                c_h = sum(1 for p in plist if p.tipo_plaza and p.tipo_plaza.plazaT.upper() == 'CONFIANZA' and p.sexo == 'M')
+                ev_m = sum(1 for p in plist if p.tipo_plaza and p.tipo_plaza.plazaT.upper() == 'EVENTUAL' and p.sexo == 'F')
+                ev_h = sum(1 for p in plist if p.tipo_plaza and p.tipo_plaza.plazaT.upper() == 'EVENTUAL' and p.sexo == 'M')
+                
+                return {
+                    'group_name': group_name,
+                    'total': t,
+                    'base': b,
+                    'confianza': c,
+                    'eventual': ev,
+                    'base_mujeres': b_m,
+                    'base_hombres': b_h,
+                    'confianza_mujeres': c_m,
+                    'confianza_hombres': c_h,
+                    'eventual_mujeres': ev_m,
+                    'eventual_hombres': ev_h,
+                }
+
+            enlace_list = [get_row_stats(name, plist) for name, plist in sorted(enlace_operativo_groups.items())]
+            mandos_list = [get_row_stats(name, plist) for name, plist in sorted(mandos_medios_groups.items())]
+            
+            # Age ranges for active staff
+            age_ranges = {'18-26': 0, '26-34': 0, '34-42': 0, '42-50': 0, '50-58': 0}
+            women_count = sum(1 for p in qs if p.sexo == 'F')
+            men_count = sum(1 for p in qs if p.sexo == 'M')
+            
+            for p in qs:
+                if p.fecha_nacimiento:
+                    born = p.fecha_nacimiento
+                    age = today.year - born.year - ((today.month, today.day) < (born.month, born.day))
+                    if 18 <= age <= 26: age_ranges['18-26'] += 1
+                    elif 27 <= age <= 34: age_ranges['26-34'] += 1
+                    elif 35 <= age <= 42: age_ranges['34-42'] += 1
+                    elif 43 <= age <= 50: age_ranges['42-50'] += 1
+                    elif 51 <= age <= 58: age_ranges['50-58'] += 1
+                    
+            return {
+                'total': total,
+                'base': base,
+                'confianza': confianza,
+                'eventual': eventual,
+                'enlace_operativo': enlace_list,
+                'mandos_medios': mandos_list,
+                'mujeres': women_count,
+                'hombres': men_count,
+                'edades': age_ranges
+            }
+            
+        # Segment querysets
+        qs_total = qs_all
+        qs_vacantes = qs_all.filter(estatus__estatus__iexact='VACANTE')
+        qs_activos = qs_all.filter(estatus__estatus__iexact='ACTIVO')
+        
+        data = {
+            'estado_nombre': estado_nombre_display,
+            'total': get_stats_for_qs(qs_total),
+            'vacantes': get_stats_for_qs(qs_vacantes),
+            'activos': get_stats_for_qs(qs_activos),
+        }
+        
+        return JsonResponse({'status': 'success', 'data': data})
+    except Estado.DoesNotExist:
+        return JsonResponse({'status': 'error', 'message': 'El estado solicitado no existe.'}, status=404)
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
