@@ -8,7 +8,7 @@ from .models import (
     CorreoTitular, TipoNombramiento, TipoProcendencia,
     Comodato, FiguraOcupacion, TipoInmueble, SituacionActual,
     TipoActividad, Inmueble, HistoricoComentarios, TipoOficina,
-    ProgramaIPC, PersonalINM, OrganigramaF
+    ProgramaIPC, PersonalINM, OrganigramaF, EstatusPersonal, TipoPlaza
 )
 
 @admin.register(Estado)
@@ -216,6 +216,18 @@ class OrganigramaFAdmin(admin.ModelAdmin):
     list_display = ('estado', 'archivo', 'vigencia')
     list_filter = ('estado', 'vigencia')
     search_fields = ('estado__nombre',)
+
+
+@admin.register(TipoPlaza)
+class TipoPlazaAdmin(admin.ModelAdmin):
+    list_display = ('plazaT',)
+    search_fields = ('plazaT',)
+
+
+@admin.register(EstatusPersonal)
+class EstatusPersonalAdmin(admin.ModelAdmin):
+    list_display = ('estatus',)
+    search_fields = ('estatus',)
 
 
 
