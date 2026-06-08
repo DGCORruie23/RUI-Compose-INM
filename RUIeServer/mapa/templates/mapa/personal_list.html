@@ -63,32 +63,68 @@
         document.body.style.overflow = 'auto';
     }
 
-    function filterLugarAsignadoByEstado() {
-        const estadoSelect = document.querySelector('[name="estado_id"]');
-        const lugarSelect = document.querySelector('[name="lugar_asignado_id"]');
+    let allInmueblesOptions = null;
+
+    function filterLugarAsignadoByEstado(forceValue) {
+        const form = document.getElementById('personalForm');
+        if (!form) return;
+        const estadoSelect = form.querySelector('[name="estado_id"]');
+        const lugarSelect = form.querySelector('[name="lugar_asignado_id"]');
         if (!estadoSelect || !lugarSelect) return;
         
-        const selectedEstadoId = estadoSelect.value;
-        const options = lugarSelect.querySelectorAll('option');
+        // Cargar y cachear todas las opciones la primera vez
+        if (!allInmueblesOptions) {
+            allInmueblesOptions = [];
+            const options = lugarSelect.querySelectorAll('option');
+            options.forEach(opt => {
+                allInmueblesOptions.push({
+                    value: opt.value,
+                    text: opt.innerText,
+                    estadoId: opt.getAttribute('data-estado')
+                });
+            });
+        }
         
-        let firstMatch = '';
-        options.forEach(opt => {
+        const selectedEstadoId = estadoSelect.value;
+        const currentValue = (forceValue !== undefined) ? forceValue : lugarSelect.value;
+        
+        // Limpiar select
+        lugarSelect.innerHTML = '';
+        
+        let hasSelectedStillAvailable = false;
+        let firstMatchValue = '';
+        
+        allInmueblesOptions.forEach(opt => {
+            // Opción vacía por defecto
             if (opt.value === '') {
-                opt.style.display = 'block';
+                const el = document.createElement('option');
+                el.value = opt.value;
+                el.innerText = opt.text;
+                lugarSelect.appendChild(el);
                 return;
             }
-            const optEstadoId = opt.getAttribute('data-estado');
-            if (optEstadoId === selectedEstadoId) {
-                opt.style.display = 'block';
-                if (!firstMatch) firstMatch = opt.value;
-            } else {
-                opt.style.display = 'none';
+            
+            // Filtrar por estado seleccionado
+            if (opt.estadoId == selectedEstadoId) {
+                const el = document.createElement('option');
+                el.value = opt.value;
+                el.innerText = opt.text;
+                lugarSelect.appendChild(el);
+                
+                if (!firstMatchValue) {
+                    firstMatchValue = opt.value;
+                }
+                if (opt.value == currentValue) {
+                    hasSelectedStillAvailable = true;
+                }
             }
         });
         
-        const selectedOpt = lugarSelect.querySelector(`option[value="${lugarSelect.value}"]`);
-        if (selectedOpt && selectedOpt.style.display === 'none') {
-            lugarSelect.value = firstMatch;
+        // Restaurar valor anterior si sigue disponible, de lo contrario primer match o vacío
+        if (hasSelectedStillAvailable) {
+            lugarSelect.value = currentValue;
+        } else {
+            lugarSelect.value = firstMatchValue || '';
         }
     }
 
@@ -149,10 +185,7 @@
                 const jefeChk = form.querySelector('[name="jefe_oficina"]');
                 if (jefeChk) jefeChk.checked = data.jefe_oficina || false;
                 
-                const lugarSel = form.querySelector('[name="lugar_asignado_id"]');
-                if (lugarSel) lugarSel.value = data.lugar_asignado_id || '';
-                
-                filterLugarAsignadoByEstado();
+                filterLugarAsignadoByEstado(data.lugar_asignado_id || '');
                 openPersonalModal();
             } else {
                 alert('Error al cargar datos: ' + result.message);

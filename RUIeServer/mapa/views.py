@@ -56,7 +56,7 @@ def parse_curp_details(curp_str):
         year_prefix = 1900
         if len(curp_str) >= 17:
             century_char = curp_str[16]
-            if century_char.isdigit():
+            if not(century_char.isdigit()):
                 year_prefix = 2000
         else:
             yy_int = int(yy_str)
