@@ -126,13 +126,16 @@
                 
                 form.querySelector('[name="personal_id"]').value = data.id;
                 form.querySelector('[name="estado_id"]').value = data.estado_id;
-                form.querySelector('[name="estatus"]').checked = data.estatus;
-                form.querySelector('[name="tipo_plaza"]').value = data.tipo_plaza;
+                form.querySelector('[name="estatus_id"]').value = data.estatus_id || '';
+                form.querySelector('[name="tipo_plaza_id"]').value = data.tipo_plaza_id || '';
                 form.querySelector('[name="codigo_plaza"]').value = data.codigo_plaza;
                 form.querySelector('[name="nivel"]').value = data.nivel;
                 form.querySelector('[name="num_empleado"]').value = data.num_empleado;
                 form.querySelector('[name="nombre"]').value = data.nombre;
                 form.querySelector('[name="apellido"]').value = data.apellido;
+                form.querySelector('[name="curp"]').value = data.curp || '';
+                form.querySelector('[name="fecha_nacimiento"]').value = data.fecha_nacimiento || '';
+                form.querySelector('[name="sexo"]').value = data.sexo || '';
                 form.querySelector('[name="tipo_movimiento"]').checked = data.tipo_movimiento;
                 form.querySelector('[name="fecha_ingreso_inm"]').value = data.fecha_ingreso_inm || '';
                 form.querySelector('[name="fecha_ingreso_plaza"]').value = data.fecha_ingreso_plaza || '';
@@ -342,6 +345,8 @@
                 let totalCreados = 0;
                 let totalActualizados = 0;
                 let totalOmitidos = 0;
+                let allEstatusIncorrectas = [];
+                let allPlazasIncorrectas = [];
                 
                 const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
                 
@@ -370,6 +375,13 @@
                             totalActualizados += result.actualizados;
                             totalOmitidos += result.omitidos;
                             
+                            if (result.lineas_estatus_incorrectas && result.lineas_estatus_incorrectas.length > 0) {
+                                allEstatusIncorrectas.push(...result.lineas_estatus_incorrectas);
+                            }
+                            if (result.lineas_plaza_incorrectas && result.lineas_plaza_incorrectas.length > 0) {
+                                allPlazasIncorrectas.push(...result.lineas_plaza_incorrectas);
+                            }
+                            
                             // Update dynamic stats
                             document.getElementById('statCreados').innerText = totalCreados;
                             document.getElementById('statActualizados').innerText = totalActualizados;
@@ -392,10 +404,24 @@
                     }
                 }
                 
-                statusText.innerText = '¡Carga rápida completada exitosamente! Recargando listado...';
+                let warningMsg = '';
+                if (allEstatusIncorrectas.length > 0) {
+                    warningMsg += `\n- Líneas con Estatus incorrecto (se guardaron como NULL): ${allEstatusIncorrectas.join(', ')}`;
+                }
+                if (allPlazasIncorrectas.length > 0) {
+                    warningMsg += `\n- Líneas con Tipo de Plaza incorrecto (se guardaron como NULL): ${allPlazasIncorrectas.join(', ')}`;
+                }
+                
+                if (warningMsg) {
+                    alert(`Carga rápida completada con las siguientes advertencias:\n${warningMsg}`);
+                } else {
+                    alert('Carga rápida completada exitosamente sin advertencias.');
+                }
+                
+                statusText.innerText = '¡Carga rápida completada! Recargando listado...';
                 setTimeout(() => {
                     location.reload();
-                }, 1500);
+                }, 500);
                 
             } catch (err) {
                 console.error(err);
@@ -595,7 +621,7 @@
                             </td>
                             <td class="px-8 py-6">
                                 <div class="text-xs font-bold text-gray-700">{{ pers.estado.nombre }}</div>
-                                <div class="text-[10px] font-bold text-gray-400 uppercase tracking-tight">CÓD: {{ pers.codigo_plaza }} ({{ pers.tipo_plaza }}) — NIVEL {{ pers.nivel }}</div>
+                                <div class="text-[10px] font-bold text-gray-400 uppercase tracking-tight">CÓD: {{ pers.codigo_plaza }} ({{ pers.tipo_plaza|default:"S/D" }}) — NIVEL {{ pers.nivel }}</div>
                             </td>
                             <td class="px-8 py-6">
                                 <div class="text-xs font-bold text-gray-700 col-puesto">
@@ -609,8 +635,8 @@
                             </td>
                             <td class="px-8 py-6">
                                 <div class="flex flex-col space-y-1">
-                                    <span class="px-2 py-0.5 inline-block text-[9px] font-black rounded-full w-max {% if pers.estatus %}bg-emerald-50 text-emerald-700 border border-emerald-100{% else %}bg-amber-50 text-amber-700 border border-amber-100{% endif %}">
-                                        {% if pers.estatus %}ACTIVO{% else %}INACTIVO{% endif %}
+                                    <span class="px-2 py-0.5 inline-block text-[9px] font-black rounded-full w-max {% if pers.estatus.estatus|upper == 'ACTIVO' %}bg-emerald-50 text-emerald-700 border border-emerald-100{% else %}bg-amber-50 text-amber-700 border border-amber-100{% endif %}">
+                                        {{ pers.estatus.estatus|default:"S/D"|upper }}
                                     </span>
                                     <span class="text-[9px] font-bold text-gray-400 uppercase">
                                         MOVIMIENTO: {% if pers.tipo_movimiento %}SÍ{% else %}NO{% endif %}
@@ -774,20 +800,42 @@
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="flex items-center flex-wrap gap-4 h-full pt-4 pl-2">
-                            <label class="flex items-center cursor-pointer space-x-3">
-                                <input type="checkbox" name="estatus" checked class="w-5 h-5 text-inm-verde-100 border-gray-300 rounded focus:ring-inm-verde-100">
-                                <span class="text-xs font-bold text-gray-700 uppercase">Activo</span>
-                            </label>
-                            <label class="flex items-center cursor-pointer space-x-3">
-                                <input type="checkbox" name="tipo_movimiento" checked class="w-5 h-5 text-inm-verde-100 border-gray-300 rounded focus:ring-inm-verde-100">
-                                <span class="text-xs font-bold text-gray-700 uppercase">Movimiento</span>
-                            </label>
-                            <label class="flex items-center cursor-pointer space-x-3">
-                                <input type="checkbox" name="jefe_oficina" class="w-5 h-5 text-inm-verde-100 border-gray-300 rounded focus:ring-inm-verde-100">
-                                <span class="text-xs font-bold text-purple-700 font-extrabold uppercase">Jefe Oficina</span>
-                            </label>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Estatus</label>
+                            <select name="estatus_id" required class="custom-select block w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-inm-verde-100 transition-all outline-none font-bold text-gray-700">
+                                <option value="">--- Seleccione Estatus ---</option>
+                                {% for est in estatus_list %}
+                                <option value="{{ est.id }}">{{ est.estatus }}</option>
+                                {% endfor %}
+                            </select>
                         </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">CURP</label>
+                            <input type="text" name="curp" maxlength="18" placeholder="Ej: AAAA999999AAAAAA99" pattern="[A-Z]{4}[0-9]{6}[A-Z]{6}[0-9A-Z]{2}" title="CURP inválida (Formato: AAAA999999AAAAAA99)" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold uppercase text-sm focus:ring-2 focus:ring-inm-verde-100 transition-all">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Fecha Nacimiento</label>
+                            <input type="date" name="fecha_nacimiento" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold text-sm focus:ring-2 focus:ring-inm-verde-100">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Sexo</label>
+                            <select name="sexo" class="custom-select block w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-inm-verde-100 transition-all outline-none font-bold text-gray-700">
+                                <option value="">--- Seleccione Sexo ---</option>
+                                <option value="M">Masculino</option>
+                                <option value="F">Femenino</option>
+                                <option value="X">Otro</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-6 mt-4 pl-1">
+                        <label class="flex items-center cursor-pointer space-x-3">
+                            <input type="checkbox" name="tipo_movimiento" checked class="w-5 h-5 text-inm-verde-100 border-gray-300 rounded focus:ring-inm-verde-100">
+                            <span class="text-xs font-bold text-gray-700 uppercase">Movimiento</span>
+                        </label>
+                        <label class="flex items-center cursor-pointer space-x-3">
+                            <input type="checkbox" name="jefe_oficina" class="w-5 h-5 text-inm-verde-100 border-gray-300 rounded focus:ring-inm-verde-100">
+                            <span class="text-xs font-bold text-purple-700 font-extrabold uppercase">Jefe Oficina</span>
+                        </label>
                     </div>
                 </div>
 
@@ -800,9 +848,11 @@
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
                         <div>
                             <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Tipo de Plaza</label>
-                            <select name="tipo_plaza" required class="custom-select block w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-inm-verde-100 transition-all outline-none font-bold text-gray-700">
-                                <option value="CONFIANZA">CONFIANZA</option>
-                                <option value="BASE">BASE</option>
+                            <select name="tipo_plaza_id" required class="custom-select block w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-inm-verde-100 transition-all outline-none font-bold text-gray-700">
+                                <option value="">--- Seleccione Plaza ---</option>
+                                {% for tp in tipo_plaza_list %}
+                                <option value="{{ tp.id }}">{{ tp.plazaT }}</option>
+                                {% endfor %}
                             </select>
                         </div>
                         <div>

@@ -10,7 +10,7 @@ from .models import (Estado, Nacionalidad, Repatriados, Recibidos,
                     PRHs, Titular, Estudio, GradoAcademico, TelefonoTitular, CorreoTitular, 
                     TipoNombramiento, TrayectoriaLaboral, ExperienciaProfesional, TipoProcendencia,
                     Comodato, FiguraOcupacion, TipoInmueble, SituacionActual, TipoActividad, Inmueble, HistoricoComentarios, TipoOficina,
-                    ProgramaIPC, PersonalINM, OrganigramaF)
+                    ProgramaIPC, PersonalINM, OrganigramaF, EstatusPersonal, TipoPlaza)
 from usuarioL.models import usuarioL
 
 from datetime import datetime
@@ -39,6 +39,48 @@ def normalizar_nombre(texto):
     texto = unicodedata.normalize('NFD', texto)
     texto = texto.encode('ascii', 'ignore').decode("utf-8")
     return str(texto).strip().upper()
+
+def parse_curp_details(curp_str):
+    if not curp_str or len(curp_str) < 10:
+        return None, None
+    
+    curp_str = curp_str.strip().upper()
+    
+    birth_date = None
+    try:
+        yy_str = curp_str[4:6]
+        mm_str = curp_str[6:8]
+        dd_str = curp_str[8:10]
+        
+        # Determine century
+        year_prefix = 1900
+        if len(curp_str) >= 17:
+            century_char = curp_str[16]
+            if century_char.isdigit():
+                year_prefix = 2000
+        else:
+            yy_int = int(yy_str)
+            if yy_int < 30:
+                year_prefix = 2000
+                
+        year = year_prefix + int(yy_str)
+        month = int(mm_str)
+        day = int(dd_str)
+        
+        from datetime import date
+        birth_date = date(year, month, day)
+    except Exception:
+        birth_date = None
+        
+    gender = None
+    if len(curp_str) >= 11:
+        g_char = curp_str[10]
+        if g_char == 'H':
+            gender = 'M' # Masculino
+        elif g_char == 'M':
+            gender = 'F' # Femenino
+            
+    return birth_date, gender
 
 def get_user_state(request):
     """Retorna el objeto Estado asociado al usuario o None si es superusuario."""
@@ -722,11 +764,13 @@ def personal_list(request):
         'estados_list_all': estados_list_all,
         'actividades_list': TipoActividad.objects.all().order_by('nombre'),
         'inmuebles_list': inmuebles_list,
-        'personal_list': page_obj,  # El paginador actúa como iterable en el template
+        'personal_list': page_obj,
         'total_matched': total_matched,
         'nombre_query': nombre_query,
         'estado_id_query': estado_id_query,
         'puesto_query': puesto_query,
+        'estatus_list': EstatusPersonal.objects.all().order_by('estatus'),
+        'tipo_plaza_list': TipoPlaza.objects.all().order_by('plazaT'),
     })
 
 
@@ -743,13 +787,16 @@ def api_get_personal(request, personal_id):
         data = {
             'id': personal.id,
             'estado_id': personal.estado_id,
-            'estatus': personal.estatus,
-            'tipo_plaza': personal.tipo_plaza,
+            'estatus_id': personal.estatus_id or '',
+            'tipo_plaza_id': personal.tipo_plaza_id or '',
             'codigo_plaza': personal.codigo_plaza,
             'nivel': personal.nivel,
             'num_empleado': personal.num_empleado or '',
             'nombre': personal.nombre or '',
             'apellido': personal.apellido or '',
+            'curp': personal.curp or '',
+            'fecha_nacimiento': personal.fecha_nacimiento.isoformat() if personal.fecha_nacimiento else '',
+            'sexo': personal.sexo or '',
             'tipo_movimiento': personal.tipo_movimiento,
             'fecha_ingreso_inm': personal.fecha_ingreso_inm.isoformat() if personal.fecha_ingreso_inm else None,
             'fecha_ingreso_plaza': personal.fecha_ingreso_plaza.isoformat() if personal.fecha_ingreso_plaza else None,
@@ -812,15 +859,30 @@ def guardar_personal(request):
         if sueldo_neto:
             sueldo_neto = float(sueldo_neto)
 
+        curp = request.POST.get('curp', '').strip().upper() or None
+        fecha_nacimiento = request.POST.get('fecha_nacimiento') or None
+        sexo = request.POST.get('sexo') or None
+        
+        # Derivar fecha_nacimiento y sexo si hay CURP pero no se enviaron
+        if curp and (not fecha_nacimiento or not sexo):
+            derived_dob, derived_sex = parse_curp_details(curp)
+            if not fecha_nacimiento:
+                fecha_nacimiento = derived_dob
+            if not sexo:
+                sexo = derived_sex
+
         defaults = {
             'estado_id': estado_id,
-            'estatus': request.POST.get('estatus') == 'on',
-            'tipo_plaza': request.POST.get('tipo_plaza'),
+            'estatus_id': request.POST.get('estatus_id') or None,
+            'tipo_plaza_id': request.POST.get('tipo_plaza_id') or None,
             'codigo_plaza': request.POST.get('codigo_plaza', '').strip().upper(),
             'nivel': request.POST.get('nivel', '').strip().upper(),
             'num_empleado': request.POST.get('num_empleado', '').strip().upper() or None,
             'nombre': normalizar_nombre(request.POST.get('nombre', '')),
             'apellido': normalizar_nombre(request.POST.get('apellido', '')),
+            'curp': curp,
+            'fecha_nacimiento': fecha_nacimiento,
+            'sexo': sexo,
             'tipo_movimiento': request.POST.get('tipo_movimiento') == 'on',
             'fecha_ingreso_inm': request.POST.get('fecha_ingreso_inm') or None,
             'fecha_ingreso_plaza': request.POST.get('fecha_ingreso_plaza') or None,
@@ -927,6 +989,8 @@ def carga_rapida_personal(request):
                 col_mapping['nivel'] = idx
             elif 'NUM EMP' in h_norm or 'NUM_EMP' in h_norm or 'EMPLEADO' in h_norm:
                 col_mapping['num_empleado'] = idx
+            elif 'CURP' in h_norm:
+                col_mapping['curp'] = idx
             elif 'NOMBRE' in h_norm:
                 col_mapping['nombre'] = idx
             elif 'MOVIMIENTO' in h_norm:
@@ -1011,11 +1075,18 @@ def carga_rapida_personal(request):
                     return est
             return None
 
+        # Pre-cargar Estatus y Plazas para optimizar y validar
+        estatus_dict = {normalizar_nombre(ep.estatus): ep for ep in EstatusPersonal.objects.all()}
+        plazas_dict = {normalizar_nombre(tp.plazaT): tp for tp in TipoPlaza.objects.all()}
+        
+        lineas_estatus_incorrectas = []
+        lineas_plaza_incorrectas = []
+
         creados = 0
         actualizados = 0
         omitidos = 0
         
-        for row_vals in rows_data:
+        for idx_row, row_vals in enumerate(rows_data):
             
             def get_cell_val(key):
                 if key in col_mapping:
@@ -1043,21 +1114,27 @@ def carga_rapida_personal(request):
                 omitidos += 1
                 continue
                 
-            estatus_raw = str(get_cell_val('status') or '').strip().upper()
-            if estatus_raw == 'ACTIVO':
-                estatus = True
-            elif estatus_raw == 'VACANTE':
-                estatus = False
-            else:
-                estatus = None
-                
-            tipo_plaza = parse_str(get_cell_val('tipo_plaza'))
-            if tipo_plaza:
-                tipo_plaza = tipo_plaza.upper()
-                if tipo_plaza not in ['CONFIANZA', 'BASE']:
-                    tipo_plaza = 'CONFIANZA'
-            else:
-                tipo_plaza = 'CONFIANZA'
+            # Estatus matching database EstatusPersonal
+            estatus_val = None
+            estatus_raw = parse_str(get_cell_val('status'))
+            if estatus_raw:
+                estatus_norm = normalizar_nombre(estatus_raw)
+                if estatus_norm in estatus_dict:
+                    estatus_val = estatus_dict[estatus_norm]
+                else:
+                    sheet_row_num = (header_row_idx + 1 + idx_row) if not is_json else (idx_row + 2)
+                    lineas_estatus_incorrectas.append(sheet_row_num)
+                    
+            # Tipo Plaza matching database TipoPlaza
+            tipo_plaza_val = None
+            tipo_plaza_raw = parse_str(get_cell_val('tipo_plaza'))
+            if tipo_plaza_raw:
+                tipo_plaza_norm = normalizar_nombre(tipo_plaza_raw)
+                if tipo_plaza_norm in plazas_dict:
+                    tipo_plaza_val = plazas_dict[tipo_plaza_norm]
+                else:
+                    sheet_row_num = (header_row_idx + 1 + idx_row) if not is_json else (idx_row + 2)
+                    lineas_plaza_incorrectas.append(sheet_row_num)
                 
             nivel = parse_str(get_cell_val('nivel')) or 'N/A'
             nivel = nivel.upper()
@@ -1071,13 +1148,17 @@ def carga_rapida_personal(request):
             num_empleado = None
             nombre = None
             apellido = None
+            curp = None
+            fecha_nacimiento = None
+            sexo = None
             tipo_movimiento = None
             fecha_ingreso_inm = None
             fecha_ingreso_plaza = None
             vig_inicio_mov = None
             vig_termino_mov = None
             
-            if estatus is not False:
+            is_vacant = (estatus_val and estatus_val.estatus.strip().upper() == 'VACANTE')
+            if not is_vacant:
                 num_empleado = parse_str(get_cell_val('num_empleado'))
                 
                 full_name = parse_str(get_cell_val('nombre'))
@@ -1095,6 +1176,11 @@ def carga_rapida_personal(request):
                     nombre = normalizar_nombre(nombre)
                     apellido = normalizar_nombre(apellido)
                 
+                curp = parse_str(get_cell_val('curp'))
+                if curp:
+                    curp = curp.strip().upper()
+                    fecha_nacimiento, sexo = parse_curp_details(curp)
+
                 mov_raw = parse_str(get_cell_val('tipo_movimiento'))
                 if mov_raw:
                     mov_norm = mov_raw.strip().upper()
@@ -1120,12 +1206,15 @@ def carga_rapida_personal(request):
 
             defaults = {
                 'estado': row_estado,
-                'estatus': estatus,
-                'tipo_plaza': tipo_plaza,
+                'estatus': estatus_val,
+                'tipo_plaza': tipo_plaza_val,
                 'nivel': nivel,
                 'num_empleado': num_empleado,
                 'nombre': nombre,
                 'apellido': apellido,
+                'curp': curp,
+                'fecha_nacimiento': fecha_nacimiento,
+                'sexo': sexo,
                 'tipo_movimiento': tipo_movimiento,
                 'fecha_ingreso_inm': fecha_ingreso_inm,
                 'fecha_ingreso_plaza': fecha_ingreso_plaza,
@@ -1154,10 +1243,18 @@ def carga_rapida_personal(request):
                 'status': 'success',
                 'creados': creados,
                 'actualizados': actualizados,
-                'omitidos': omitidos
+                'omitidos': omitidos,
+                'lineas_estatus_incorrectas': lineas_estatus_incorrectas,
+                'lineas_plaza_incorrectas': lineas_plaza_incorrectas,
             })
             
-        messages.success(request, f"Carga rápida completada: {creados} creados, {actualizados} actualizados, {omitidos} omitidos.")
+        msg = f"Carga rápida completada: {creados} creados, {actualizados} actualizados, {omitidos} omitidos."
+        messages.success(request, msg)
+        if lineas_estatus_incorrectas:
+            messages.warning(request, f"Líneas con Estatus incorrecto (se guardaron como NULL): {', '.join(map(str, lineas_estatus_incorrectas))}")
+        if lineas_plaza_incorrectas:
+            messages.warning(request, f"Líneas con Tipo de Plaza incorrecto (se guardaron como NULL): {', '.join(map(str, lineas_plaza_incorrectas))}")
+            
     except Exception as e:
         if is_json:
             from django.http import JsonResponse

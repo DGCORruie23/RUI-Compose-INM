@@ -490,21 +490,46 @@ class HistoricoComentarios(models.Model):
         verbose_name = "Historial de Comentario"
         verbose_name_plural = "Historial de Comentarios"
 
+#---------------------------------------------------------------------
+# Personal
+#---------------------------------------------------------------------
+
+class TipoPlaza(models.Model):
+    plazaT = models.CharField(max_length=200, unique=True)
+
+    def __str__(self):
+        return self.plazaT
+
+    class Meta:
+        verbose_name = "Tipo Plaza"
+        verbose_name_plural = "Tipos Plazas"
+
+class EstatusPersonal(models.Model):
+    estatus = models.CharField(max_length=200, unique=True)
+
+    def __str__(self):
+        return self.estatus
+
+    class Meta:
+        verbose_name = "Estatus P"
+        verbose_name_plural = "Estatus P"
 
 class PersonalINM(models.Model):
-    TIPO_PLAZA_CHOICES = [
-        ('CONFIANZA', 'CONFIANZA'),
-        ('BASE', 'BASE'),
+    SEXO_CHOICES = [
+        ('M', 'Masculino'),
+        ('F', 'Femenino'),
+        ('X', 'Otro'),
     ]
 
     estado = models.ForeignKey(Estado, on_delete=models.CASCADE, db_index=True)
-    estatus = models.BooleanField(default=True, null=True, blank=True)
-    tipo_plaza = models.CharField(max_length=15, choices=TIPO_PLAZA_CHOICES)
+    estatus = models.ForeignKey(EstatusPersonal, on_delete=models.SET_NULL, null=True, blank=True)
+    tipo_plaza = models.ForeignKey(TipoPlaza, on_delete=models.SET_NULL, null=True, blank=True)
     codigo_plaza = models.CharField(max_length=20)
     nivel = models.CharField(max_length=4)
     num_empleado = models.CharField(max_length=8, null=True, blank=True)
     nombre = models.CharField(max_length=100, null=True, blank=True)
     apellido = models.CharField(max_length=100, null=True, blank=True)
+    curp = models.CharField(max_length=20, null=True, blank=True)
     tipo_movimiento = models.BooleanField(default=True, null=True, blank=True)
     fecha_ingreso_inm = models.DateField(null=True, blank=True)
     fecha_ingreso_plaza = models.DateField(null=True, blank=True)
@@ -516,6 +541,8 @@ class PersonalINM(models.Model):
     actividad = models.ForeignKey(TipoActividad, on_delete=models.SET_NULL, null=True, blank=True)
     jefe_oficina = models.BooleanField(default=False, null=True, blank=True)
     lugar_asignado = models.ForeignKey('Inmueble', on_delete=models.CASCADE, related_name='inmuebleAsignado', blank=True, null=True)
+    fecha_nacimiento = models.DateField(null=True, blank=True)
+    sexo = models.CharField(max_length=1, choices=SEXO_CHOICES, null=True, blank=True)
 
     def __str__(self):
         return f"{self.nombre or ''} {self.apellido or ''} - {self.puesto_especifico}"
