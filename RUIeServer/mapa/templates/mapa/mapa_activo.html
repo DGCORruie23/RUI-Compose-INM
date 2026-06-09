@@ -100,7 +100,7 @@
 {% endblock styles %}
 
 {% block content %}
-<main class="page px-8 pt-4 pb-8 bg-gray-50 rounded-2xl shadow-lg opacity-0 translate-y-10 transition-all duration-700 ease-out flex flex-col justify-start min-h-[calc(100vh-4rem)]" id="main-section">
+<main class="page px-8 pt-4 pb-8 bg-gray-50 rounded-2xl shadow-lg opacity-0 translate-y-10 transition-[opacity,transform] duration-500 ease-out flex flex-col justify-start min-h-[calc(100vh-4rem)]" id="main-section">
 
   <!-- MODAL: Selección de Rango Personalizado -->
   <div id="customDateModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4">
@@ -1115,6 +1115,8 @@
     return { start: startCS, end: today };
   };
 
+  let rankingChartAbortController = null;
+
   /**
    * Actualiza la gráfica de barras de ranking (Estados o Nacionalidades)
    */
@@ -1122,6 +1124,10 @@
     const metric = metricInput || document.querySelector('input[name="heatmap_metric"]:checked')?.value;
     const container = document.getElementById('chartContainer');
     const label = document.getElementById('chartMetricLabel');
+    
+    if (rankingChartAbortController) {
+        rankingChartAbortController.abort();
+    }
     
     if (!metric || metric === 'todos') {
         container.classList.add('hidden');
@@ -1166,8 +1172,11 @@
         const { start, end } = window.getCurrentDates();
         const normState = normalizar_nombre(currentStateName);
 
+        rankingChartAbortController = new AbortController();
         try {
-            const response = await fetch(`/mapa/api/nacionalidad-ranking?estado=${normState}&metric=${metric}&start=${start}&end=${end}`);
+            const response = await fetch(`/mapa/api/nacionalidad-ranking?estado=${normState}&metric=${metric}&start=${start}&end=${end}`, {
+                signal: rankingChartAbortController.signal
+            });
             const result = await response.json();
 
             if (result.status === 'success') {
@@ -1178,7 +1187,13 @@
                 );
             }
         } catch (e) {
-            console.error("Error fetching nationality ranking:", e);
+            if (e.name !== 'AbortError') {
+                console.error("Error fetching nationality ranking:", e);
+            }
+        } finally {
+            if (rankingChartAbortController && !rankingChartAbortController.signal.aborted) {
+                rankingChartAbortController = null;
+            }
         }
     }
   };
@@ -1556,23 +1571,23 @@
       // Marcadores Infraestructura y PRH
       window.mapMarkers = [];
 
-      let markerSizeTicking = false;
+      let lastMarkerSize = null;
       const updateMarkerSizes = () => {
-          if (!map || markerSizeTicking) return;
+          if (!map) return;
+          const zoom = map.getZoom();
+          // Escala dinámica optimizada
+          const size = Math.round(Math.max(10, Math.min(35, 12 + (zoom - 4.5) * 6)));
+          if (size === lastMarkerSize) return;
           
-          markerSizeTicking = true;
+          lastMarkerSize = size;
+          const sizePx = size + 'px';
+          
           requestAnimationFrame(() => {
-              const zoom = map.getZoom();
-              // Escala dinámica optimizada
-              const size = Math.max(10, Math.min(35, 12 + (zoom - 4.5) * 6));
-              const sizePx = size + 'px';
-              
               for (let i = 0; i < window.mapMarkers.length; i++) {
                   const el = window.mapMarkers[i].element;
                   el.style.width = sizePx;
                   el.style.height = sizePx;
               }
-              markerSizeTicking = false;
           });
       };
 

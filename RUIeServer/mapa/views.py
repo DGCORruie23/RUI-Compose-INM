@@ -129,38 +129,92 @@ def get_totals_by_period(start, end):
     datos_ina = {}
     datos_t = {}
 
+    # Agrupar y resumir datos en una sola consulta por modelo
+    rep_raw = Repatriados.objects.filter(fecha__range=[start, end]) \
+        .values('estado_id') \
+        .annotate(
+            total=Sum('mex_rep'),
+            adultos=Sum('adultos'),
+            menores=Sum('menores'),
+            nna_solo=Sum('nna_solo'),
+            nna_acom=Sum('nna_acom'),
+            terrestres=Sum('terrestres'),
+            vuelos=Sum('vuelos')
+        )
+    rep_map = {item['estado_id']: item for item in rep_raw}
+
+    rec_raw = Recibidos.objects.filter(fecha__range=[start, end]) \
+        .values('estado_id') \
+        .annotate(
+            total=Sum('ext_rec'),
+            adultos=Sum('adultos'),
+            menores=Sum('menores')
+        )
+    rec_map = {item['estado_id']: item for item in rec_raw}
+
+    res_raw = ExtRescatados.objects.filter(fecha__range=[start, end]) \
+        .values('estado_id') \
+        .annotate(
+            total=Sum('rescatados'),
+            una_vez=Sum('una_vez'),
+            reincidente=Sum('reincidente'),
+            estacion=Sum('estacion'),
+            dif=Sum('dif'),
+            conduccion=Sum('conduccion')
+        )
+    res_map = {item['estado_id']: item for item in res_raw}
+
+    ing_raw = Ingresos.objects.filter(fecha__range=[start, end]) \
+        .values('estado_id') \
+        .annotate(
+            total=Sum('ingresos_total'),
+            aereos=Sum('aereos'),
+            maritimos=Sum('maritimos'),
+            terrestres=Sum('terrestres')
+        )
+    ing_map = {item['estado_id']: item for item in ing_raw}
+
+    tra_raw = Tramites.objects.filter(fecha__range=[start, end]) \
+        .values('estado_id') \
+        .annotate(
+            total=Sum('total_documentos'),
+            res_perm=Sum('residente_permanente'),
+            res_temp=Sum('residente_temporal'),
+            res_est=Sum('residente_temp_estudio'),
+            vis_hum=Sum('visitante_humanitario'),
+            vis_adop=Sum('visitante_adopcion'),
+            vis_reg=Sum('visitante_regional'),
+            vis_trab=Sum('visitante_trabajador')
+        )
+    tra_map = {item['estado_id']: item for item in tra_raw}
+
+    ret_raw = Retornados.objects.filter(fecha__range=[start, end]) \
+        .values('estado_id') \
+        .annotate(
+            total=Sum('retornados_total'),
+            deportado=Sum('deportado'),
+            retornado=Sum('retornado')
+        )
+    ret_map = {item['estado_id']: item for item in ret_raw}
+
+    ina_raw = Inadmitidos.objects.filter(fecha__range=[start, end]) \
+        .values('estado_id') \
+        .annotate(
+            total=Sum('inadmitidos_total')
+        )
+    ina_map = {item['estado_id']: item for item in ina_raw}
+
     for edo in estados:
         key = normalizar_nombre(edo.nombre)
+        edo_id = edo.id
         
-        # Agregaciones (convertimos a dict para obtener los valores con .get)
-        rep = dict(Repatriados.objects.filter(estado=edo, fecha__range=[start, end]).aggregate(
-            total=Sum('mex_rep'), adultos=Sum('adultos'), menores=Sum('menores'),
-            nna_solo=Sum('nna_solo'), nna_acom=Sum('nna_acom'),
-            terrestres=Sum('terrestres'), vuelos=Sum('vuelos')
-        ))
-        rec = dict(Recibidos.objects.filter(estado=edo, fecha__range=[start, end]).aggregate(
-            total=Sum('ext_rec'), adultos=Sum('adultos'), menores=Sum('menores')
-        ))
-        res = dict(ExtRescatados.objects.filter(estado=edo, fecha__range=[start, end]).aggregate(
-            total=Sum('rescatados'), una_vez=Sum('una_vez'), reincidente=Sum('reincidente'),
-            estacion=Sum('estacion'), dif=Sum('dif'), conduccion=Sum('conduccion')
-        ))
-        ing = dict(Ingresos.objects.filter(estado=edo, fecha__range=[start, end]).aggregate(
-            total=Sum('ingresos_total'), aereos=Sum('aereos'), maritimos=Sum('maritimos'), terrestres=Sum('terrestres')
-        ))
-        tra = dict(Tramites.objects.filter(estado=edo, fecha__range=[start, end]).aggregate(
-            total=Sum('total_documentos'),
-            res_perm=Sum('residente_permanente'), res_temp=Sum('residente_temporal'),
-            res_est=Sum('residente_temp_estudio'), vis_hum=Sum('visitante_humanitario'),
-            vis_adop=Sum('visitante_adopcion'), vis_reg=Sum('visitante_regional'),
-            vis_trab=Sum('visitante_trabajador')
-        ))
-        ret = dict(Retornados.objects.filter(estado=edo, fecha__range=[start, end]).aggregate(
-            total=Sum('retornados_total'), deportado=Sum('deportado'), retornado=Sum('retornado')
-        ))
-        ina = dict(Inadmitidos.objects.filter(estado=edo, fecha__range=[start, end]).aggregate(
-            total=Sum('inadmitidos_total')
-        ))
+        rep = rep_map.get(edo_id, {})
+        rec = rec_map.get(edo_id, {})
+        res = res_map.get(edo_id, {})
+        ing = ing_map.get(edo_id, {})
+        tra = tra_map.get(edo_id, {})
+        ret = ret_map.get(edo_id, {})
+        ina = ina_map.get(edo_id, {})
 
         datos_rep[key] = val_int(rep, 'total')
         datos_rec[key] = val_int(rec, 'total')
@@ -305,6 +359,8 @@ def get_all_update_dates():
 # --- VIEW PRINCIPAL ---
 
 def mapa_informacion(request):
+    if not request.user.is_authenticated:
+        return redirect('/log-in/?next=%s' % request.path)
     if not request.user.is_superuser:
         return render(request, 'base/error404.html')
 
@@ -465,6 +521,8 @@ def mapa_informacion(request):
 
 def carga_datos(request):
     # Restricción de acceso: Solo superusuarios
+    if not request.user.is_authenticated:
+        return redirect('/log-in/?next=%s' % request.path)
     if not request.user.is_superuser:
         return render(request, 'base/error404.html')
 
@@ -627,6 +685,8 @@ def carga_datos(request):
 
 def titulares_list(request):
     """Vista para la gestión independiente de expedientes de titulares."""
+    if not request.user.is_authenticated:
+        return redirect('/log-in/?next=%s' % request.path)
     user_state = get_user_state(request)
     
     if user_state:
@@ -712,6 +772,8 @@ def eliminar_titular(request, titular_id):
 
 def personal_list(request):
     """Vista para la gestión independiente del Personal INM con paginación y filtros en el servidor."""
+    if not request.user.is_authenticated:
+        return redirect('/log-in/?next=%s' % request.path)
     user_state = get_user_state(request)
     
     # 1. Obtener filtros de la solicitud GET
@@ -1859,6 +1921,8 @@ def carga_oficinas(request):
 
 def reportes(request):
     """Vista para el tablero de reportes con datos reales y gráficas Bokeh."""
+    if not request.user.is_authenticated:
+        return redirect('/log-in/?next=%s' % request.path)
     if not request.user.is_superuser:
         return render(request, 'base/error404.html')
 
@@ -2215,6 +2279,8 @@ def mapa_ejemplo(request):
 # -------------------------------------------------------
 
 def mapa_interactivo(request):
+    if not request.user.is_authenticated:
+        return redirect('/log-in/?next=%s' % request.path)
     if not request.user.is_superuser:
         return render(request, 'base/error404.html')
 
@@ -2501,6 +2567,8 @@ def mapa_interactivo(request):
 
 def inmuebles_list(request):
     """Muestra la lista de inmuebles y gestiona sus catálogos."""
+    if not request.user.is_authenticated:
+        return redirect('/log-in/?next=%s' % request.path)
     user_state = get_user_state(request)
     
     if request.user.is_superuser:
@@ -2736,6 +2804,8 @@ def api_guardar_comodato(request):
 
 def organigramas_list(request):
     """Vista para la gestión de Organigramas por Estado."""
+    if not request.user.is_authenticated:
+        return redirect('/log-in/?next=%s' % request.path)
     user_state = get_user_state(request)
     
     if user_state:

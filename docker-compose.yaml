@@ -19,6 +19,8 @@ services:
       - ./RUIeServer/dashboard:/src/backendRUIe/dashboard
       - ./RUIeServer/usuario:/src/backendRUIe/usuario
       - ./RUIeServer/mapa:/src/backendRUIe/mapa
+      - ./RUIeServer/usuarioL:/src/backendRUIe/usuarioL
+      - ./RUIeServer/serverRUI:/src/backendRUIe/serverRUI
 
   db:
     container_name: dbPGruie
