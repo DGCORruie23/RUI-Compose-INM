@@ -2725,10 +2725,10 @@
           if (count > 0) {
               hasData = true;
               const row = document.createElement('div');
-              row.className = 'flex justify-between items-center gap-6 font-bold text-[10px] text-gray-200 uppercase tracking-tight py-1 border-b border-gray-800 last:border-0 last:pb-0';
+              row.className = 'flex justify-between items-start gap-4 font-bold text-[10px] text-gray-200 uppercase tracking-tight py-1 border-b border-gray-800 last:border-0 last:pb-0';
               row.innerHTML = `
-                  <span class="truncate max-w-[170px]" title="${puesto}">${puesto}</span>
-                  <span class="text-emerald-400 font-black font-mono ml-auto">${count}</span>
+                  <span class="whitespace-normal leading-normal pr-2">${puesto}</span>
+                  <span class="text-emerald-400 font-black font-mono ml-auto flex-shrink-0">${count}</span>
               `;
               content.appendChild(row);
           }
