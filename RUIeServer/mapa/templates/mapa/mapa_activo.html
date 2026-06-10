@@ -71,29 +71,360 @@
   /* Ajustar el panel derecho para que no se corte */
   #main-section.focus-mode #right-panel {
     max-height: none !important;
-    height: 100% !important;
+    height: 100% !important;  /* Optimizaciones para resoluciones bajas y Landscape en iPads, Android y PCs */
+  }
+  @media (max-height: 850px) {
+    /* Ajustes generales del Dashboard principal */
+    .page { 
+      padding: 0.5rem !important; 
+      min-height: calc(100vh - 3.5rem) !important;
+    }
+    #main-section > div.grid {
+      gap: 0.75rem !important;
+    }
+    
+    /* Ajustar las alturas de mapa y panel lateral para que entren en pantalla sin hacer scroll de página */
+    #main-section > div.grid > :first-child, #right-panel { 
+      height: calc(100vh - 120px) !important; 
+      max-height: calc(100vh - 120px) !important; 
+      min-height: 400px !important; 
+    }
+    
+    /* Compactar cabecera del panel derecho */
+    #right-panel .p-6 { padding: 0.75rem 1rem !important; }
+    #right-panel .mt-4 { margin-top: 0.35rem !important; }
+    #right-panel .mb-4 { margin-bottom: 0.35rem !important; }
+    #right-panel .space-y-6 > * + * { margin-top: 0.5rem !important; }
+    #right-panel .text-2xl { font-size: 1.15rem !important; line-height: 1.5rem !important; }
+    #right-panel .text-xl { font-size: 1.1rem !important; }
+    #cardsContainer { gap: 0.35rem !important; }
+    #cardsContainer .text-lg { font-size: 1rem !important; }
+    #cardsContainer .p-2 { padding: 0.35rem !important; }
+    
+    /* Compactar sección de infraestructura */
+    #infraSection { margin-top: 0.5rem !important; }
+    #infraSection .p-4 { padding: 0.5rem !important; }
+    #infraSection .mb-4 { margin-bottom: 0.5rem !important; }
+    #infraSection .mb-3 { margin-bottom: 0.25rem !important; }
+    #infraSection .grid { gap: 0.35rem !important; }
+    #infraSection .p-3 { padding: 0.4rem !important; }
+    #infraSection .text-xs { font-size: 0.7rem !important; }
+    #infraSection .w-14 { width: 2.5rem !important; height: 2.5rem !important; }
+    #infraSection .h-14 { height: 2.5rem !important; }
+    
+    /* Leyenda del mapa y zoom más compactos */
+    .absolute.bottom-6.left-6 {
+      bottom: 0.75rem !important;
+      left: 0.75rem !important;
+      padding: 0.5rem !important;
+      width: 120px !important;
+    }
+    .absolute.bottom-6.left-6 h3 { font-size: 0.55rem !important; }
+    .absolute.bottom-6.left-6 span { font-size: 0.6rem !important; }
+    
+    .absolute.bottom-8.right-6 {
+      bottom: 0.75rem !important;
+      right: 0.75rem !important;
+    }
+    .absolute.bottom-8.right-6 .p-3 { padding: 0.5rem !important; }
+
+    /* --- OPTIMIZACIÓN DE TODOS LOS MODALES EN LANDSCAPE --- */
+    
+    /* Contenedores generales de Modales */
+    [id*="Modal"] > div.relative {
+      max-height: 95vh !important;
+      border-radius: 1.5rem !important;
+    }
+    
+    /* Reducir padding de cabeceras de modales */
+    .modal-header {
+      padding: 0.75rem 1.5rem !important;
+    }
+    .modal-header h2 {
+      font-size: 1.25rem !important;
+    }
+    .modal-header span {
+      font-size: 8px !important;
+    }
+    .modal-header img {
+      height: 1.75rem !important;
+    }
+    
+    /* Ajustar botones de cerrar en los modales */
+    [id*="Modal"] button.absolute.top-6.right-6 {
+      top: 0.75rem !important;
+      right: 1rem !important;
+      padding: 0.35rem !important;
+      border-radius: 0.75rem !important;
+    }
+    
+    /* Cuerpo del modal padding general */
+    .modal-body {
+      padding: 1rem !important;
+      gap: 1rem !important;
+    }
+    
+    /* --- CV MODAL SPECIFICS --- */
+    #cvModal .gap-8 { gap: 1rem !important; }
+    #cvModal .space-y-8 > * + *, #cvModal .space-y-10 > * + * { margin-top: 0.75rem !important; }
+    #cvModal .max-h-[180px] { max-height: 100px !important; }
+    #cvModal .max-h-[450px] { max-height: 220px !important; }
+    #cvModal .w-44 { width: 7.5rem !important; }
+    #cvModal .h-56 { height: 9.5rem !important; }
+    #cvModal .w-64 { width: 10rem !important; }
+    #cvModal .text-xl { font-size: 0.95rem !important; }
+    #cvModal .h-12 { height: 2rem !important; margin-bottom: 0.75rem !important; }
+    #cvModal .mb-6 { margin-bottom: 0.5rem !important; }
+    #cvModal .mb-8 { margin-bottom: 0.5rem !important; }
+    #cvModal .my-4 { margin-top: 0.5rem !important; margin-bottom: 0.5rem !important; }
+    
+    /* --- INMUEBLE & ESTADO DETAIL MODALS SPECIFICS --- */
+    #inmuebleDetailModal .space-y-6 > * + *, #estadoDetailModal .space-y-6 > * + * {
+      margin-top: 0.5rem !important;
+    }
+    /* Tarjetas principales */
+    #inmuebleDetailModal .modal-body .p-6, #estadoDetailModal .modal-body .p-6 {
+      padding: 0.75rem !important;
+      border-radius: 1.25rem !important;
+      gap: 0.75rem !important;
+    }
+    #inmuebleDetailModal .w-14, #estadoDetailModal .w-14 {
+      width: 2.5rem !important;
+      height: 2.5rem !important;
+    }
+    #inmuebleDetailModal .h-14, #estadoDetailModal .h-14 {
+      height: 2.5rem !important;
+    }
+    #inmuebleDetailModal .text-3xl, #estadoDetailModal .text-3xl {
+      font-size: 1.5rem !important;
+    }
+    /* Tarjeta PIPC */
+    #inmuebleDetailModal .space-y-3 > * + *, #estadoDetailModal .space-y-3 > * + * {
+      margin-top: 0.35rem !important;
+    }
+    #inmuebleDetailModal .pb-2, #estadoDetailModal .pb-2 {
+      padding-bottom: 0.35rem !important;
+    }
+    /* Column 2 grids */
+    #inmOficinasGrid, #estOficinasGrid {
+      max-height: 100px !important;
+    }
+    #inmActividadesGrid, #estActividadesGrid {
+      max-height: 110px !important;
+      gap: 0.5rem !important;
+      padding: 0.25rem !important;
+    }
+    #inmActividadesGrid > div, #estActividadesGrid > div {
+      padding: 0.25rem 0.5rem !important;
+      font-size: 9px !important;
+    }
+    /* Column 3 details */
+    #inmuebleDetailModal .modal-body .p-5, #estadoDetailModal .modal-body .p-5 {
+      padding: 0.75rem !important;
+      border-radius: 1.25rem !important;
+    }
+    #inmuebleDetailModal .modal-body .p-4, #estadoDetailModal .modal-body .p-4 {
+      padding: 0.5rem !important;
+    }
+    #inmuebleDetailModal .gap-4, #estadoDetailModal .gap-4 {
+      gap: 0.5rem !important;
+    }
+    #inmuebleDetailModal .text-base, #estadoDetailModal .text-base {
+      font-size: 0.9rem !important;
+    }
+    #inmuebleDetailModal .w-11, #estadoDetailModal .w-11 {
+      width: 2.25rem !important;
+      height: 2.25rem !important;
+    }
+    #inmuebleDetailModal .h-11, #estadoDetailModal .h-11 {
+      height: 2.25rem !important;
+    }
+    /* Figuras de ocupación items */
+    #inmuebleDetailModal .gap-3, #estadoDetailModal .gap-3 {
+      gap: 0.35rem !important;
+    }
+    #inmuebleDetailModal .p-3, #estadoDetailModal .p-3 {
+      padding: 0.4rem !important;
+      border-radius: 0.75rem !important;
+    }
+    #inmuebleDetailModal .w-8, #estadoDetailModal .w-8 {
+      width: 1.5rem !important;
+      height: 1.5rem !important;
+    }
+    #inmuebleDetailModal .h-8, #estadoDetailModal .h-8 {
+      height: 1.5rem !important;
+    }
+    
+    /* --- PERSONAL STATS MODALS SPECIFICS --- */
+    #personalStatsTotalModal .gap-4 {
+      gap: 0.5rem !important;
+    }
+    #personalStatsTotalModal .p-5 {
+      padding: 0.75rem !important;
+      border-radius: 1.25rem !important;
+    }
+    #personalStatsTotalModal .text-3xl {
+      font-size: 1.5rem !important;
+    }
+    #personalStatsTotalModal .w-12, #personalStatsTotalModal .h-12 {
+      width: 2.25rem !important;
+      height: 2.25rem !important;
+    }
+    #personalStatsTotalModal .w-12 svg, #personalStatsTotalModal .h-12 svg {
+      width: 1.25rem !important;
+      height: 1.25rem !important;
+    }
+    #personalStatsTotalRowsContainer, #personalStatsActivosRowsContainer {
+      padding: 1rem !important;
+      border-radius: 1.25rem !important;
+      gap: 0.5rem !important;
+    }
+    #personalStatsTotalRowsContainer .gap-6, #personalStatsActivosRowsContainer .gap-6 {
+      gap: 0.5rem !important;
+    }
+    #personalStatsTotalRowsContainer .h-14, #personalStatsActivosRowsContainer .h-14 {
+      height: 2.5rem !important;
+      border-radius: 0.75rem !important;
+    }
+    #personalStatsTotalRowsContainer .text-sm, #personalStatsActivosRowsContainer .text-sm {
+      font-size: 0.75rem !important;
+    }
+    #personalStatsTotalRowsContainer .text-base, #personalStatsActivosRowsContainer .text-base {
+      font-size: 0.9rem !important;
+    }
+    #personalStatsTotalRowsContainer .w-12, #personalStatsActivosRowsContainer .w-12 {
+      width: 2.25rem !important;
+      height: 2.25rem !important;
+    }
+    #personalStatsTotalRowsContainer .h-12, #personalStatsActivosRowsContainer .h-12 {
+      height: 2.25rem !important;
+    }
+    #personalStatsTotalRowsContainer .w-12 svg, #personalStatsActivosRowsContainer .w-12 svg {
+      width: 1.25rem !important;
+      height: 1.25rem !important;
+    }
+    
+    /* Activos Modal layouts */
+    #personalStatsActivosModal .gap-5 {
+      gap: 0.5rem !important;
+    }
+    #personalStatsActivosModal .p-5 {
+      padding: 0.75rem !important;
+      border-radius: 1.25rem !important;
+    }
+    
+    /* Columna de Total Activos */
+    #personalStatsActivosModal .modal-body > div > :first-child {
+      width: 8.5rem !important;
+    }
+    
+    /* Columna de mini sub-tarjetas de tipo plaza */
+    #personalStatsActivosModal .modal-body > div > :last-child {
+      width: 15rem !important;
+    }
+    
+    #personalStatsActivosModal .text-4xl {
+      font-size: 1.75rem !important;
+    }
+    #personalStatsActivosModal .w-12, #personalStatsActivosModal .h-12 {
+      width: 2.25rem !important;
+      height: 2.25rem !important;
+    }
+    #personalStatsActivosModal .w-5, #personalStatsActivosModal .h-5 {
+      width: 1rem !important;
+      height: 1rem !important;
+    }
+    #persActMujeresVal, #persActHombresVal {
+      padding-left: 0.5rem !important;
+      padding-right: 0.5rem !important;
+      padding-top: 0.25rem !important;
+      padding-bottom: 0.25rem !important;
+    }
+    #personalStatsActivosModal .text-sm {
+      font-size: 0.75rem !important;
+    }
+    #personalStatsActivosModal .gap-6 {
+      gap: 0.75rem !important;
+    }
+    #persAgeBarContainer {
+      height: 0.75rem !important;
+    }
+    #personalStatsActivosModal .flex-wrap {
+      gap: 0.35rem !important;
+    }
+    #personalStatsActivosModal span.rounded {
+      width: 0.5rem !important;
+      height: 0.5rem !important;
+    }
+    #personalStatsActivosModal .flex-wrap > div {
+      gap: 0.25rem !important;
+    }
+    #personalStatsActivosModal .w-5 svg {
+      width: 1rem !important;
+      height: 1rem !important;
+    }
+    #personalStatsActivosModal .p-3 {
+      padding: 0.4rem 0.5rem !important;
+      border-radius: 0.75rem !important;
+    }
+    #personalStatsActivosModal .grid-cols-2 {
+      gap: 0.35rem !important;
+    }
+    #personalStatsActivosRowsContainer .gap-2 {
+      gap: 0.25rem !important;
+    }
+    #personalStatsActivosRowsContainer .mt-1 {
+      margin-top: 0.25rem !important;
+    }
+    
+    /* --- INSTRUCCIONES MODAL SPECIFICS --- */
+    #instruccionesModal .px-6.py-4 {
+      padding: 0.5rem 0.75rem !important;
+      font-size: 0.75rem !important;
+    }
+    
+    /* --- INFO MODAL SPECIFICS --- */
+    #infoModal .p-8 {
+      padding: 1rem 1.5rem !important;
+    }
+    #infoModal .mt-10 {
+      margin-top: 1rem !important;
+      padding-top: 0.75rem !important;
+    }
+    #infoModal .py-4 {
+      padding-top: 0.5rem !important;
+      padding-bottom: 0.5rem !important;
+    }
+    #infoModal .text-3xl {
+      font-size: 1.5rem !important;
+    }
+    #detailBody {
+      max-height: 40vh !important;
+      overflow-y: auto !important;
+      padding-right: 0.5rem !important;
+    }
   }
 
-  /* Optimizaciones para resoluciones bajas (como 1024x768) */
-  @media (max-height: 800px) {
-    #main-section.focus-mode .p-6 { padding: 0.75rem !important; }
-    #main-section.focus-mode .space-y-6 > * + * { margin-top: 0.75rem !important; }
-    #main-section.focus-mode .text-2xl { font-size: 1.25rem !important; line-height: 1.75rem !important; }
-    #main-section.focus-mode .text-3xl { font-size: 1.5rem !important; line-height: 2rem !important; }
-    
-    /* Hacer la leyenda del mapa más compacta */
-    #main-section.focus-mode .absolute.bottom-6.left-6 {
-      bottom: 1rem !important;
-      left: 1rem !important;
-      padding: 0.5rem !important;
-      width: 130px !important;
+  /* Optimizaciones extra para móviles en formato landscape (alturas muy bajas, e.g. < 550px) */
+  @media (max-height: 550px) {
+    #main-section > div.grid > :first-child, #right-panel { 
+      height: calc(100vh - 100px) !important; 
+      max-height: calc(100vh - 100px) !important; 
+      min-height: 300px !important; 
     }
-    #main-section.focus-mode .absolute.bottom-6.left-6 span { font-size: 0.65rem !important; }
     
-    /* Compactar controles de zoom */
-    #main-section.focus-mode .absolute.top-6.right-6 {
-      top: 1rem !important;
-      right: 1rem !important;
+    #main-section .text-2xl { font-size: 1rem !important; }
+    
+    /* Reducir tamaño de foto en CV */
+    #cvModal .w-44 { width: 5.5rem !important; }
+    #cvModal .h-56 { height: 7rem !important; }
+    #cvModal .w-64 { width: 8.5rem !important; }
+    
+    /* Ocultar elementos decorativos en alturas muy bajas */
+    [id*="Modal"] .pointer-events-none.opacity-\[0\.25\],
+    [id*="Modal"] .pointer-events-none.opacity-\[0\.40\],
+    [id*="Modal"] .pointer-events-none.mt-auto {
+      display: none !important;
     }
   }
 </style>
@@ -133,9 +464,9 @@
     </div>
   </div>
 
-  <div class="grid grid-cols-1 lg:grid-cols-7 gap-8 w-full max-w-[1700px] mx-auto">
+  <div class="grid grid-cols-1 md:grid-cols-7 gap-6 lg:gap-8 w-full max-w-[1700px] mx-auto">
     <!-- Panel Izquierdo: Mapa Bokeh -->
-    <div class="col-span-1 lg:col-span-5 bg-white p-4 rounded-xl shadow-md border border-gray-200 flex justify-center items-center overflow-hidden h-[750px] relative">
+    <div class="col-span-1 md:col-span-5 bg-white p-4 rounded-xl shadow-md border border-gray-200 flex justify-center items-center overflow-hidden h-[calc(100vh-180px)] min-h-[500px] relative">
       <!-- Selector de Mapa de Calor -->
       <div class="absolute bottom-6 left-6 z-10 bg-white/95 backdrop-blur-md rounded-2xl shadow-lg border border-gray-100 p-3 flex flex-col gap-1.5 w-40">
         <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Métrica de Calor</h3>
@@ -195,7 +526,7 @@
     </div>
 
     <!-- Panel Derecho: Información del Estado (Rediseñado) -->
-    <div id="right-panel" class="col-span-1 lg:col-span-2 bg-white rounded-xl shadow-md border border-gray-200 flex flex-col h-full max-h-[750px] overflow-hidden">
+    <div id="right-panel" class="col-span-1 md:col-span-2 bg-white rounded-xl shadow-md border border-gray-200 flex flex-col h-[calc(100vh-180px)] md:max-h-[calc(100vh-180px)] min-h-[500px] overflow-hidden">
       
       <!-- NUEVA CABECERA DEL PANEL: Título y Periodo -->
       <div class="p-6 pb-4 border-b border-gray-50 bg-gray-50/30">
@@ -2810,8 +3141,7 @@
     <!-- Modal Curriculum Titular -->
     <div id="cvModal" class="hidden fixed inset-0 z-[10000] flex items-center justify-center p-4">
         <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity duration-300" onclick="closeCVModal()"></div>
-        <div class="relative w-full max-w-5xl bg-white rounded-[2.5rem] overflow-hidden shadow-2xl animate-fade-in flex flex-col" 
-             style="min-height: 580px;">
+        <div class="relative w-full max-w-5xl bg-white rounded-[2.5rem] overflow-hidden shadow-2xl animate-fade-in flex flex-col max-h-[90vh]">
             <!-- Fondo SVG con opacidad ajustable (10%) -->
             <div class="absolute inset-0 pointer-events-none opacity-[0.40]" 
                  style="background-image: url('{% static 'mapa/fondos/patron_.svg' %}'); background-size: 60%; background-position: center;">
@@ -2822,7 +3152,7 @@
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
 
-            <div class="p-12 relative flex flex-col md:flex-row gap-10 flex-grow">
+            <div class="modal-body p-6 md:p-10 relative flex flex-col md:flex-row gap-8 flex-grow overflow-y-auto custom-scrollbar">
                 <!-- Columna Izquierda: Trayectoria y Experiencia -->
                 <div class="flex-1 space-y-8 pr-2">
                     <div>
@@ -2926,7 +3256,7 @@
             </button>
 
             <!-- Cabecera -->
-            <div class="p-8 border-b border-gray-100 flex-shrink-0 bg-gray-50/50">
+            <div class="modal-header p-8 border-b border-gray-100 flex-shrink-0 bg-gray-50/50">
                 <span class="text-[9px] font-black text-emerald-600 uppercase tracking-[0.2em]">Estructura Orgánica</span>
                 <h2 id="orgStateName" class="text-3xl font-extrabold text-gray-900 mt-1 uppercase">ESTADO</h2>
                 <div class="flex items-center space-x-2 mt-2">
@@ -2937,7 +3267,7 @@
             </div>
 
             <!-- Cuerpo (Visor de PDF) -->
-            <div class="flex-grow p-4 bg-gray-100 flex items-center justify-center relative">
+            <div class="modal-body flex-grow p-4 bg-gray-100 flex items-center justify-center relative">
                 <iframe id="orgPdfViewer" class="w-full h-full rounded-2xl border-0 hidden" src=""></iframe>
                 <div id="orgNoPdf" class="flex flex-col items-center justify-center text-center p-8 bg-white rounded-3xl shadow-sm max-w-md">
                     <div class="w-16 h-16 bg-rose-50 text-rose-500 rounded-2xl flex items-center justify-center mb-4">
@@ -2965,7 +3295,7 @@
             </div>
 
             <!-- Header Section -->
-            <div class="relative z-10 px-10 pt-8 pb-6 border-b border-gray-100 flex flex-col md:flex-row md:items-center md:justify-between bg-white/90 backdrop-blur-md">
+            <div class="modal-header relative z-10 px-6 md:px-10 pt-6 md:pt-8 pb-4 md:pb-6 border-b border-gray-100 flex flex-col md:flex-row md:items-center md:justify-between bg-white/90 backdrop-blur-md">
                 <div class="flex-grow">
                     <span id="inmStateName" class="text-[10px] font-black text-[#611232] uppercase tracking-[0.25em] block mb-1">
                         OFICINA DE REPRESENTACIÓN: -
@@ -2990,7 +3320,7 @@
             </div>
 
             <!-- Body Content Section: 3-column scrollable grid -->
-            <div class="relative z-10 p-10 flex-grow overflow-y-auto custom-scrollbar flex flex-col lg:flex-row gap-8" style="background-color: rgba(255, 255, 255, 0.45);">
+            <div class="modal-body relative z-10 p-5 md:p-8 flex-grow overflow-y-auto custom-scrollbar flex flex-col md:flex-row gap-8" style="background-color: rgba(255, 255, 255, 0.45);">
                 
                 <!-- COLUMN 1: Operaciones (Personal, Vehículos, PIPC) -->
                 <div class="flex-1 space-y-6">
@@ -3193,7 +3523,7 @@
             </div>
 
             <!-- Header Section -->
-            <div class="relative z-10 px-10 pt-8 pb-6 border-b border-gray-100 flex flex-col md:flex-row md:items-center md:justify-between bg-white/90 backdrop-blur-md">
+            <div class="modal-header relative z-10 px-6 md:px-10 pt-6 md:pt-8 pb-4 md:pb-6 border-b border-gray-100 flex flex-col md:flex-row md:items-center md:justify-between bg-white/90 backdrop-blur-md">
                 <div class="flex-grow">
                     <span id="estStateName" class="text-[10px] font-black text-[#611232] uppercase tracking-[0.25em] block mb-1">
                         OFICINA DE REPRESENTACIÓN: -
@@ -3218,7 +3548,7 @@
             </div>
 
             <!-- Body Content Section: 3-column scrollable grid -->
-            <div class="relative z-10 p-10 flex-grow overflow-y-auto custom-scrollbar flex flex-col lg:flex-row gap-8" style="background-color: rgba(255, 255, 255, 0.45);">
+            <div class="modal-body relative z-10 p-5 md:p-8 flex-grow overflow-y-auto custom-scrollbar flex flex-col md:flex-row gap-8" style="background-color: rgba(255, 255, 255, 0.45);">
                 
                 <!-- COLUMN 1: Operaciones (Personal, Vehículos, PIPC) -->
                 <div class="flex-1 space-y-6">
@@ -3424,7 +3754,7 @@
             <div class="absolute inset-0 pointer-events-none opacity-[0.25]" 
                  style="background-image: url('{% static 'mapa/fondos/patron_.svg' %}'); background-size: 50%; background-position: center; z-index: 0;">
             </div>
-            <div class="relative z-10 px-10 pt-8 pb-6 border-b border-gray-100 flex flex-col md:flex-row md:items-center md:justify-between bg-white/90 backdrop-blur-md">
+            <div class="modal-header relative z-10 px-6 md:px-10 pt-6 md:pt-8 pb-4 md:pb-6 border-b border-gray-100 flex flex-col md:flex-row md:items-center md:justify-between bg-white/90 backdrop-blur-md">
                 <div class="flex-grow">
                     <span id="persTotalStateName" class="text-[10px] font-black text-[#611232] uppercase tracking-[0.25em] block mb-1">
                         OFICINA DE REPRESENTACIÓN: -
@@ -3443,8 +3773,8 @@
                     <img src="{% static 'mapa/fondos/logo_gob.png' %}" alt="Gobierno de México" class="h-10 object-contain bg-inm-verde-100">
                 </div>
             </div>
-            <div class="relative z-10 p-10 flex-grow overflow-y-auto custom-scrollbar flex flex-col gap-8" style="background-color: rgba(255, 255, 255, 0.45);">
-                <div class="grid grid-cols-4 gap-4">
+            <div class="modal-body relative z-10 p-5 md:p-8 flex-grow overflow-y-auto custom-scrollbar flex flex-col gap-6" style="background-color: rgba(255, 255, 255, 0.45);">
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
                     <div class="bg-black text-white p-5 rounded-[2rem] shadow-md flex items-center justify-between border border-stone-500/20">
                         <div>
                             <h4 class="text-[10px] font-black uppercase tracking-widest text-stone-100/90 mb-1">TOTAL</h4>
@@ -3508,7 +3838,7 @@
             <div class="absolute inset-0 pointer-events-none opacity-[0.25]" 
                  style="background-image: url('{% static 'mapa/fondos/patron_.svg' %}'); background-size: 50%; background-position: center; z-index: 0;">
             </div>
-            <div class="relative z-10 px-10 pt-8 pb-4 border-b border-gray-100 flex flex-col md:flex-row md:items-center md:justify-between bg-white/90 backdrop-blur-md">
+            <div class="modal-header relative z-10 px-6 md:px-10 pt-6 md:pt-8 pb-3 md:pb-4 border-b border-gray-100 flex flex-col md:flex-row md:items-center md:justify-between bg-white/90 backdrop-blur-md">
                 <div class="flex-grow">
                     <span id="persActStateName" class="text-[10px] font-black text-[#611232] uppercase tracking-[0.25em] block mb-1">
                         OFICINA DE REPRESENTACIÓN: -
@@ -3527,9 +3857,9 @@
                     <img src="{% static 'mapa/fondos/logo_gob.png' %}" alt="Gobierno de México" class="h-9 object-contain bg-inm-verde-100">
                 </div>
             </div>
-            <div class="relative z-10 p-8 flex-grow overflow-y-auto custom-scrollbar flex flex-col gap-6" style="background-color: rgba(255, 255, 255, 0.45);">
-                <div class="flex flex-col lg:flex-row gap-5 items-stretch">
-                    <div class="bg-[#548235] text-white p-5 rounded-[2rem] shadow-md flex flex-col justify-between border border-[#10312B]/20 w-full lg:w-44 flex-shrink-0">
+            <div class="modal-body relative z-10 p-5 md:p-8 flex-grow overflow-y-auto custom-scrollbar flex flex-col gap-6" style="background-color: rgba(255, 255, 255, 0.45);">
+                <div class="flex flex-col md:flex-row gap-5 items-stretch">
+                    <div class="bg-[#548235] text-white p-5 rounded-[2rem] shadow-md flex flex-col justify-between border border-[#10312B]/20 w-full md:w-44 flex-shrink-0">
                         <span class="text-[9px] font-black uppercase tracking-widest text-white/80 mb-1 leading-tight">TOTAL ACTIVOS</span>
                         <div class="flex items-baseline gap-2 mt-2">
                             <span id="persActTotalVal" class="text-4xl font-black leading-none">-</span>
@@ -3602,7 +3932,7 @@
                             </div>
                         </div>
                     </div>
-                    <div class="grid grid-cols-2 gap-3 w-full lg:w-72 flex-shrink-0">
+                    <div class="grid grid-cols-2 gap-3 w-full md:w-72 flex-shrink-0">
                         <div class="bg-stone-200 rounded-2xl border border-gray-200/60 p-3 flex items-center justify-between shadow-sm">
                             <div>
                                 <span class="text-[8px] font-black text-gray-400 uppercase tracking-widest block">TOTAL</span>
@@ -3658,7 +3988,7 @@
             </div>
 
             <!-- Header Section -->
-            <div class="relative z-10 px-10 pt-8 pb-6 border-b border-gray-100 flex flex-col items-center justify-center bg-white/90 backdrop-blur-md">
+            <div class="modal-header relative z-10 px-10 pt-8 pb-6 border-b border-gray-100 flex flex-col items-center justify-center bg-white/90 backdrop-blur-md">
                 <div class="text-center w-full">
                     <span class="text-[10px] font-black text-[#611232] uppercase tracking-[0.25em] block mb-1">
                         AVANCE DE SEGUIMIENTO
@@ -3678,7 +4008,7 @@
             </div>
 
             <!-- Body Content Section: table -->
-            <div class="relative z-10 p-10 flex-grow overflow-y-auto custom-scrollbar" style="background-color: rgba(255, 255, 255, 0.45);">
+            <div class="modal-body relative z-10 p-10 flex-grow overflow-y-auto custom-scrollbar" style="background-color: rgba(255, 255, 255, 0.45);">
                 <div class="overflow-hidden border border-gray-200 rounded-[1.5rem] shadow-sm bg-white">
                     <table class="w-full border-collapse text-left text-sm text-gray-500">
                         <thead>
