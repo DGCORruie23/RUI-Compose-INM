@@ -3192,6 +3192,7 @@ def api_get_personal_stats(request, estado_id):
             return cleaned.upper().strip()
 
         MANDOS_MEDIOS_KEYWORDS = [
+            ('OFICINA DE REPRESENTACION', 'OFICINA DE REPRESENTACION'),
             ('SUB REPRESENTACION FEDERAL', 'SUB REPRESENTACIÓN FEDERAL'),
             ('SUB REPRESENTACION LOCAL', 'SUB REPRESENTACIÓN LOCAL'),
             ('REPRESENTACION LOCAL', 'REPRESENTACIÓN LOCAL'),
@@ -3214,7 +3215,7 @@ def api_get_personal_stats(request, estado_id):
             mandos_medios_groups = {}
             
             enlace_levels = {'2', '3', '5', '6', '7', '11', 'P11', 'P12', 'P13'}
-            mandos_levels = {'O11', 'O21', 'O23', 'M11', 'M23', 'N11', 'N22'}
+            mandos_levels = {'O11', 'O21', 'O23', 'M11', 'M23', 'N11', 'N22', 'M41', 'M43'}
             
             for p in qs:
                 lvl = (p.nivel or '').strip().upper()
@@ -3243,6 +3244,12 @@ def api_get_personal_stats(request, estado_id):
                     if group_name not in mandos_medios_groups:
                         mandos_medios_groups[group_name] = []
                     mandos_medios_groups[group_name].append(p)
+
+                else:
+                    # Group by puesto_especifico (exact upper text)
+                    if puesto_upper not in enlace_operativo_groups:
+                        enlace_operativo_groups[puesto_upper] = []
+                    enlace_operativo_groups[puesto_upper].append(p)
 
             def get_row_stats(group_name, plist):
                 t = len(plist)
