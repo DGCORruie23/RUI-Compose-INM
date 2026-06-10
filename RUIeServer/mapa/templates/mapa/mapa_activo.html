@@ -2707,6 +2707,69 @@
   };
   
   setTimeout(setupTooltip, 500);
+  
+  // --- Tooltips para Puestos Específicos (Mandos Medios & Enlace/Operativo) ---
+  let puestosTooltipTimeout;
+  window.showPuestosTooltip = function(event, puestosJsonStr) {
+      clearTimeout(puestosTooltipTimeout);
+      const puestos = JSON.parse(decodeURIComponent(puestosJsonStr));
+      const tooltip = document.getElementById('puestosTooltip');
+      const content = document.getElementById('puestosTooltipContent');
+      if (!tooltip || !content) return;
+      
+      content.innerHTML = '';
+      let hasData = false;
+      
+      // Ordenar por cantidad descendente y generar renglones
+      Object.entries(puestos).sort((a, b) => b[1] - a[1]).forEach(([puesto, count]) => {
+          if (count > 0) {
+              hasData = true;
+              const row = document.createElement('div');
+              row.className = 'flex justify-between items-center gap-6 font-bold text-[10px] text-gray-200 uppercase tracking-tight py-1 border-b border-gray-800 last:border-0 last:pb-0';
+              row.innerHTML = `
+                  <span class="truncate max-w-[170px]" title="${puesto}">${puesto}</span>
+                  <span class="text-emerald-400 font-black font-mono ml-auto">${count}</span>
+              `;
+              content.appendChild(row);
+          }
+      });
+      
+      if (!hasData) return;
+      
+      tooltip.classList.remove('hidden');
+      tooltip.style.opacity = '0';
+      
+      // Calcular dimensiones y posicionar en el siguiente frame de renderizado
+      requestAnimationFrame(() => {
+          tooltip.style.opacity = '1';
+          const rect = event.currentTarget.getBoundingClientRect();
+          const tooltipWidth = tooltip.offsetWidth || 200;
+          const tooltipHeight = tooltip.offsetHeight || 60;
+          
+          let leftPos = rect.left + (rect.width / 2) - (tooltipWidth / 2);
+          let topPos = rect.top - tooltipHeight - 8;
+          
+          // Mantener dentro de los bordes horizontales de la pantalla
+          if (leftPos < 8) leftPos = 8;
+          if (leftPos + tooltipWidth > window.innerWidth - 8) {
+              leftPos = window.innerWidth - tooltipWidth - 8;
+          }
+          // Si no cabe arriba, mostrar abajo
+          if (topPos < 8) {
+              topPos = rect.bottom + 8;
+          }
+          
+          tooltip.style.left = `${leftPos}px`;
+          tooltip.style.top = `${topPos}px`;
+      });
+  };
+  
+  window.hidePuestosTooltip = function() {
+      puestosTooltipTimeout = setTimeout(() => {
+          const tooltip = document.getElementById('puestosTooltip');
+          if (tooltip) tooltip.classList.add('hidden');
+      }, 100);
+  };
 
   // --- Modal de Instrucciones (Seguimiento de Acuerdos) ---
   window.openInstruccionesModal = function(stateName) {
@@ -2827,6 +2890,9 @@
                     // Enlace y Operativo rows (Green style)
                     if (stats.enlace_operativo && stats.enlace_operativo.length > 0) {
                         stats.enlace_operativo.forEach(row => {
+                            const baseJson = encodeURIComponent(JSON.stringify(row.base_puestos || {}));
+                            const confJson = encodeURIComponent(JSON.stringify(row.confianza_puestos || {}));
+                            const evenJson = encodeURIComponent(JSON.stringify(row.eventual_puestos || {}));
                             const html = `
                                 <div class="flex items-center gap-6 pb-6 border-b border-gray-100 last:border-b-0 last:pb-0">
                                     <div class="w-1/3 flex items-center gap-4">
@@ -2841,15 +2907,15 @@
                                         </div>
                                     </div>
                                     <div class="flex-grow flex h-14 rounded-2xl overflow-hidden shadow-inner border border-gray-100/50 bg-gray-50/55 p-1 gap-1">
-                                        <div class="flex-1 bg-[#10312B] text-white flex items-center justify-center gap-2 rounded-xl">
+                                        <div class="flex-1 bg-[#10312B] text-white flex items-center justify-center gap-2 rounded-xl ${row.base > 0 ? 'cursor-help hover:opacity-90 hover:scale-[1.02] transition-all' : ''}" ${row.base > 0 ? `onmouseenter="window.showPuestosTooltip(event, '${baseJson}')" onmouseleave="window.hidePuestosTooltip()"` : ''}>
                                             <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
                                             <span class="text-base font-black">${row.base}</span>
                                         </div>
-                                        <div class="flex-1 bg-[#611232] text-white flex items-center justify-center gap-2 rounded-xl">
+                                        <div class="flex-1 bg-[#611232] text-white flex items-center justify-center gap-2 rounded-xl ${row.confianza > 0 ? 'cursor-help hover:opacity-90 hover:scale-[1.02] transition-all' : ''}" ${row.confianza > 0 ? `onmouseenter="window.showPuestosTooltip(event, '${confJson}')" onmouseleave="window.hidePuestosTooltip()"` : ''}>
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
                                             <span class="text-base font-black">${row.confianza}</span>
                                         </div>
-                                        <div class="flex-1 bg-[#8f6805] text-white flex items-center justify-center gap-2 rounded-xl">
+                                        <div class="flex-1 bg-[#8f6805] text-white flex items-center justify-center gap-2 rounded-xl ${row.eventual > 0 ? 'cursor-help hover:opacity-90 hover:scale-[1.02] transition-all' : ''}" ${row.eventual > 0 ? `onmouseenter="window.showPuestosTooltip(event, '${evenJson}')" onmouseleave="window.hidePuestosTooltip()"` : ''}>
                                             <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm-2-7h-5v5h5v-5z"/></svg>
                                             <span class="text-base font-black">${row.eventual}</span>
                                         </div>
@@ -2863,6 +2929,9 @@
                     // Mandos Medios rows (Orange/Amber style)
                     if (stats.mandos_medios && stats.mandos_medios.length > 0) {
                         stats.mandos_medios.forEach(row => {
+                            const baseJson = encodeURIComponent(JSON.stringify(row.base_puestos || {}));
+                            const confJson = encodeURIComponent(JSON.stringify(row.confianza_puestos || {}));
+                            const evenJson = encodeURIComponent(JSON.stringify(row.eventual_puestos || {}));
                             const html = `
                                 <div class="flex items-center gap-6 pb-6 border-b border-gray-100 last:border-b-0 last:pb-0">
                                     <div class="w-1/3 flex items-center gap-4">
@@ -2877,15 +2946,15 @@
                                         </div>
                                     </div>
                                     <div class="flex-grow flex h-14 rounded-2xl overflow-hidden shadow-inner border border-gray-100/50 bg-gray-50/55 p-1 gap-1">
-                                        <div class="flex-1 bg-[#10312B] text-white flex items-center justify-center gap-2 rounded-xl">
+                                        <div class="flex-1 bg-[#10312B] text-white flex items-center justify-center gap-2 rounded-xl ${row.base > 0 ? 'cursor-help hover:opacity-90 hover:scale-[1.02] transition-all' : ''}" ${row.base > 0 ? `onmouseenter="window.showPuestosTooltip(event, '${baseJson}')" onmouseleave="window.hidePuestosTooltip()"` : ''}>
                                             <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
                                             <span class="text-base font-black">${row.base}</span>
                                         </div>
-                                        <div class="flex-1 bg-[#611232] text-white flex items-center justify-center gap-2 rounded-xl">
+                                        <div class="flex-1 bg-[#611232] text-white flex items-center justify-center gap-2 rounded-xl ${row.confianza > 0 ? 'cursor-help hover:opacity-90 hover:scale-[1.02] transition-all' : ''}" ${row.confianza > 0 ? `onmouseenter="window.showPuestosTooltip(event, '${confJson}')" onmouseleave="window.hidePuestosTooltip()"` : ''}>
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
                                             <span class="text-base font-black">${row.confianza}</span>
                                         </div>
-                                        <div class="flex-1 bg-[#8f6805] text-white flex items-center justify-center gap-2 rounded-xl">
+                                        <div class="flex-1 bg-[#8f6805] text-white flex items-center justify-center gap-2 rounded-xl ${row.eventual > 0 ? 'cursor-help hover:opacity-90 hover:scale-[1.02] transition-all' : ''}" ${row.eventual > 0 ? `onmouseenter="window.showPuestosTooltip(event, '${evenJson}')" onmouseleave="window.hidePuestosTooltip()"` : ''}>
                                             <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm-2-7h-5v5h5v-5z"/></svg>
                                             <span class="text-base font-black">${row.eventual}</span>
                                         </div>
@@ -4034,6 +4103,10 @@
             </div>
 
         </div>
+    </div>
+    <!-- Tooltip Global para Puestos Específicos -->
+    <div id="puestosTooltip" class="hidden fixed bg-gray-900/95 backdrop-blur-md text-white text-xs rounded-xl shadow-2xl p-3 z-[15000] border border-gray-700/50 pointer-events-none transition-opacity duration-200 max-w-xs">
+        <div id="puestosTooltipContent" class="space-y-1.5 min-w-[150px]"></div>
     </div>
 </main>
 

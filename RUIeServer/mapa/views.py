@@ -3265,6 +3265,20 @@ def api_get_personal_stats(request, estado_id):
                 ev_m = sum(1 for p in plist if p.tipo_plaza and p.tipo_plaza.plazaT.upper() == 'EVENTUAL' and p.sexo == 'F')
                 ev_h = sum(1 for p in plist if p.tipo_plaza and p.tipo_plaza.plazaT.upper() == 'EVENTUAL' and p.sexo == 'M')
                 
+                # Puestos especificos breakdown per plaza type
+                base_puestos = {}
+                confianza_puestos = {}
+                eventual_puestos = {}
+                for p in plist:
+                    puesto = p.puesto_especifico or 'SIN ESPECIFICAR'
+                    plaza = p.tipo_plaza.plazaT.upper() if (p.tipo_plaza and p.tipo_plaza.plazaT) else ''
+                    if plaza == 'BASE':
+                        base_puestos[puesto] = base_puestos.get(puesto, 0) + 1
+                    elif plaza == 'CONFIANZA':
+                        confianza_puestos[puesto] = confianza_puestos.get(puesto, 0) + 1
+                    elif plaza == 'EVENTUAL':
+                        eventual_puestos[puesto] = eventual_puestos.get(puesto, 0) + 1
+                
                 return {
                     'group_name': group_name,
                     'total': t,
@@ -3277,6 +3291,9 @@ def api_get_personal_stats(request, estado_id):
                     'confianza_hombres': c_h,
                     'eventual_mujeres': ev_m,
                     'eventual_hombres': ev_h,
+                    'base_puestos': base_puestos,
+                    'confianza_puestos': confianza_puestos,
+                    'eventual_puestos': eventual_puestos,
                 }
 
             enlace_list = [get_row_stats(name, plist) for name, plist in sorted(enlace_operativo_groups.items())]
