@@ -3,6 +3,17 @@
 
 {% block title %}Expediente Digital - RUIE{% endblock title %}
 
+{% block styles %}
+<style>
+    header.header-style {
+        display: none !important;
+    }
+    body > div.flex.justify-center.mt-4.space-x-2 {
+        display: none !important;
+    }
+</style>
+{% endblock styles %}
+
 {% block scripts %}
 <!-- Cropper.js -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">

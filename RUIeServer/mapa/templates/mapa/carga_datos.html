@@ -228,6 +228,13 @@
         background-position: right 0.75rem center;
         background-size: 1.5em 1.5em;
     }
+    
+    header.header-style {
+        display: none !important;
+    }
+    body > div.flex.justify-center.mt-4.space-x-2 {
+        display: none !important;
+    }
 </style>
 {% endblock styles %}
 
@@ -236,11 +243,16 @@
     <!-- Header -->
     <div class="text-center mb-12 animate-slide-up">
         <h1 class="text-4xl font-extrabold text-gray-900 tracking-tight">Gestión de Datos</h1>
+        {% if request.user.is_superuser %}
         <p class="mt-4 text-lg text-gray-600 max-w-2xl">Carga masiva de información migratoria mediante archivos Excel. Asegúrese de que el formato coincida con el modelo seleccionado.</p>
+        {% else %}
+        <p class="mt-4 text-lg text-gray-600 max-w-2xl">Carga de información migratoria de la Oficina de Representación. Asegúrese de que la información registrada sea correcta.</p>
+        {% endif %}
     </div>
 
     <!-- Main Buttons - Row 1: Cargas y Catálogos -->
     <div class="flex flex-wrap items-center justify-center gap-4 animate-slide-up" style="animation-delay: 0.1s;">
+        {% if request.user.is_superuser %}
         <button onclick="openUploadModal()" class="group relative inline-flex items-center justify-center px-8 py-4 font-bold text-white transition-all duration-200 bg-inm-verde-100 font-pj rounded-2xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 hover:bg-inm-verde-200 shadow-xl shadow-emerald-900/10 w-full md:w-auto">
             <svg class="w-6 h-6 mr-3 transition-transform group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
@@ -261,6 +273,7 @@
             </svg>
             Información Oficinas
         </button>
+        {% endif %}
     </div>
 
     <!-- Main Buttons - Row 2: Expedientes y Estructuras -->
@@ -320,6 +333,16 @@
         {% endfor %}
     </div>
     {% endif %}
+
+    <!-- Logout Button -->
+    <div class="mt-8 flex justify-center animate-slide-up" style="animation-delay: 0.25s;">
+        <a href="{% url 'logout' %}" class="px-8 py-4 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-2xl shadow-xl shadow-rose-950/20 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center">
+            <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+            </svg>
+            Cerrar sesión
+        </a>
+    </div>
 
     <!-- Upload Modal -->
     <div id="uploadModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">

@@ -3,6 +3,17 @@
 
 {% block title %}Estructura Orgánica - RUIE{% endblock title %}
 
+{% block styles %}
+<style>
+    header.header-style {
+        display: none !important;
+    }
+    body > div.flex.justify-center.mt-4.space-x-2 {
+        display: none !important;
+    }
+</style>
+{% endblock styles %}
+
 {% block content %}
 <main class="min-h-screen bg-gray-50/50 p-6 md:p-12">
     <div class="max-w-6xl mx-auto">

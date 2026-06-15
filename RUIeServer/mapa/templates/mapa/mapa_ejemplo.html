@@ -78,13 +78,13 @@
 
     map.on('load', () => {
       // 2. Cargar el GeoJSON de México de manera asíncrona
-      fetch('https://raw.githubusercontent.com/codeforamerica/click_that_hood/master/public/data/mexico.geojson')
+      fetch("{% static 'mapa/data/inegi_latlon_mexico.geojson' %}")
         .then(res => res.json())
         .then(data => {
             
           // 3. Asignar colores aleatorios a cada estado
           data.features.forEach(feature => {
-            // Generar un color Hex aleatorio, e.g. #3A7F5C
+            // Generar un color Hex aleatorio
             const randomColor = '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
             feature.properties.color = randomColor;
           });

@@ -22,6 +22,10 @@
   .flex.justify-center.mt-4.space-x-2 {
     display: none !important;
   }
+  /* Ocultar el encabezado/cinta del base.html */
+  header.header-style {
+    display: none !important;
+  }
   /* Estilos para el Menú de Pulsación Larga */
   #longPressMenu {
     position: fixed;
@@ -510,10 +514,12 @@
 
       <!-- Controles de Zoom Personalizados (Flotantes) -->
       <div class="absolute bottom-8 right-6 flex flex-col gap-2 z-10 transition-all duration-500">
+        {% if is_superuser %}
         <button onclick="resetMap()" title="Vista Nacional (Reiniciar)" class="bg-white/90 backdrop-blur-md p-3 rounded-2xl shadow-xl border border-gray-100 hover:bg-inm-verde-100 hover:text-white text-inm-verde-100 transition-all active:scale-95">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
         </button>
         <div class="h-px bg-gray-200/50 my-1"></div>
+        {% endif %}
         <button onclick="toggleFocusMode()" title="Modo Enfoque (Pantalla Completa)" class="bg-white/90 backdrop-blur-md p-3 rounded-2xl shadow-xl border border-gray-100 hover:bg-gray-800 hover:text-white text-gray-600 transition-all active:scale-95">
           <svg id="focusIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>
@@ -530,7 +536,7 @@
       
       <!-- NUEVA CABECERA DEL PANEL: Título y Periodo -->
       <div class="p-6 pb-4 border-b border-gray-50 bg-gray-50/30">
-          <h1 class="text-xl font-bold text-gray-800 tracking-tight text-center">Monitoreo Migratorio</h1>
+          <h1 class="text-xl font-bold text-gray-800 tracking-tight text-center">Mapa Orgánico Interactivo</h1>
           
           <div class="mt-4 bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
             <div class="flex justify-between items-center mb-2">
@@ -653,7 +659,7 @@
       <!-- Footer timestamp -->
       <div class="mt-4 pt-4 border-t border-gray-50 text-[10px] text-gray-400 flex justify-between items-center">
         <span class="px-4">Datos actualizados al {% if fecha_actualizacion %}{{ fecha_actualizacion|date:"d F Y" }}{% else %}N/A{% endif %}</span>
-        <span class="font-bold px-4">RUIE</span>
+        <span class="font-bold px-4">INM</span>
       </div>
     </div>
   </div>
@@ -1269,6 +1275,15 @@
 
   window.animateToNationalView = function() {
       if (!map) return;
+      if (!IS_SUPERUSER && geoDataJSON) {
+          try {
+              const bbox = turf.bbox(geoDataJSON);
+              map.fitBounds(bbox, { padding: 50, duration: 800 });
+          } catch (e) {
+              console.error("Error setting bounds:", e);
+          }
+          return;
+      }
       map.flyTo({
           center: [-102.5528, 23.6345],
           zoom: 4.5,
@@ -1335,15 +1350,15 @@
     
     if (metric === 'todos') {
         if (selectedName) {
-            // MODO ENFOQUE (VENTANA) - Se destaca el estado seleccionado en verde claro #b3d9a5 y el resto blanco
+            // MODO ENFOQUE (VENTANA) - Se destaca el estado seleccionado en transparente y el resto blanco
             map.setPaintProperty('mexico-states-fill', 'fill-color', [
                 'case',
-                ['==', ['get', 'name'], selectedName], '#b3d9a5',
+                ['==', ['get', 'name'], selectedName], 'rgba(0,0,0,0)',
                 '#ffffff'
             ]);
             map.setPaintProperty('mexico-states-fill', 'fill-opacity', [
                 'case',
-                ['==', ['get', 'name'], selectedName], 0.1,
+                ['==', ['get', 'name'], selectedName], 0.0,
                 1.0
             ]);
             if (map.getLayer('mexico-states-line')) {
@@ -1354,9 +1369,9 @@
                 ]);
             }
         } else {
-            // VISTA NACIONAL - Todo el mapa con el mismo color #b3d9a5
-            map.setPaintProperty('mexico-states-fill', 'fill-color', '#b3d9a5');
-            map.setPaintProperty('mexico-states-fill', 'fill-opacity', 0.9);
+            // VISTA NACIONAL - Todo el mapa transparente
+            map.setPaintProperty('mexico-states-fill', 'fill-color', 'rgba(0,0,0,0)');
+            map.setPaintProperty('mexico-states-fill', 'fill-opacity', 0.0);
             if (map.getLayer('mexico-states-line')) {
                 map.setPaintProperty('mexico-states-line', 'line-opacity', 1.0);
             }
@@ -1658,6 +1673,11 @@
 <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
 <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
 <script>
+  // Permisos y Estado del Usuario
+  const IS_SUPERUSER = {{ is_superuser|yesno:"true,false" }};
+  const USER_STATE_NAME = "{{ user_state_name|default:'' }}";
+  const USER_STATE_NAME_NORMALIZED = "{{ user_state_name_normalized|default:'' }}";
+
   // Variables globales con los datos que venían de Bokeh
   const geoDataJSON = {{ geo_data_json|safe }};
   const infraPtsDataJSON = {{ infra_pts_data_json|safe }};
@@ -1681,7 +1701,7 @@
               'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}'
             ],
             'tileSize': 256,
-            'attribution': 'Tiles &copy; Esri'
+            'attribution': 'INEGI &copy; Esri'
           }
         },
         'layers': [
@@ -1711,6 +1731,15 @@
         generateId: true // Importante para feature state (hover)
       });
 
+      if (!IS_SUPERUSER && geoDataJSON && geoDataJSON.features && geoDataJSON.features.length > 0) {
+          try {
+              const bbox = turf.bbox(geoDataJSON);
+              map.fitBounds(bbox, { padding: 50, animate: false });
+          } catch (e) {
+              console.error("Error setting bounds on load:", e);
+          }
+      }
+
       // Máscara
       const worldMask = turf.mask(geoDataJSON);
       map.addSource('world-mask', {
@@ -1734,8 +1763,8 @@
         type: 'fill',
         source: 'mexico-states',
         paint: {
-          'fill-color': '#b3d9a5',
-          'fill-opacity': 0.9
+          'fill-color': 'rgba(0,0,0,0)',
+          'fill-opacity': 0.0
         }
       });
 

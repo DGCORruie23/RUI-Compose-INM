@@ -515,6 +515,13 @@
         background-position: right 0.75rem center;
         background-size: 1.25em 1.25em;
     }
+    
+    header.header-style {
+        display: none !important;
+    }
+    body > div.flex.justify-center.mt-4.space-x-2 {
+        display: none !important;
+    }
 </style>
 {% endblock styles %}
 
@@ -535,10 +542,12 @@
                     <p class="text-lg text-gray-500 max-w-2xl font-medium">Gestión administrativa, plazas, sueldos y movimientos del personal por oficina de representación.</p>
                 </div>
                 <div class="flex flex-wrap items-center gap-3">
+                    {% if request.user.is_superuser %}
                     <button onclick="openCargaRapidaModal();" class="px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-bold shadow-xl shadow-emerald-950/20 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center">
                         <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
                         Carga Rápida
                     </button>
+                    {% endif %}
                     <button onclick="resetPersonalForm(); openPersonalModal();" class="px-8 py-4 bg-stone-800 text-white rounded-2xl font-bold shadow-xl shadow-stone-900/20 hover:bg-stone-900 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center">
                         <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
                         Nuevo Personal

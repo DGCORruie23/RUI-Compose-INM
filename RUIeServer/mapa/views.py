@@ -520,10 +520,11 @@ def mapa_informacion(request):
     return render(request, 'mapa/informacion.html', context)
 
 def carga_datos(request):
-    # Restricción de acceso: Solo superusuarios
     if not request.user.is_authenticated:
         return redirect('/log-in/?next=%s' % request.path)
-    if not request.user.is_superuser:
+    
+    user_state = get_user_state(request)
+    if not request.user.is_superuser and not user_state:
         return render(request, 'base/error404.html')
 
     models_available = {
@@ -595,6 +596,9 @@ def carga_datos(request):
                         if not estado_obj:
                             errors.append(f"Fila {row_idx}: Estado '{estado_nombre}' no encontrado.")
                             continue
+                        if user_state and estado_obj != user_state:
+                            errors.append(f"Fila {row_idx}: No tiene permisos para modificar datos del estado '{estado_nombre}'.")
+                            continue
 
                         obj, created = Encuentros.objects.update_or_create(
                             fecha=fecha_val,
@@ -631,6 +635,9 @@ def carga_datos(request):
                         
                         if not estado_obj:
                             errors.append(f"Fila {row_idx}: Estado '{estado_nombre}' no encontrado.")
+                            continue
+                        if user_state and estado_obj != user_state:
+                            errors.append(f"Fila {row_idx}: No tiene permisos para modificar datos del estado '{estado_nombre}'.")
                             continue
 
                         # Construir diccionario de datos
@@ -1612,8 +1619,11 @@ def api_reporte_nacionalidades(request):
         return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
 
 def carga_datos_batch(request):
-    # Restricción de acceso: Solo superusuarios
-    if not request.user.is_superuser:
+    if not request.user.is_authenticated:
+        return JsonResponse({'status': 'error', 'message': 'No autenticado'}, status=401)
+        
+    user_state = get_user_state(request)
+    if not request.user.is_superuser and not user_state:
         return JsonResponse({'status': 'error', 'message': 'Acceso denegado'}, status=403)
 
     if request.method == 'POST':
@@ -1679,6 +1689,9 @@ def carga_datos_batch(request):
                         if not estado_obj:
                             errors.append(f"Reg {row_idx}: Estado '{estado_nombre}' no encontrado.")
                             continue
+                        if user_state and estado_obj != user_state:
+                            errors.append(f"Reg {row_idx}: No tiene permisos para modificar datos del estado '{estado_nombre}'.")
+                            continue
 
                         data_dict = {'encuentros_total': row[6] if len(row) > 6 else 0}
 
@@ -1709,6 +1722,9 @@ def carga_datos_batch(request):
                         
                         if not estado_obj:
                             errors.append(f"Reg {row_idx}: Estado '{estado_nombre}' no encontrado.")
+                            continue
+                        if user_state and estado_obj != user_state:
+                            errors.append(f"Reg {row_idx}: No tiene permisos para modificar datos del estado '{estado_nombre}'.")
                             continue
 
                         # Preparar datos
@@ -2281,7 +2297,9 @@ def mapa_ejemplo(request):
 def mapa_interactivo(request):
     if not request.user.is_authenticated:
         return redirect('/log-in/?next=%s' % request.path)
-    if not request.user.is_superuser:
+    
+    user_state = get_user_state(request)
+    if not request.user.is_superuser and not user_state:
         return render(request, 'base/error404.html')
 
     fecha_act = get_global_update_date() or date.today()
@@ -2432,26 +2450,34 @@ def mapa_interactivo(request):
     }
 
 
+    # Valores por defecto para estados sin datos
+    default_vals = {
+        'todos': 0, 'color_t': 32, 'color_rep': 32, 'color_rec': 32, 'color_res': 32, 'color_ing': 32, 'color_tra': 32, 'color_ret': 32, 'color_ina': 32,
+        'repatriados': 0, 'rep_adultos': 0, 'rep_menores': 0, 'rep_nna_solo': 0, 'rep_nna_acom': 0, 'rep_terrestres': 0, 'rep_vuelos': 0,
+        'recibidos': 0, 'rec_adultos': 0, 'rec_menores': 0,
+        'rescatados': 0, 'res_una_vez': 0, 'res_reincidente': 0, 'res_estacion': 0, 'res_dif': 0, 'res_conduccion': 0,
+        'ingresos': 0, 'ing_aereos': 0, 'ing_maritimos': 0, 'ing_terrestres': 0,
+        'tramites': 0, 'tra_res_perm': 0, 'tra_res_temp': 0, 'tra_res_est': 0, 'tra_vis_hum': 0, 'tra_vis_adop': 0, 'tra_vis_reg': 0, 'tra_vis_trab': 0,
+        'retornados': 0, 'ret_deportado': 0, 'ret_retornado': 0, 'inadmitidos': 0,
+        'instrucciones': 0, 'color_ins': 32
+    }
+
     # Ruta al archivo geojson descargado
-    geojson_path = os.path.join(settings.BASE_DIR, 'mapa', 'static', 'mapa', 'data', 'mexico.geojson')
+    geojson_path = os.path.join(settings.BASE_DIR, 'mapa', 'static', 'mapa', 'data', 'inegi_latlon_mexico.geojson')
     
     with open(geojson_path, 'r', encoding='utf-8') as f:
         geo_data = json.load(f)
-          # Inyectar datos reales en cada estado
+
+    # Filtrar el GeoJSON por estado si el usuario no es superusuario
+    if user_state:
+        user_state_name_normalized = normalizar_nombre(user_state.nombre)
+        geo_data['features'] = [
+            f for f in geo_data['features']
+            if normalizar_nombre(f['properties']['name']) == user_state_name_normalized
+        ]
+    # Inyectar datos reales en cada estado
     for feature in geo_data['features']:
         name_normalized = normalizar_nombre(feature['properties']['name'])
-        
-        # Obtener datos de los diccionarios (usar default con ceros para todos los campos nuevos)
-        default_vals = {
-            'todos': 0, 'color_t': 32, 'color_rep': 32, 'color_rec': 32, 'color_res': 32, 'color_ing': 32, 'color_tra': 32, 'color_ret': 32, 'color_ina': 32,
-            'repatriados': 0, 'rep_adultos': 0, 'rep_menores': 0, 'rep_nna_solo': 0, 'rep_nna_acom': 0, 'rep_terrestres': 0, 'rep_vuelos': 0,
-            'recibidos': 0, 'rec_adultos': 0, 'rec_menores': 0,
-            'rescatados': 0, 'res_una_vez': 0, 'res_reincidente': 0, 'res_estacion': 0, 'res_dif': 0, 'res_conduccion': 0,
-            'ingresos': 0, 'ing_aereos': 0, 'ing_maritimos': 0, 'ing_terrestres': 0,
-            'tramites': 0, 'tra_res_perm': 0, 'tra_res_temp': 0, 'tra_res_est': 0, 'tra_vis_hum': 0, 'tra_vis_adop': 0, 'tra_vis_reg': 0, 'tra_vis_trab': 0,
-            'retornados': 0, 'ret_deportado': 0, 'ret_retornado': 0, 'inadmitidos': 0,
-            'instrucciones': 0, 'color_ins': 32
-        }
         
         cs = totals_cs.get(name_normalized, default_vals).copy()
         dt = totals_dt.get(name_normalized, default_vals).copy()
@@ -2484,6 +2510,8 @@ def mapa_interactivo(request):
         
     # --- Capa de Infraestructura (Iconos SVG) ---
     infra_points_objs = PuntosInternacionEstacion.objects.all()
+    if user_state:
+        infra_points_objs = infra_points_objs.filter(estado=user_state)
     infra_pts_data = []
     for pt in infra_points_objs:
         icon_file = 'terrestre2.svg' # Default
@@ -2502,6 +2530,8 @@ def mapa_interactivo(request):
 
     # --- Capa de Puntos de Rescate Humano (PRH) ---
     prh_points = PRHs.objects.all().select_related('modalidad')
+    if user_state:
+        prh_points = prh_points.filter(estado=user_state)
     prh_pts_data = []
     for pt in prh_points:
         icon = 'agente_activo2.svg' if pt.activo else 'agente_inactivo2.svg'
@@ -2517,6 +2547,8 @@ def mapa_interactivo(request):
 
     # --- Capa de Inmuebles (Icono OR_ACTIVO) ---
     inmuebles_objs = Inmueble.objects.all()
+    if user_state:
+        inmuebles_objs = inmuebles_objs.filter(estado=user_state)
     inmuebles_pts_data = []
     for pt in inmuebles_objs:
         inmuebles_pts_data.append({
@@ -2533,16 +2565,32 @@ def mapa_interactivo(request):
     total_national_atendidos = sum(s['atendido'] for s in instrucciones_totales_dict.values())
     national_avance = (total_national_atendidos * 100 // total_national_acuerdos) if total_national_acuerdos > 0 else 100
 
-    national_data = {
-        'name': LABEL_NACIONAL,
-        'cs': calc_national(totals_cs),
-        'dt': calc_national(totals_dt),
-        'pe': calc_national(totals_cs) # Inicializar PE con valores de CS
-    }
-    
-    national_data['cs']['instrucciones'] = national_avance
-    national_data['dt']['instrucciones'] = national_avance
-    national_data['pe']['instrucciones'] = national_avance
+    if user_state:
+        # Totales del estado del usuario
+        user_state_key = normalizar_nombre(user_state.nombre)
+        ins_val = instrucciones_totales_dict.get(user_state_key, {'avance': 100, 'has_pending': False})
+        
+        cs = totals_cs.get(user_state_key, default_vals).copy()
+        dt = totals_dt.get(user_state_key, default_vals).copy()
+        cs['instrucciones'] = ins_val['avance']
+        dt['instrucciones'] = ins_val['avance']
+        
+        national_data = {
+            'name': user_state.nombre.upper(),
+            'cs': cs,
+            'dt': dt,
+            'pe': cs
+        }
+    else:
+        national_data = {
+            'name': LABEL_NACIONAL,
+            'cs': calc_national(totals_cs),
+            'dt': calc_national(totals_dt),
+            'pe': calc_national(totals_cs)
+        }
+        national_data['cs']['instrucciones'] = national_avance
+        national_data['dt']['instrucciones'] = national_avance
+        national_data['pe']['instrucciones'] = national_avance
     
     context = {
         'geo_data_json': json.dumps(geo_data),
@@ -2556,6 +2604,9 @@ def mapa_interactivo(request):
         'metric_labels_json': json.dumps(METRIC_LABELS),
         'fecha_actualizacion': fecha_act,
         'instrucciones_api_json': json.dumps(api_instrucciones),
+        'is_superuser': request.user.is_superuser,
+        'user_state_name': user_state.nombre if user_state else '',
+        'user_state_name_normalized': normalizar_nombre(user_state.nombre) if user_state else '',
     }
     
     return render(request, 'mapa/mapa_activo.html', context)
