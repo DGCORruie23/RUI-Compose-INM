@@ -8,6 +8,10 @@
 <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
 <style>
   .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+  #floatingMenu::-webkit-scrollbar { width: 3px; }
+  #floatingMenu::-webkit-scrollbar-track { background: transparent; }
+  #floatingMenu::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+  #floatingMenu::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
   .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
   .custom-scrollbar::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 10px; }
   .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #d1d5db; }
@@ -58,12 +62,6 @@
     padding: 0.75rem !important; /* Reducido de 1.5rem */
     border-radius: 0 !important;
     background: #f9fafb !important;
-  }
-
-  /* Asegurar que los modales estén por encima del modo enfoque */
-  body.focus-mode #infoModal,
-  body.focus-mode #selectionModal {
-    z-index: 3000 !important;
   }
 
   /* Asegurar que la cuadrícula ocupe todo el espacio en modo enfoque */
@@ -386,27 +384,6 @@
       padding: 0.5rem 0.75rem !important;
       font-size: 0.75rem !important;
     }
-    
-    /* --- INFO MODAL SPECIFICS --- */
-    #infoModal .p-8 {
-      padding: 1rem 1.5rem !important;
-    }
-    #infoModal .mt-10 {
-      margin-top: 1rem !important;
-      padding-top: 0.75rem !important;
-    }
-    #infoModal .py-4 {
-      padding-top: 0.5rem !important;
-      padding-bottom: 0.5rem !important;
-    }
-    #infoModal .text-3xl {
-      font-size: 1.5rem !important;
-    }
-    #detailBody {
-      max-height: 40vh !important;
-      overflow-y: auto !important;
-      padding-right: 0.5rem !important;
-    }
   }
 
   /* Optimizaciones extra para móviles en formato landscape (alturas muy bajas, e.g. < 550px) */
@@ -437,79 +414,147 @@
 {% block content %}
 <main class="page px-8 pt-4 pb-8 bg-gray-50 rounded-2xl shadow-lg opacity-0 translate-y-10 transition-[opacity,transform] duration-500 ease-out flex flex-col justify-start min-h-[calc(100vh-4rem)]" id="main-section">
 
-  <!-- MODAL: Selección de Rango Personalizado -->
-  <div id="customDateModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4">
-    <div class="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" onclick="closeCustomModal()"></div>
-    <div class="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden border-t-8 border-inm-verde-100 animate-fade-in">
-      <div class="p-6">
-        <div class="flex justify-between items-center mb-6">
-          <h3 class="text-lg font-bold text-gray-800">Periodo Personalizado</h3>
-          <button onclick="closeCustomModal()" class="text-gray-400 p-1.5 hover:bg-gray-50 rounded-lg">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-          </button>
-        </div>
 
-        <div class="space-y-4">
-          <div>
-            <label class="block text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Fecha Inicial</label>
-            <input type="date" id="customStart" min="2024-10-01" max="{{ fecha_actualizacion|date:'Y-m-d' }}" class="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-inm-verde-100 outline-none">
-          </div>
-          <div>
-            <label class="block text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Fecha Final</label>
-            <input type="date" id="customEnd" max="{{ fecha_actualizacion|date:'Y-m-d' }}" class="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-inm-verde-100 outline-none">
-          </div>
-        </div>
-
-        <button id="btnApplyCustom" onclick="consultarPeriodoPersonalizado()" class="w-full mt-8 py-4 bg-inm-verde-100 text-white rounded-2xl font-bold shadow-lg shadow-emerald-900/10 hover:scale-[1.02] active:scale-[0.98] transition-all flex justify-center items-center gap-2">
-          <span>Consultar Periodo</span>
-          <div id="loaderPE" class="hidden w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-        </button>
-      </div>
-    </div>
-  </div>
 
   <div class="grid grid-cols-1 md:grid-cols-7 gap-6 lg:gap-8 w-full max-w-[1700px] mx-auto">
-    <!-- Panel Izquierdo: Mapa Bokeh -->
-    <div class="col-span-1 md:col-span-5 bg-white p-4 rounded-xl shadow-md border border-gray-200 flex justify-center items-center overflow-hidden h-[calc(100vh-180px)] min-h-[500px] relative">
-      <!-- Selector de Mapa de Calor -->
-      <div class="absolute bottom-6 left-6 z-10 bg-white/95 backdrop-blur-md rounded-2xl shadow-lg border border-gray-100 p-3 flex flex-col gap-1.5 w-40">
-        <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Métrica de Calor</h3>
-        <label class="flex items-center gap-2 cursor-pointer group">
-          <input type="radio" name="heatmap_metric" value="todos" checked onchange="updateHeatmap()" class="w-3.5 h-3.5 text-inm-verde-100 bg-gray-50 border-gray-300 focus:ring-inm-verde-100">
-          <span class="text-xs font-semibold text-gray-700 group-hover:text-inm-verde-100 transition-colors">{{ metric_labels.todos }}</span>
-        </label>
-        <label class="flex items-center gap-2 cursor-pointer group">
-          <input type="radio" name="heatmap_metric" value="repatriados" onchange="updateHeatmap()" class="w-3.5 h-3.5 text-inm-verde-100 bg-gray-50 border-gray-300 focus:ring-inm-verde-100">
-          <span class="text-xs font-semibold text-gray-700 group-hover:text-inm-verde-100 transition-colors">{{ metric_labels.repatriados }}</span>
-        </label>
-        <label class="flex items-center gap-2 cursor-pointer group">
-          <input type="radio" name="heatmap_metric" value="recibidos" onchange="updateHeatmap()" class="w-3.5 h-3.5 text-inm-verde-100 bg-gray-50 border-gray-300 focus:ring-inm-verde-100">
-          <span class="text-xs font-semibold text-gray-700 group-hover:text-inm-verde-100 transition-colors">{{ metric_labels.recibidos }}</span>
-        </label>
-        <label class="flex items-center gap-2 cursor-pointer group">
-          <input type="radio" name="heatmap_metric" value="rescatados" onchange="updateHeatmap()" class="w-3.5 h-3.5 text-inm-verde-100 bg-gray-50 border-gray-300 focus:ring-inm-verde-100">
-          <span class="text-xs font-semibold text-gray-700 group-hover:text-inm-verde-100 transition-colors">{{ metric_labels.rescatados }}</span>
-        </label>
-        <label class="flex items-center gap-2 cursor-pointer group">
-          <input type="radio" name="heatmap_metric" value="ingresos" onchange="updateHeatmap()" class="w-3.5 h-3.5 text-inm-verde-100 bg-gray-50 border-gray-300 focus:ring-inm-verde-100">
-          <span class="text-xs font-semibold text-gray-700 group-hover:text-inm-verde-100 transition-colors">{{ metric_labels.ingresos }}</span>
-        </label>
-        <label class="flex items-center gap-2 cursor-pointer group">
-          <input type="radio" name="heatmap_metric" value="tramites" onchange="updateHeatmap()" class="w-3.5 h-3.5 text-inm-verde-100 bg-gray-50 border-gray-300 focus:ring-inm-verde-100">
-          <span class="text-xs font-semibold text-gray-700 group-hover:text-inm-verde-100 transition-colors">{{ metric_labels.tramites }}</span>
-        </label>
-        <label class="flex items-center gap-2 cursor-pointer group">
-          <input type="radio" name="heatmap_metric" value="retornados" onchange="updateHeatmap()" class="w-3.5 h-3.5 text-inm-verde-100 bg-gray-50 border-gray-300 focus:ring-inm-verde-100">
-          <span class="text-xs font-semibold text-gray-700 group-hover:text-inm-verde-100 transition-colors">{{ metric_labels.retornados }}</span>
-        </label>
-        <label class="flex items-center gap-2 cursor-pointer group">
-          <input type="radio" name="heatmap_metric" value="inadmitidos" onchange="updateHeatmap()" class="w-3.5 h-3.5 text-inm-verde-100 bg-gray-50 border-gray-300 focus:ring-inm-verde-100">
-          <span class="text-xs font-semibold text-gray-700 group-hover:text-inm-verde-100 transition-colors">{{ metric_labels.inadmitidos }}</span>
-        </label>
-        <label class="flex items-center gap-2 cursor-pointer group">
-          <input type="radio" name="heatmap_metric" value="instrucciones" onchange="updateHeatmap()" class="w-3.5 h-3.5 text-inm-verde-100 bg-gray-50 border-gray-300 focus:ring-inm-verde-100">
-          <span class="text-xs font-semibold text-gray-700 group-hover:text-inm-verde-100 transition-colors">{{ metric_labels.instrucciones }}</span>
-        </label>
+    <!-- Panel Izquierdo: Mapa Bokeh (Ampliado a 7 columnas) -->
+    <div class="col-span-1 md:col-span-7 bg-white p-4 rounded-xl shadow-md border border-gray-200 flex justify-center items-center overflow-hidden h-[calc(100vh-140px)] min-h-[500px] relative">
+      
+      <!-- New Floating Menu -->
+      <div id="floatingMenu" class="absolute top-6 left-6 z-20 bg-gray-100/90 backdrop-blur-md border border-gray-200/50 shadow-2xl rounded-[2.5rem] p-4 transition-all duration-300 flex flex-col gap-4 w-[100px] max-h-[calc(100vh-180px)] overflow-y-auto custom-scrollbar select-none">
+          <!-- State Title Card (Visible in colapsado and expandido states) -->
+          <div id="menuStateTitleCard" class="hidden w-full bg-white/80 border border-gray-200/50 rounded-2xl p-3 flex flex-col items-center justify-center text-center relative shadow-sm">
+             <div class="flex items-center justify-center gap-2">
+                 <button id="menuStateDetailBtn" onclick="openStateDetailModal()" class="hidden hover:scale-110 active:scale-95 transition-all p-1 bg-[#611232]/5 hover:bg-[#611232]/10 rounded-xl border border-[#611232]/15 shadow-sm" title="Ver detalle consolidado del Estado">
+                     <img src="/static/mapa/icons/OR_ACTIVO.svg" alt="Detalle" class="w-5 h-5 object-contain">
+                 </button>
+                 <h2 id="menuStateNameDisplay" class="text-xs font-black text-gray-800 tracking-tight leading-tight">Total Nacional</h2>
+                 <button id="menuStateOrganigramaBtn" onclick="showStateOrganigrama()" class="hidden hover:scale-110 active:scale-95 transition-all p-1.5 bg-emerald-50 hover:bg-emerald-100 rounded-xl border border-emerald-200 shadow-sm text-emerald-700" title="Ver Estructura Orgánica (PDF)">
+                     <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"></path></svg>
+                 </button>
+             </div>
+          </div>
+
+          <!-- Avatar container (Visible in general state) -->
+          <div id="menuGeneralAvatar" class="flex justify-center items-center">
+              <div onclick="openResponsibleCV()" class="w-14 h-14 rounded-2xl overflow-hidden bg-white border border-gray-200 shadow-sm flex items-center justify-center cursor-pointer hover:border-inm-verde-100 hover:scale-105 active:scale-95 transition-all">
+                  <img id="menuGeneralAvatarPhoto" src="" alt="Photo" class="w-full h-full object-cover hidden">
+                  <div id="menuGeneralAvatarPlaceholder" class="text-inm-verde-100/70">
+                      <svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                  </div>
+              </div>
+          </div>
+
+          <!-- Expanded Responsible info (Visible in expandido state) -->
+          <div id="menuExpandedResponsible" class="hidden flex flex-col items-center text-center bg-white border border-gray-100 rounded-3xl p-4 shadow-sm relative animate-fade-in">
+              <div onclick="openResponsibleCV()" class="w-16 h-16 rounded-2xl overflow-hidden bg-gray-50 border border-gray-200 shadow-sm flex items-center justify-center cursor-pointer hover:border-inm-verde-100 hover:scale-105 active:scale-95 transition-all mb-2">
+                  <img id="menuExpandedAvatarPhoto" src="" alt="Photo" class="w-full h-full object-cover hidden">
+                  <div id="menuExpandedAvatarPlaceholder" class="text-inm-verde-100/70">
+                      <svg class="w-9 h-9" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                  </div>
+              </div>
+              <div class="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Responsable</div>
+              <div id="menuTitularName" onclick="openResponsibleCV()" class="text-xs font-black text-gray-700 truncate w-full cursor-pointer hover:underline hover:text-inm-verde-100 transition-colors">-</div>
+              <div id="menuTitularStatus" class="text-[8px] font-bold text-inm-verde-100/60 uppercase tracking-tighter mt-0.5">Sin foto</div>
+          </div>
+
+          <!-- Infrastructure cards list (Visible in general and expandido states) -->
+          <div id="menuCardsList" class="flex flex-col gap-3 w-full">
+              <!-- Card: Internación Aérea -->
+              <div id="card_aereo" onclick="toggleFilter('AEREO')" class="bg-gray-200/80 border border-gray-300/30 p-2.5 rounded-2xl flex items-center justify-between cursor-pointer hover:bg-gray-200 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 group">
+                  <div class="flex items-center gap-3">
+                      <div class="w-10 h-10 rounded-full bg-[#800000] flex items-center justify-center flex-shrink-0 shadow-sm">
+                          <img src="/static/mapa/icons/aereo2.svg" class="w-6 h-6 object-contain" alt="Aéreo">
+                      </div>
+                      <span class="menu-label-text text-[11px] font-black text-gray-600 uppercase tracking-tight hidden">Internación Aérea</span>
+                  </div>
+                  <span id="menu_infra_aereo" class="text-base font-extrabold text-[#800000] pr-1">0</span>
+              </div>
+
+              <!-- Card: Internación Marítima -->
+              <div id="card_maritimo" onclick="toggleFilter('MARITIMO')" class="bg-gray-200/80 border border-gray-300/30 p-2.5 rounded-2xl flex items-center justify-between cursor-pointer hover:bg-gray-200 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 group">
+                  <div class="flex items-center gap-3">
+                      <div class="w-10 h-10 rounded-full bg-[#0080a0] flex items-center justify-center flex-shrink-0 shadow-sm">
+                          <img src="/static/mapa/icons/maritimo2.svg" class="w-6 h-6 object-contain" alt="Marítimo">
+                      </div>
+                      <span class="menu-label-text text-[11px] font-black text-gray-600 uppercase tracking-tight hidden">Internación Marítima</span>
+                  </div>
+                  <span id="menu_infra_maritimo" class="text-base font-extrabold text-[#0080a0] pr-1">0</span>
+              </div>
+
+              <!-- Card: Internación Terrestre -->
+              <div id="card_terrestre" onclick="toggleFilter('TERRESTRE')" class="bg-gray-200/80 border border-gray-300/30 p-2.5 rounded-2xl flex items-center justify-between cursor-pointer hover:bg-gray-200 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 group">
+                  <div class="flex items-center gap-3">
+                      <div class="w-10 h-10 rounded-full bg-[#f97316] flex items-center justify-center flex-shrink-0 shadow-sm">
+                          <img src="/static/mapa/icons/terrestre2.svg" class="w-6 h-6 object-contain" alt="Terrestre">
+                      </div>
+                      <span class="menu-label-text text-[11px] font-black text-gray-600 uppercase tracking-tight hidden">Internación Terrestre</span>
+                  </div>
+                  <span id="menu_infra_terrestre" class="text-base font-extrabold text-[#f97316] pr-1">0</span>
+              </div>
+
+              <!-- Card: Inmuebles -->
+              <div id="card_inmuebles" onclick="toggleFilter('INMUEBLE')" class="bg-gray-200/80 border border-gray-300/30 p-2.5 rounded-2xl flex items-center justify-between cursor-pointer hover:bg-gray-200 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 group">
+                  <div class="flex items-center gap-3">
+                      <div class="w-10 h-10 rounded-full bg-[#854d0e] flex items-center justify-center flex-shrink-0 shadow-sm">
+                          <img src="/static/mapa/icons/OR_ACTIVO.svg" class="w-6 h-6 object-contain" alt="Inmuebles">
+                      </div>
+                      <span class="menu-label-text text-[11px] font-black text-gray-600 uppercase tracking-tight hidden">Inmuebles</span>
+                  </div>
+                  <span id="menu_infra_inmuebles" class="text-base font-extrabold text-[#854d0e] pr-1">0</span>
+              </div>
+
+              <!-- Card: Estación Migratoria -->
+              <div id="card_estacion" onclick="toggleFilter('ESTACION')" class="bg-gray-200/80 border border-gray-300/30 p-2.5 rounded-2xl flex items-center justify-between cursor-pointer hover:bg-gray-200 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 group">
+                  <div class="flex items-center gap-3">
+                      <div class="w-10 h-10 rounded-full bg-[#ca8a04] flex items-center justify-center flex-shrink-0 shadow-sm">
+                          <img src="/static/mapa/icons/estacion2.svg" class="w-6 h-6 object-contain" alt="Estación">
+                      </div>
+                      <span class="menu-label-text text-[11px] font-black text-gray-600 uppercase tracking-tight hidden">Estación Migratoria</span>
+                  </div>
+                  <span id="menu_infra_estacion" class="text-base font-extrabold text-[#ca8a04] pr-1">0</span>
+              </div>
+
+              <!-- Card: PRH Activo -->
+              <div id="card_prh_activo" onclick="toggleFilter('PRH_ACTIVO')" class="bg-gray-200/80 border border-gray-300/30 p-2.5 rounded-2xl flex items-center justify-between cursor-pointer hover:bg-gray-200 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 group">
+                  <div class="flex items-center gap-3">
+                      <div class="w-10 h-10 rounded-full bg-[#15803d] flex items-center justify-center flex-shrink-0 shadow-sm">
+                          <img src="/static/mapa/icons/agente_activo2.svg" class="w-6 h-6 object-contain" alt="PRH Activo">
+                      </div>
+                      <span class="menu-label-text text-[11px] font-black text-gray-600 uppercase tracking-tight hidden">PRHs Activo</span>
+                  </div>
+                  <span id="menu_prh_activo" class="text-base font-extrabold text-[#15803d] pr-1">0</span>
+              </div>
+
+              <!-- Card: PRH Inactivo -->
+              <div id="card_prh_inactivo" onclick="toggleFilter('PRH_INACTIVO')" class="bg-gray-200/80 border border-gray-300/30 p-2.5 rounded-2xl flex items-center justify-between cursor-pointer hover:bg-gray-200 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 group">
+                  <div class="flex items-center gap-3">
+                      <div class="w-10 h-10 rounded-full bg-[#6b7280] flex items-center justify-center flex-shrink-0 shadow-sm">
+                          <img src="/static/mapa/icons/agente_inactivo2.svg" class="w-6 h-6 object-contain" alt="PRH Inactivo">
+                      </div>
+                      <span class="menu-label-text text-[11px] font-black text-gray-600 uppercase tracking-tight hidden">PRHs Inactivo</span>
+                  </div>
+                  <span id="menu_prh_inactivo" class="text-base font-extrabold text-[#6b7280] pr-1">0</span>
+              </div>
+          </div>
+
+          <!-- Navigation / Toggle state row -->
+          <div id="menuControlRow" class="flex items-center justify-center gap-3 mt-1 pt-2 border-t border-gray-300/40 w-full">
+              <!-- Button: Collapse (to colapsado state) -->
+              <button id="menuBtnCollapse" onclick="changeMenuState('colapsado')" class="p-2 bg-white hover:bg-gray-50 border border-gray-200/70 shadow-sm rounded-xl text-gray-500 hover:text-gray-700 transition-all hover:scale-105 active:scale-95 flex items-center justify-center" title="Colapsar Menú">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"></path></svg>
+              </button>
+
+              <!-- Button: Expand (to expandido state) -->
+              <button id="menuBtnExpand" onclick="changeMenuState('expandido')" class="p-2 bg-white hover:bg-gray-50 border border-gray-200/70 shadow-sm rounded-xl text-gray-500 hover:text-gray-700 transition-all hover:scale-105 active:scale-95 flex items-center justify-center" title="Expandir Menú">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"></path></svg>
+              </button>
+
+              <!-- Button: Return to General -->
+              <button id="menuBtnReturn" onclick="changeMenuState('general')" class="hidden p-2 bg-white hover:bg-gray-50 border border-gray-200/70 shadow-sm rounded-xl text-gray-500 hover:text-gray-700 transition-all hover:scale-105 active:scale-95 flex items-center justify-center" title="Volver al Menú General">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3"></path></svg>
+              </button>
+          </div>
       </div>
 
       <!-- Controles de Zoom Personalizados (Flotantes) -->
@@ -530,228 +575,31 @@
       <!-- Contenedor del Mapa MapLibre -->
       <div id="map" class="w-full h-full rounded-xl"></div>
     </div>
-
-    <!-- Panel Derecho: Información del Estado (Rediseñado) -->
-    <div id="right-panel" class="col-span-1 md:col-span-2 bg-white rounded-xl shadow-md border border-gray-200 flex flex-col h-[calc(100vh-180px)] md:max-h-[calc(100vh-180px)] min-h-[500px] overflow-hidden">
-      
-      <!-- NUEVA CABECERA DEL PANEL: Título y Periodo -->
-      <div class="p-6 pb-4 border-b border-gray-50 bg-gray-50/30">
-          <h1 class="text-xl font-bold text-gray-800 tracking-tight text-center">Mapa Orgánico Interactivo</h1>
-          
-          <div class="mt-4 bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
-            <div class="flex justify-between items-center mb-2">
-                <span class="text-[9px] font-bold uppercase tracking-[0.1em] text-inm-verde-100">Periodo de Consulta</span>
-                <div class="bg-gray-100 p-0.5 rounded-lg flex gap-0.5">
-                    <button id="btnCS" onclick="switchPeriod('cs')" class="px-3 py-1 text-[10px] font-bold rounded-md transition-all duration-300 bg-inm-verde-100 text-white shadow-sm active:scale-95">CS</button>
-                    <button id="btnDT" onclick="switchPeriod('dt')" class="px-3 py-1 text-[10px] font-bold rounded-md transition-all duration-300 text-gray-400 hover:text-gray-600 active:scale-95">DT</button>
-                    <button id="btnPE" onclick="switchPeriod('pe')" class="px-3 py-1 text-[10px] font-bold rounded-md transition-all duration-300 text-gray-400 hover:text-gray-600 active:scale-95">PE</button>
-                </div>
-            </div>
-            <h3 id="currentPeriodLabel" class="text-[11px] font-bold text-gray-700">01 OCT 2024 - ACTUAL (CS)</h3>
-          </div>
-      </div>
-
-      <!-- Main Content (Scrollable Area) -->
-      <div class="flex-1 overflow-y-auto p-6 pt-4 custom-scrollbar">
-        <!-- Nombre del Estado (Debajo del periodo según solicitud) -->
-        <div class="mb-4 text-center flex items-center justify-center gap-3">
-          <!-- Button with OR_ACTIVO.svg icon, initially hidden -->
-          <button id="btnStateDetailModal" onclick="openStateDetailModal()" class="hidden hover:scale-110 active:scale-95 transition-all p-1 bg-[#611232]/5 hover:bg-[#611232]/10 rounded-xl border border-[#611232]/15 shadow-sm" title="Ver detalle consolidado del Estado">
-             <img src="/static/mapa/icons/OR_ACTIVO.svg" alt="Detalle del Estado" class="w-6 h-6 object-contain">
-          </button>
-          <h2 id="stateNameDisplay" class="text-2xl font-bold text-gray-800 tracking-tight leading-tight">Seleccione un Estado</h2>
-        </div>
-
-        <!-- Cards Grid -->
-        <div class="grid grid-cols-3 gap-2" id="cardsContainer">
-          <!-- Card Recibidos Total (Consolidada) -->
-          <div onclick="showSelectionModal()" class="bg-gray-50 border-2 border-inm-verde-100/30 p-2 rounded-xl cursor-pointer hover:border-inm-verde-100 hover:shadow-md transition-all group text-center bg-gradient-to-br from-white to-gray-50">
-            <div id="card_recibidos_total_val" class="text-lg font-black text-inm-verde-100 card-value">-</div>
-            <div class="text-[9px] uppercase tracking-wider text-inm-verde-100 font-bold leading-tight card-label">{{ metric_labels.recibidos_total }}</div>
-          </div>
-          <!-- Card Rescatados -->
-          <div onclick="showDetail('rescatados')" class="bg-gray-50 border border-gray-200 p-2 rounded-xl cursor-pointer hover:border-inm-verde-100 hover:shadow-sm transition-all group text-center">
-            <div id="card_rescatados_val" class="text-lg font-bold text-gray-700 group-hover:text-inm-verde-100 card-value">-</div>
-             <div id="card_rescatados_lbl" class="text-[9px] uppercase tracking-wider text-gray-400 font-semibold group-hover:text-inm-verde-100 leading-tight card-label">Rescates</div>
-          </div>
-          <!-- Card Ingresos -->
-          <div onclick="showDetail('ingresos')" class="bg-gray-50 border border-gray-200 p-2 rounded-xl cursor-pointer hover:border-inm-verde-100 hover:shadow-sm transition-all group text-center">
-            <div id="card_ingresos_val" class="text-lg font-bold text-gray-700 group-hover:text-inm-verde-100 card-value">-</div>
-            <div id="card_ingresos_lbl" class="text-[9px] uppercase tracking-wider text-gray-400 font-semibold group-hover:text-inm-verde-100 leading-tight card-label">Internaciones</div>
-          </div>
-          <!-- Card Trámites -->
-          <div onclick="showDetail('tramites')" class="bg-gray-50 border border-gray-200 p-2 rounded-xl cursor-pointer hover:border-inm-verde-100 hover:shadow-sm transition-all group text-center">
-            <div id="card_tramites_val" class="text-lg font-bold text-gray-700 group-hover:text-inm-verde-100 card-value">-</div>
-            <div id="card_tramites_lbl" class="text-[9px] uppercase tracking-wider text-gray-400 font-semibold group-hover:text-inm-verde-100 leading-tight card-label">Trámites</div>
-          </div>
-          <!-- Card Retornados -->
-          <div onclick="showDetail('retornados')" class="bg-gray-50 border border-gray-200 p-2 rounded-xl cursor-pointer hover:border-inm-verde-100 hover:shadow-sm transition-all group text-center">
-            <div id="card_retornados_val" class="text-lg font-bold text-gray-700 group-hover:text-inm-verde-100 card-value">-</div>
-            <div id="card_retornados_lbl" class="text-[9px] uppercase tracking-wider text-gray-400 font-semibold group-hover:text-inm-verde-100 leading-tight card-label">Retornados</div>
-          </div>
-          </div>
-
-        <!-- Nueva Sección: Infraestructura y Titularidad (Solo visible en métrica 'Todos') -->
-        <div id="infraSection" class="mt-5 animate-fade-in hidden">
-            <div class="mb-2">
-                <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Infraestructura y Titularidad</h3>
-                <div class="p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                    <div class="flex items-center gap-4 mb-4 p-1">
-                        <div id="titularPhotoContainer" class="w-14 h-14 rounded-2xl overflow-hidden bg-inm-verde-100/10 border-2 border-white shadow-sm flex-shrink-0">
-                            <img id="titularPhoto" src="" alt="Titular" class="w-full h-full object-cover hidden">
-                            <div id="titularPhotoPlaceholder" class="w-full h-full flex items-center justify-center text-inm-verde-100">
-                                <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
-                            </div>
-                        </div>
-                        <div class="overflow-hidden">
-                            <div class="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Responsable</div>
-                            <div id="titularName" class="text-sm font-black text-gray-700 truncate hover:text-inm-verde-100 transition-colors">-</div>
-                            <div id="titularStatus" class="text-[8px] font-bold text-inm-verde-100/60 uppercase tracking-tighter">Asignado</div>
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-3">
-                        <div id="btn_infra_estacion" onclick="filterInfraPoints('ESTACION')" class="bg-white p-3 rounded-xl border border-gray-100 flex items-center justify-between cursor-pointer hover:border-inm-verde-100 hover:shadow-sm transition-all group">
-                            <span class="text-[10px] font-semibold text-gray-500 group-hover:text-inm-verde-100">Estaciones Migratorias</span>
-                            <span id="infra_estacion" class="text-xs font-bold text-inm-verde-100">0</span>
-                        </div>
-                        <div id="btn_infra_aereo" onclick="filterInfraPoints('AEREO')" class="bg-white p-3 rounded-xl border border-gray-100 flex items-center justify-between cursor-pointer hover:border-inm-verde-100 hover:shadow-sm transition-all group">
-                            <span class="text-[10px] font-semibold text-gray-500 group-hover:text-inm-verde-100">Internación Aérea</span>
-                            <span id="infra_aereo" class="text-xs font-bold text-inm-verde-100">0</span>
-                        </div>
-                        <div id="btn_infra_maritimo" onclick="filterInfraPoints('MARITIMO')" class="bg-white p-3 rounded-xl border border-gray-100 flex items-center justify-between cursor-pointer hover:border-inm-verde-100 hover:shadow-sm transition-all group">
-                            <span class="text-[10px] font-semibold text-gray-500 group-hover:text-inm-verde-100">Internación Marítima</span>
-                            <span id="infra_maritimo" class="text-xs font-bold text-inm-verde-100">0</span>
-                        </div>
-                        <div id="btn_infra_terrestre" onclick="filterInfraPoints('TERRESTRE')" class="bg-white p-3 rounded-xl border border-gray-100 flex items-center justify-between cursor-pointer hover:border-inm-verde-100 hover:shadow-sm transition-all group">
-                            <span class="text-[10px] font-semibold text-gray-500 group-hover:text-inm-verde-100">Internación Terrestre</span>
-                            <span id="infra_terrestre" class="text-xs font-bold text-inm-verde-100">0</span>
-                        </div>
-                        <div id="btn_infra_prh" onclick="filterInfraPoints('PRH')" class="bg-white p-3 rounded-xl border border-gray-100 flex items-center justify-between cursor-pointer hover:border-inm-verde-100 hover:shadow-sm transition-all group">
-                            <span class="text-[10px] font-semibold text-gray-500 group-hover:text-inm-verde-100">Puntos de Rescate (PRH)</span>
-                            <span id="infra_prh" class="text-xs font-bold text-inm-verde-100 text-[#7E1D36]">0</span>
-                        </div>
-                        <div id="btn_organigrama" onclick="showStateOrganigrama()" class="bg-white p-3 rounded-xl border border-gray-100 flex items-center justify-between cursor-pointer hover:border-emerald-600 hover:shadow-sm transition-all group">
-                            <span class="text-[10px] font-semibold text-gray-500 group-hover:text-emerald-600">Estructura Orgánica</span>
-                            <span class="text-xs font-bold text-emerald-600 flex items-center">
-                                <svg class="w-4 h-4 transition-transform group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                                </svg>
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- CHART: Ranking de Estados (Visible solo al seleccionar métrica) -->
-        <div id="chartContainer" class="hidden mt-6 pt-6 border-t border-gray-100 animate-fade-in" style="animation-delay: 0.2s;">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Ranking por Oficina/Estado</h3>
-                <span id="chartMetricLabel" class="text-[10px] font-bold text-inm-verde-100 uppercase tracking-widest">Métrica</span>
-            </div>
-            <div class="h-[300px] w-full">
-                <canvas id="rankingChart"></canvas>
-            </div>
-        </div>
-      </div>
-
-      <!-- Footer timestamp -->
-      <div class="mt-4 pt-4 border-t border-gray-50 text-[10px] text-gray-400 flex justify-between items-center">
-        <span class="px-4">Datos actualizados al {% if fecha_actualizacion %}{{ fecha_actualizacion|date:"d F Y" }}{% else %}N/A{% endif %}</span>
-        <span class="font-bold px-4">INM</span>
-      </div>
-    </div>
   </div>
 </main>
 
-<!-- Menú de Pulsación Larga (Persistente) -->
-<div id="longPressMenu" class="hidden bg-white/95 backdrop-blur-md border border-gray-100 rounded-2xl p-2 animate-fade-in">
-    <!-- El contenido se genera dinámicamente -->
-</div>
 
-<!-- Modal de Selección (Repatriados vs Recibidos) -->
-<div id="selectionModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4">
-  <div class="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" onclick="closeSelectionModal()"></div>
-  <div class="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden border border-gray-100 animate-fade-in">
-    <div class="p-6">
-      <div class="flex justify-between items-start mb-6">
-        <div>
-          <div class="flex items-baseline gap-2">
-            <span class="text-[9px] uppercase tracking-tighter text-gray-400 font-bold">Total de Recibidos</span>
-            <span id="sel_total_val" class="text-xl font-black text-inm-verde-100 leading-none">-</span>
-          </div>
-        </div>
-        <button onclick="closeSelectionModal()" class="text-gray-400 hover:text-gray-600 transition-colors bg-gray-50 p-2 rounded-xl">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-        </button>
-      </div>
-      
-      <div class="grid grid-cols-2 gap-4">
-          <!-- Card Repatriados -->
-          <div onclick="showDetailFromSelection('repatriados')" class="bg-gray-50 border border-gray-100 p-4 rounded-2xl cursor-pointer hover:border-inm-verde-100 hover:shadow-lg transition-all group text-center relative overflow-hidden">
-            <div id="sel_repatriados_val" class="text-2xl font-bold text-gray-700 group-hover:text-inm-verde-100">-</div>
-            <div class="text-[10px] uppercase tracking-widest text-gray-400 font-bold group-hover:text-inm-verde-100 mt-1">{{ metric_labels.repatriados }}</div>
-            <div id="sel_repatriados_pct" class="text-[9px] font-bold text-inm-verde-100/50 mt-1">0%</div>
-          </div>
-          <!-- Card Recibidos -->
-          <div onclick="showDetailFromSelection('recibidos')" class="bg-gray-50 border border-gray-100 p-4 rounded-2xl cursor-pointer hover:border-inm-verde-100 hover:shadow-lg transition-all group text-center relative overflow-hidden">
-            <div id="sel_recibidos_val" class="text-2xl font-bold text-gray-700 group-hover:text-inm-verde-100">-</div>
-            <div class="text-[10px] uppercase tracking-widest text-gray-400 font-bold group-hover:text-inm-verde-100 mt-1">{{ metric_labels.recibidos }}</div>
-            <div id="sel_recibidos_pct" class="text-[9px] font-bold text-inm-verde-100/50 mt-1">0%</div>
-          </div>
-      </div>
-    </div>
-  </div>
-</div>
 
-<!-- Modal de Desglose (Pop-up) -->
-<div id="infoModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
-  <!-- Backdrop con efecto blur -->
-  <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onclick="closeDetail()"></div>
-  
-  <!-- Contenido del Modal -->
-  <div class="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border-t-8 border-inm-verde-100 translate-y-0" id="modalContainer">
-    <div class="p-8">
-      <div class="flex justify-between items-start mb-6">
-        <div>
-          <h3 id="modalStateName" class="text-[10px] font-bold uppercase tracking-widest text-inm-verde-100 mb-1">-</h3>
-          <h4 id="detailTitle" class="text-3xl font-bold text-gray-800">Desglose</h4>
-          <div class="mt-1 flex flex-col gap-1">
-            <div class="flex items-baseline gap-2">
-              <span class="text-[10px] uppercase tracking-widest text-gray-400 font-bold">Total: </span>
-              <span id="modalTotalValue" class="text-xl font-black text-inm-verde-100 leading-none">-</span>
-            </div>
-            <div id="modalPeriodDisplay" class="text-[10px] py-2 uppercase tracking-wider font-bold text-inm-verde-100/50"></div>
-          </div>
-        </div>
-        <button onclick="closeDetail()" class="text-gray-400 hover:text-gray-600 transition-colors bg-gray-50 p-2 rounded-xl">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-        </button>
-      </div>
 
-      <div id="detailBody" class="space-y-6 text-gray-600 min-h-[150px] flex flex-col justify-center">
-        <!-- Contenido dinámico -->
-      </div>
-      
-      <div class="mt-10 pt-6 border-t border-gray-100">
-        <button onclick="closeDetail()" class="w-full py-4 bg-inm-verde-100 text-white rounded-2xl font-bold shadow-lg shadow-emerald-900/20 hover:scale-[1.02] transition-transform active:scale-[0.98]">
-          Entendido
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
+
+
 
 <script>
-  let currentPeriod = 'cs';
-  let myRankingChart = null;
   const LABEL_NACIONAL = "{{ label_nacional }}";
   const METRIC_LABELS = {{ metric_labels_json|safe }};
+  window.menuState = 'general';
+
+  // ── Datos de puntos disponibles globalmente desde el inicio ──────────────
+  // Se inicializan aquí para que updateFloatingMenu pueda accederlos
+  // incluso antes de que el segundo bloque de scripts (MapLibre) se evalúe.
+  window.infraPtsDataJSON     = {{ infra_pts_data_json|safe }};
+  window.prhPtsDataJSON       = {{ prh_pts_data_json|safe }};
+  window.inmueblesPtsDataJSON = {{ inmuebles_pts_data_json|safe }};
+  // ─────────────────────────────────────────────────────────────────────────
 
   function normalizar_nombre(text) {
     if (!text) return "";
-    return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+    return text.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().trim();
   }
 
   const normalizar = normalizar_nombre;
@@ -763,18 +611,6 @@
       main.classList.add("opacity-100", "translate-y-0");
     }
 
-    // Seteo de fechas máximas para el modal PE (Periodo Extraordinario)
-    const inputStart = document.getElementById('customStart');
-    const inputEnd = document.getElementById('customEnd');
-    if (inputStart && inputEnd) {
-        // Usar la fecha de actualización global para limitar el calendario
-        const maxDateStr = "{% if fecha_actualizacion %}{{ fecha_actualizacion|date:'Y-m-d' }}{% else %}" + new Date().toISOString().split('T')[0] + "{% endif %}";
-        inputEnd.max = maxDateStr;
-        inputStart.max = maxDateStr;
-        inputStart.value = "2024-10-01";
-        inputEnd.value = maxDateStr;
-    }
-
     // Inicializar con Datos Nacionales del Backend (Restaurado)
     try {
         window.selectedStateData = {{ national_data_json|safe }};
@@ -784,6 +620,9 @@
     } catch (e) {
         console.error("Error cargando national_data_json:", e);
     }
+
+    // Inicializar estado del menú flotante
+    changeMenuState('general');
 
     if (window.updateInformationPanel) {
         window.updateInformationPanel();
@@ -811,439 +650,187 @@
     }, 100);
   };
 
+  window.changeMenuState = function(state) {
+    window.menuState = state;
+    const menu = document.getElementById('floatingMenu');
+    if (!menu) return;
+    
+    // Resetear clases de estado y anchos
+    menu.classList.remove('menu-state-general', 'menu-state-expandido', 'menu-state-colapsado');
+    menu.classList.remove('w-[100px]', 'w-[300px]', 'w-[240px]');
+    
+    const titleCard = document.getElementById('menuStateTitleCard');
+    const genAvatar = document.getElementById('menuGeneralAvatar');
+    const expResp = document.getElementById('menuExpandedResponsible');
+    const cardsList = document.getElementById('menuCardsList');
+    const labels = document.querySelectorAll('.menu-label-text');
+    
+    const btnCollapse = document.getElementById('menuBtnCollapse');
+    const btnExpand = document.getElementById('menuBtnExpand');
+    const btnReturn = document.getElementById('menuBtnReturn');
+
+    if (state === 'colapsado') {
+        menu.classList.add('menu-state-colapsado', 'w-[240px]');
+        if (titleCard) titleCard.classList.remove('hidden');
+        if (genAvatar) genAvatar.classList.add('hidden');
+        if (expResp) expResp.classList.add('hidden');
+        if (cardsList) cardsList.classList.add('hidden');
+        
+        if (btnCollapse) btnCollapse.classList.add('hidden');
+        if (btnExpand) btnExpand.classList.add('hidden');
+        if (btnReturn) btnReturn.classList.remove('hidden');
+    } else if (state === 'expandido') {
+        menu.classList.add('menu-state-expandido', 'w-[300px]');
+        if (titleCard) titleCard.classList.remove('hidden');
+        if (genAvatar) genAvatar.classList.add('hidden');
+        if (expResp) expResp.classList.remove('hidden');
+        if (cardsList) cardsList.classList.remove('hidden');
+        labels.forEach(lbl => lbl.classList.remove('hidden'));
+        
+        if (btnCollapse) btnCollapse.classList.add('hidden');
+        if (btnExpand) btnExpand.classList.add('hidden');
+        if (btnReturn) btnReturn.classList.remove('hidden');
+    } else { // general
+        menu.classList.add('menu-state-general', 'w-[100px]');
+        if (titleCard) titleCard.classList.add('hidden');
+        if (genAvatar) genAvatar.classList.remove('hidden');
+        if (expResp) expResp.classList.add('hidden');
+        if (cardsList) cardsList.classList.remove('hidden');
+        labels.forEach(lbl => lbl.classList.add('hidden'));
+        
+        if (btnCollapse) btnCollapse.classList.remove('hidden');
+        if (btnExpand) btnExpand.classList.remove('hidden');
+        if (btnReturn) btnReturn.classList.add('hidden');
+    }
+  };
+
+  window.openResponsibleCV = function() {
+    if (!window.selectedStateData) return;
+    const stateName = window.selectedStateData.name;
+    const isNational = stateName === LABEL_NACIONAL || stateName === "Total Nacional" || stateName === "NACIONAL";
+    const key = isNational ? LABEL_NACIONAL : normalizar_nombre(stateName);
+    const data = window.infraData[key];
+    if (data && data.titular_id) {
+        openCVModal(data.titular_id);
+    }
+  };
+
+  window.openStateDetailModal = function() {
+    if (!window.selectedStateData) return;
+    const stateName = window.selectedStateData.name;
+    const isNational = stateName === LABEL_NACIONAL || stateName === "Total Nacional" || stateName === "NACIONAL";
+    if (isNational) return;
+    const key = normalizar_nombre(stateName);
+    const estadoId = window.infraData[key]?.estado_id;
+    if (estadoId && window.openEstadoDetailModal) {
+        window.openEstadoDetailModal(estadoId);
+    }
+  };
+
+  window.updateFloatingMenu = function() {
+    if (!window.selectedStateData) return;
+    
+    const stateName = window.selectedStateData.name;
+    const isNational = stateName === LABEL_NACIONAL || stateName === "Total Nacional" || stateName === "NACIONAL";
+    const normalizedState = normalizar_nombre(stateName);
+    
+    // 1. Actualizar título de la tarjeta en el menú
+    const titleCard = document.getElementById('menuStateNameDisplay');
+    if (titleCard) {
+        titleCard.innerText = stateName;
+    }
+    
+    // Visibilidad de los botones de detalle y organigrama
+    const detailBtn = document.getElementById('menuStateDetailBtn');
+    const orgBtn = document.getElementById('menuStateOrganigramaBtn');
+    if (detailBtn) {
+        if (isNational) detailBtn.classList.add('hidden');
+        else detailBtn.classList.remove('hidden');
+    }
+    if (orgBtn) {
+        if (isNational) orgBtn.classList.add('hidden');
+        else orgBtn.classList.remove('hidden');
+    }
+
+    // 2. Actualizar foto y datos del Responsable
+    const key = isNational ? LABEL_NACIONAL : normalizedState;
+    const data = window.infraData[key] || { 'AEREO': 0, 'MARITIMO': 0, 'TERRESTRE': 0, 'ESTACION': 0, 'titular': 'No disponible' };
+    
+    const genPhotoImg = document.getElementById('menuGeneralAvatarPhoto');
+    const genPhotoPlaceholder = document.getElementById('menuGeneralAvatarPlaceholder');
+    const expPhotoImg = document.getElementById('menuExpandedAvatarPhoto');
+    const expPhotoPlaceholder = document.getElementById('menuExpandedAvatarPlaceholder');
+    const expName = document.getElementById('menuTitularName');
+    const expStatus = document.getElementById('menuTitularStatus');
+
+    if (data.foto) {
+        if (genPhotoImg) { genPhotoImg.src = data.foto; genPhotoImg.classList.remove('hidden'); }
+        if (genPhotoPlaceholder) genPhotoPlaceholder.classList.add('hidden');
+        if (expPhotoImg) { expPhotoImg.src = data.foto; expPhotoImg.classList.remove('hidden'); }
+        if (expPhotoPlaceholder) expPhotoPlaceholder.classList.add('hidden');
+        if (expStatus) {
+            expStatus.innerText = data.tipo_nombramiento || "Titular Activo";
+            expStatus.className = "text-[8px] font-bold text-inm-verde-100 uppercase tracking-tighter mt-0.5";
+        }
+    } else {
+        if (genPhotoImg) { genPhotoImg.classList.add('hidden'); }
+        if (genPhotoPlaceholder) genPhotoPlaceholder.classList.remove('hidden');
+        if (expPhotoImg) { expPhotoImg.classList.add('hidden'); }
+        if (expPhotoPlaceholder) expPhotoPlaceholder.classList.remove('hidden');
+        if (expStatus) {
+            expStatus.innerText = data.titular === 'Sin titular asignado' ? "Pendiente" : "Sin fotografía";
+            expStatus.className = "text-[8px] font-bold text-amber-500/60 uppercase tracking-tighter mt-0.5";
+        }
+    }
+
+    if (expName) {
+        expName.innerText = data.titular;
+    }
+
+    // 3. Calcular cantidades del lado del cliente dinámicamente
+    // Usar arrays vacíos como fallback si los datos aún no están disponibles
+    const _infraPts = Array.isArray(window.infraPtsDataJSON) ? window.infraPtsDataJSON : [];
+    const _inmueblesPts = Array.isArray(window.inmueblesPtsDataJSON) ? window.inmueblesPtsDataJSON : [];
+    const _prhPts = Array.isArray(window.prhPtsDataJSON) ? window.prhPtsDataJSON : [];
+
+    const aereoCount = _infraPts.filter(item => isNational || item.estado === normalizedState).filter(item => item.tipo === 'AEREO').length;
+    const maritimoCount = _infraPts.filter(item => isNational || item.estado === normalizedState).filter(item => item.tipo === 'MARITIMO').length;
+    const terrestreCount = _infraPts.filter(item => isNational || item.estado === normalizedState).filter(item => item.tipo === 'TERRESTRE').length;
+    const estacionCount = _infraPts.filter(item => isNational || item.estado === normalizedState).filter(item => item.tipo === 'ESTACION').length;
+    const inmueblesCount = _inmueblesPts.filter(item => isNational || item.estado === normalizedState).length;
+    const prhActivosCount = _prhPts.filter(item => isNational || item.estado === normalizedState).filter(item => item.status === 'Activo').length;
+    const prhInactivosCount = _prhPts.filter(item => isNational || item.estado === normalizedState).filter(item => item.status === 'Inactivo').length;
+
+    // Actualizar counts en el DOM
+    const _setCount = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
+    _setCount('menu_infra_aereo', aereoCount);
+    _setCount('menu_infra_maritimo', maritimoCount);
+    _setCount('menu_infra_terrestre', terrestreCount);
+    _setCount('menu_infra_estacion', estacionCount);
+    _setCount('menu_infra_inmuebles', inmueblesCount);
+    _setCount('menu_prh_activo', prhActivosCount);
+    _setCount('menu_prh_inactivo', prhInactivosCount);
+  };
+
   window.updateInformationPanel = function() {
     if (!window.selectedStateData) return;
     
-    // Update Title
+    // Update Title (if exists)
     const nameArr = window.selectedStateData.name.split(' ');
     let nameHtml = `<span class="font-bold">${nameArr[0]}</span>`;
     if (nameArr.length > 1) {
         nameHtml = `${nameArr[0]} <span class="font-bold">${nameArr.slice(1).join(' ')}</span>`;
     }
-    document.getElementById('stateNameDisplay').innerHTML = nameHtml;
+    const nameDisp = document.getElementById('stateNameDisplay');
+    if (nameDisp) nameDisp.innerHTML = nameHtml;
     
-    // Toggle State Detail Button (hide if National, show otherwise)
-    const btn = document.getElementById('btnStateDetailModal');
-    if (btn) {
-        const isNational = window.selectedStateData.name === LABEL_NACIONAL || 
-                           window.selectedStateData.name === "Total Nacional" || 
-                           window.selectedStateData.name === "NACIONAL";
-        if (isNational) {
-            btn.classList.add('hidden');
-        } else {
-            btn.classList.remove('hidden');
-        }
-    }
-    
-    updateCards();
-    updateRankingChart();
-    updateInfraSection();
+    updateFloatingMenu();
     applyMapFilters(); // Sincronizar iconos con el estado seleccionado
-    closeDetail();
   };
 
   function updateInfraSection() {
-    if (!window.selectedStateData) return;
-    const section = document.getElementById('infraSection');
-    const metric = window.currentMetric || 'todos';
-    
-    if (metric === 'todos') {
-      section.classList.remove('hidden');
-      const isNational = window.selectedStateData.name === LABEL_NACIONAL;
-      const key = isNational ? LABEL_NACIONAL : normalizar_nombre(window.selectedStateData.name);
-      const data = window.infraData[key] || { 'AEREO': 0, 'MARITIMO': 0, 'TERRESTRE': 0, 'ESTACION': 0, 'titular': 'No disponible' };
-      
-      document.getElementById('titularName').innerText = data.titular;
-      
-      const photoImg = document.getElementById('titularPhoto');
-      const photoPlaceholder = document.getElementById('titularPhotoPlaceholder');
-      const titularStatus = document.getElementById('titularStatus');
-
-      if (data.foto) {
-          photoImg.src = data.foto;
-          photoImg.classList.remove('hidden');
-          photoPlaceholder.classList.add('hidden');
-          titularStatus.innerText = data.tipo_nombramiento || "Titular Activo";
-          titularStatus.className = "text-[8px] font-bold text-inm-verde-100 uppercase tracking-tighter";
-      } else {
-          photoImg.classList.add('hidden');
-          photoPlaceholder.classList.remove('hidden');
-          titularStatus.innerText = data.titular === 'Sin titular asignado' ? "Pendiente" : "Sin fotografía";
-          titularStatus.className = "text-[8px] font-bold text-amber-500/60 uppercase tracking-tighter";
-      }
-
-      // Configurar clic para el CV Modal
-      const nameEl = document.getElementById('titularName');
-      if (data.titular_id) {
-          nameEl.classList.add('cursor-pointer', 'hover:underline');
-          nameEl.onclick = () => openCVModal(data.titular_id);
-      } else {
-          nameEl.classList.remove('cursor-pointer', 'hover:underline');
-          nameEl.onclick = null;
-      }
-
-      document.getElementById('infra_estacion').innerText = data.ESTACION;
-      document.getElementById('infra_aereo').innerText = data.AEREO;
-      document.getElementById('infra_maritimo').innerText = data.MARITIMO;
-      document.getElementById('infra_terrestre').innerText = data.TERRESTRE;
-      document.getElementById('infra_prh').innerText = data.PRH || 0;
-    } else {
-      section.classList.add('hidden');
-    }
+    updateFloatingMenu();
   }
-
-  function updateCards() {
-    if (!window.selectedStateData) return;
-    const data = window.selectedStateData[currentPeriod];
-    
-    const categories = ['rescatados', 'ingresos', 'tramites', 'retornados'];
-    categories.forEach(cat => {
-      const valEl = document.getElementById(`card_${cat}_val`);
-      const lblEl = document.getElementById(`card_${cat}_lbl`);
-      if (valEl) {
-        valEl.innerText = data[cat].toLocaleString();
-        adjustFontSize(valEl, 18);
-      }
-      if (lblEl) {
-        adjustFontSize(lblEl, 9);
-      }
-    });
-
-    // Actualizar Recibidos Total (Consolidado)
-    const totalConsolidado = (data['repatriados'] || 0) + (data['recibidos'] || 0);
-    const totalEl = document.getElementById('card_recibidos_total_val');
-    if (totalEl) {
-        totalEl.innerText = totalConsolidado.toLocaleString();
-        adjustFontSize(totalEl, 18);
-    }
-
-    // Actualizar valores en el Modal de Selección
-    const selRepVal = document.getElementById('sel_repatriados_val');
-    const selRecVal = document.getElementById('sel_recibidos_val');
-    const selTotalVal = document.getElementById('sel_total_val');
-    const selRepPct = document.getElementById('sel_repatriados_pct');
-    const selRecPct = document.getElementById('sel_recibidos_pct');
-
-    const repVal = data['repatriados'] || 0;
-    const recVal = data['recibidos'] || 0;
-
-    if (selRepVal) selRepVal.innerText = repVal.toLocaleString();
-    if (selRecVal) selRecVal.innerText = recVal.toLocaleString();
-    if (selTotalVal) selTotalVal.innerText = totalConsolidado.toLocaleString();
-
-    if (totalConsolidado > 0) {
-        if (selRepPct) selRepPct.innerText = ((repVal / totalConsolidado) * 100).toFixed(1) + '%';
-        if (selRecPct) selRecPct.innerText = ((recVal / totalConsolidado) * 100).toFixed(1) + '%';
-    } else {
-        if (selRepPct) selRepPct.innerText = '0%';
-        if (selRecPct) selRecPct.innerText = '0%';
-    }
-  }
-
-  /**
-   * Ajusta el tamaño de fuente de un elemento para que quepa en su contenedor
-   */
-  function adjustFontSize(el, maxFontSize) {
-    let size = maxFontSize;
-    el.style.fontSize = size + 'px';
-    
-    // Bucle para reducir el tamaño si hay desborde
-    while (el.scrollWidth > el.clientWidth && size > 10) {
-      size--;
-      el.style.fontSize = size + 'px';
-    }
-  }
-
-  window.switchPeriod = function(period) {
-    if (period === 'pe') {
-        document.getElementById('customDateModal').classList.remove('hidden');
-        return;
-    }
-
-    currentPeriod = period;
-    
-    // Update UI Card Toggle
-    const btnCS = document.getElementById('btnCS');
-    const btnDT = document.getElementById('btnDT');
-    const btnPE = document.getElementById('btnPE');
-    const label = document.getElementById('currentPeriodLabel');
-
-    const cs_start = "01 OCT 2024";
-    const cs_end = "{{ fecha_actualizacion|date:'d M Y'|upper }}";
-    const dt_start = "20 ENE 2025";
-    const dt_end = "{{ fecha_actualizacion|date:'d M Y'|upper }}";
-    
-    if (period === 'cs') {
-      btnCS.className = "px-5 py-1.5 text-[11px] font-bold rounded-lg transition-all duration-300 bg-inm-verde-100 text-white shadow-md active:scale-95";
-      btnDT.className = "px-5 py-1.5 text-[11px] font-bold rounded-lg transition-all duration-300 text-gray-400 hover:text-gray-600 active:scale-95";
-      btnPE.className = "px-5 py-1.5 text-[11px] font-bold rounded-lg transition-all duration-300 text-gray-400 hover:text-gray-600 active:scale-95";
-      label.innerText = `${cs_start} - ${cs_end} (CS)`;
-    } else if (period === 'dt') {
-      btnDT.className = "px-5 py-1.5 text-[11px] font-bold rounded-lg transition-all duration-300 bg-inm-verde-100 text-white shadow-md active:scale-95";
-      btnCS.className = "px-5 py-1.5 text-[11px] font-bold rounded-lg transition-all duration-300 text-gray-400 hover:text-gray-600 active:scale-95";
-      btnPE.className = "px-5 py-1.5 text-[11px] font-bold rounded-lg transition-all duration-300 text-gray-400 hover:text-gray-600 active:scale-95";
-      label.innerText = `${dt_start} - ${dt_end} (DT)`;
-    }
-    
-    updateCards();
-    updateHeatmap();
-    updateRankingChart();
-    closeDetail();
-  };
-
-  window.closeCustomModal = function() {
-    document.getElementById('customDateModal').classList.add('hidden');
-  };
-
-  // --- Funciones para el Modal de Selección ---
-  window.showSelectionModal = function() {
-    const modal = document.getElementById('selectionModal');
-    if (modal) modal.classList.remove('hidden');
-  };
-
-  window.closeSelectionModal = function() {
-    const modal = document.getElementById('selectionModal');
-    if (modal) modal.classList.add('hidden');
-  };
-
-  window.showDetailFromSelection = function(category) {
-    closeSelectionModal();
-    showDetail(category);
-  };
-
-  window.consultarPeriodoPersonalizado = async function() {
-    const start = document.getElementById('customStart').value;
-    const end = document.getElementById('customEnd').value;
-    const loader = document.getElementById('loaderPE');
-    const btn = document.getElementById('btnApplyCustom');
-
-    if (!start || !end) {
-        alert("Por favor seleccione ambas fechas");
-        return;
-    }
-
-    const maxDate = "{{ fecha_actualizacion|date:'Y-m-d' }}";
-    if (end > maxDate || start > maxDate) {
-        alert("La fecha seleccionada no puede ser superior a la fecha de actualización: " + maxDate);
-        return;
-    }
-
-    loader.classList.remove('hidden');
-    btn.disabled = true;
-
-    try {
-        const response = await fetch(`/mapa/api/periodo-custom?start=${start}&end=${end}`);
-        const result = await response.json();
-
-        if (result.status === 'success') {
-            // 1. Actualizar los datos del mapa (GeoJSON)
-            Object.keys(result.data).forEach(stateKey => {
-                const feature = geoDataJSON.features.find(f => normalizar_nombre(f.properties.name) === stateKey);
-                if (feature) {
-                    const stateData = result.data[stateKey];
-                    Object.keys(stateData).forEach(k => {
-                        feature.properties[`pe_${k}`] = stateData[k];
-                        feature.properties[`pe_str_${k}`] = stateData[k].toLocaleString();
-                    });
-                }
-            });
-
-            // Forzar actualización del mapa
-            if (map && map.getSource('mexico-states')) {
-                map.getSource('mexico-states').setData(geoDataJSON);
-            }
-
-            // 2. Actualizar Datos Nacionales
-            const nat = window.nationalData;
-            Object.keys(result.national).forEach(k => {
-                nat.pe[k] = result.national[k];
-            });
-
-            // 2.5 Actualizar selectedStateData para la vista actual (Centralizada vs Estado)
-            if (window.selectedStateData.name === LABEL_NACIONAL) {
-                window.selectedStateData.pe = result.national;
-            } else {
-                const normalizedCurrent = normalizar_nombre(window.selectedStateData.name);
-                if (result.data[normalizedCurrent]) {
-                    window.selectedStateData.pe = result.data[normalizedCurrent];
-                }
-            }
-
-            // 3. Cambiar UI visualmente a PE
-            currentPeriod = 'pe';
-            const btnPE = document.getElementById('btnPE');
-            const btnCS = document.getElementById('btnCS');
-            const btnDT = document.getElementById('btnDT');
-            const label = document.getElementById('currentPeriodLabel');
-
-            btnPE.className = "px-5 py-1.5 text-[11px] font-bold rounded-lg transition-all duration-300 bg-inm-verde-100 text-white shadow-md active:scale-95";
-            btnCS.className = "px-5 py-1.5 text-[11px] font-bold rounded-lg transition-all duration-300 text-gray-400 hover:text-gray-600 active:scale-95";
-            btnDT.className = "px-5 py-1.5 text-[11px] font-bold rounded-lg transition-all duration-300 text-gray-400 hover:text-gray-600 active:scale-95";
-            
-            // Formatear fechas para el label
-            const fmt = d => {
-                const dateObj = new Date(d + "T12:00:00");
-                return dateObj.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase();
-            };
-            label.innerText = `${fmt(start)} - ${fmt(end)} (PE)`;
-
-            updateCards();
-            updateHeatmap();
-            closeCustomModal();
-            closeDetail();
-        } else {
-            alert("Error: " + result.message);
-        }
-    } catch (error) {
-        console.error(error);
-        alert("Ocurrió un error al consultar los datos.");
-    } finally {
-        loader.classList.add('hidden');
-        btn.disabled = false;
-    }
-  };
-
-
-  window.showDetail = function(category) {
-    if (!window.selectedStateData) return;
-    
-    // Asegurar que si venimos del de selección, este se cierre
-    closeSelectionModal();
-    
-    const infoModal = document.getElementById('infoModal');
-    const modalContainer = document.getElementById('modalContainer');
-    const modalStateName = document.getElementById('modalStateName');
-    const detailTitle = document.getElementById('detailTitle');
-    const detailBody = document.getElementById('detailBody');
-    
-    modalStateName.innerText = window.selectedStateData.name;
-    
-    detailTitle.innerText = METRIC_LABELS[category] || category;
-
-    const data = window.selectedStateData[currentPeriod];
-    const totalVal = data[category] || 0;
-    document.getElementById('modalTotalValue').innerText = totalVal.toLocaleString();
-    
-    // Asignar el texto del periodo actual
-    const currentPeriodText = document.getElementById('currentPeriodLabel').innerText;
-    document.getElementById('modalPeriodDisplay').innerText = "Periodo de consulta: " + currentPeriodText;
-    
-    modalContainer.classList.remove('animate-fade-in');
-    void modalContainer.offsetWidth; // Trigger reflow
-    modalContainer.classList.add('animate-fade-in');
-    
-    infoModal.classList.remove('hidden');
-    
-    let html = '';
-
-    // Mapeo de campos por categoría
-    const mapping = {
-        'repatriados': [
-            { k: 'rep_adultos', label: 'Adultos' },
-            { k: 'rep_menores', label: 'NNA Total' },
-            { k: 'rep_nna_solo', label: 'NNA No Acompañados' },
-            { k: 'rep_nna_acom', label: 'NNA Acompañados' },
-            { k: 'rep_terrestres', label: 'Vía Terrestre' },
-            { k: 'rep_vuelos', label: 'Vía Aérea (Vuelos PRIM)' }
-        ],
-        'recibidos': [
-            { k: 'rec_adultos', label: 'Adultos' },
-            { k: 'rec_menores', label: 'NNA' }
-        ],
-        'rescatados': [
-            { k: 'res_una_vez', label: 'Rescatados Primera Vez (Personas)' },
-            { k: 'res_estacion', label: 'En Estación Migratoria' },
-            { k: 'res_dif', label: 'Canalizados DIF' },
-            { k: 'res_reincidente', label: 'Reincidencias (Eventos)' }
-        ],
-        'ingresos': [
-            { k: 'ing_aereos', label: 'Vía Aérea' },
-            { k: 'ing_maritimos', label: 'Vía Marítima' },
-            { k: 'ing_terrestres', label: 'Vía Terrestre' }
-        ],
-        'tramites': [
-            { k: 'tra_res_perm', label: 'Residencia Permanente' },
-            { k: 'tra_res_temp', label: 'Residencia Temporal' },
-            { k: 'tra_res_est', label: 'Residente Temporal Estudiante' },
-            { k: 'tra_vis_hum', label: 'Visitante por Razones Humanitarias' },
-            { k: 'tra_vis_adop', label: 'Visitante con fines de Adopción' },
-            { k: 'tra_vis_reg', label: 'Visitante Regional' },
-            { k: 'tra_vis_trab', label: 'Visitante Trabajador Fronterizo' }
-        ],
-        'retornados': [
-            { k: 'ret_deportado', label: 'Deportados' },
-            { k: 'ret_retornado', label: 'Retornos Asistidos' }
-        ],
-        'inadmitidos': []
-    };
-
-    const fields = mapping[category] || [];
-    const total = data[category] || 1; // Evitar división por cero
-
-    html = `<div class="space-y-3">`;
-    fields.forEach(f => {
-        const val = data[f.k] || 0;
-        const pct = ((val / total) * 100).toFixed(1);
-        
-        // Línea divisora específica para Repatriados antes de Vía Terrestre
-        if (category === 'repatriados' && f.k === 'rep_terrestres' || category === 'rescatados' && f.k === 'res_reincidente') {
-            html += `<div class="border-t-2 border-inm-verde-100 my-4 pt-4 border-dashed"></div>`;
-        }
-        
-        html += `
-            <div class="p-3 bg-gray-50 rounded-xl border border-gray-100">
-                <div class="flex justify-between items-center mb-1">
-                    <span class="text-[11px] font-bold uppercase tracking-tight text-gray-400">${f.label}</span>
-                    <span class="text-xs font-bold text-inm-verde-100">${val.toLocaleString()}</span>
-                </div>
-                <div class="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                    <div class="bg-inm-verde-100 h-full transition-all duration-700" style="width: ${pct}%"></div>
-                </div>
-                <div class="flex justify-end mt-1">
-                    <span class="text-[9px] text-gray-400 font-medium">${pct}% del total</span>
-                </div>
-            </div>
-        `;
-
-        // Nota de recibidos menores
-        if (category === 'recibidos' && f.k === 'rec_menores') {
-            html += `<p class="text-[10px] text-red-400 mt-2 font-medium text-center italic">* Todos los menores se encuentran en núcleos familiares</p>`;
-        }
-    });
-    
-    if (fields.length === 0 && category !== 'ingresos') {
-        html += `<p class="text-center text-gray-500 py-4">Sin desglose disponible para esta categoría.</p>`;
-    }
-
-    // Integración especial RED para Inadmitidos dentro de Ingresos
-    if (category === 'ingresos') {
-        const inadVal = data['inadmitidos'] || 0;
-        html += `
-            <div class="mt-6 pt-6 border-t-2 border-dashed border-red-100">
-                <div class="p-4 bg-red-50 rounded-2xl border border-red-100 flex justify-between items-center group transition-all hover:border-red-200">
-                    <div>
-                        <div class="text-[10px] font-bold uppercase tracking-widest text-red-400 mb-0.5">Total Inadmitidos</div>
-                        <div class="text-2xl font-black text-red-600">${inadVal.toLocaleString()}</div>
-                    </div>
-                    <div class="bg-red-100/50 p-2.5 rounded-xl text-red-600">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path>
-                        </svg>
-                    </div>
-                </div>
-                <p class="text-[10px] text-red-400 mt-2 font-medium text-center italic">*Persona(s) extranjera(s) a la que se le niega la entrada a territorio nacional en cualquier punto de internación (aéreo, terrestre o marítimo), por ubicarse en alguno de los supuestos previstos en la Ley de Migración</p>
-            </div>
-        `;
-    }
-    
-    html += `</div>`;
-    detailBody.innerHTML = html;
-  };
-
-  window.closeDetail = function() {
-    const infoModal = document.getElementById('infoModal');
-    infoModal.classList.add('hidden');
-  };
 
   // Funciones para control del Mapa (MapLibre)
   window.zoomMap = function(factor) {
@@ -1265,8 +852,8 @@
   };
 
   window.animateToSelectedState = function(stateName) {
-      if (!map || !geoDataJSON) return;
-      const feature = geoDataJSON.features.find(f => normalizar_nombre(f.properties.name) === normalizar_nombre(stateName) || f.properties.name === stateName);
+      if (!map || !window.geoDataJSON) return;
+      const feature = window.geoDataJSON.features.find(f => normalizar_nombre(f.properties.name) === normalizar_nombre(stateName) || f.properties.name === stateName);
       if (feature) {
           const bbox = turf.bbox(feature);
           map.fitBounds(bbox, { padding: 50, duration: 800 });
@@ -1275,9 +862,9 @@
 
   window.animateToNationalView = function() {
       if (!map) return;
-      if (!IS_SUPERUSER && geoDataJSON) {
+      if (!IS_SUPERUSER && window.geoDataJSON) {
           try {
-              const bbox = turf.bbox(geoDataJSON);
+              const bbox = turf.bbox(window.geoDataJSON);
               map.fitBounds(bbox, { padding: 50, duration: 800 });
           } catch (e) {
               console.error("Error setting bounds:", e);
@@ -1291,130 +878,45 @@
       });
   };
 
-  // Función para actualizar el Mapa de Calor Dinámicamente
   window.updateHeatmap = function() {
-    const selectedRadio = document.querySelector('input[name="heatmap_metric"]:checked');
-    if (!selectedRadio || !map) return;
-    
-    const metric = selectedRadio.value;
-    window.currentMetric = metric; 
-    
-    // Calcular el nombre de la propiedad raw (ej. cs_todos, dt_recibidos)
-    const rawFieldName = currentPeriod + '_' + metric;
-    
-    // Obtener el valor máximo para ajustar la escala de color
-    let maxValue = 1;
-    if (geoDataJSON && geoDataJSON.features) {
-        geoDataJSON.features.forEach(f => {
-            const val = f.properties[rawFieldName] || 0;
-            if (val > maxValue) {
-                maxValue = val;
-            }
-        });
-    }
+    if (!map) return;
+    window.currentMetric = 'todos'; 
     
     // Actualizar color y opacidad de la capa de estados
     updateStateOpacity();
 
-    // Ocultar marcadores si la métrica no es "todos"
-    const isVisible = (metric === "todos");
+    // Asegurar que se muestren marcadores
     if (window.mapMarkers) {
         window.mapMarkers.forEach(m => {
-            m.element.style.display = isVisible ? 'block' : 'none';
+            m.element.style.display = 'block';
         });
     }
 
-    if (isVisible && window.currentInfraFilter) {
+    if (window.currentInfraFilter) {
         filterInfraPoints(null);
     }
     
     // ACTUALIZAR SECCIÓN DE INFRAESTRUCTURA
-    updateInfraSection();
-
-    // ACTUALIZAR GRÁFICA DE RANKING
-    updateRankingChart(metric);
+    updateFloatingMenu();
   };
 
-  /**
-   * Actualiza la opacidad de los estados para resaltar el seleccionado
-   */
   window.updateStateOpacity = function() {
     if (!map || !map.getLayer('mexico-states-fill')) return;
     
     const selectedName = (window.selectedStateData && window.selectedStateData.name !== LABEL_NACIONAL) 
         ? window.selectedStateData.name 
         : null;
-
-    const selectedRadio = document.querySelector('input[name="heatmap_metric"]:checked');
-    const metric = selectedRadio ? selectedRadio.value : 'todos';
     
-    if (metric === 'todos') {
-        if (selectedName) {
-            // MODO ENFOQUE (VENTANA) - Se destaca el estado seleccionado en transparente y el resto blanco
-            map.setPaintProperty('mexico-states-fill', 'fill-color', [
-                'case',
-                ['==', ['get', 'name'], selectedName], 'rgba(0,0,0,0)',
-                '#ffffff'
-            ]);
-            map.setPaintProperty('mexico-states-fill', 'fill-opacity', [
-                'case',
-                ['==', ['get', 'name'], selectedName], 0.0,
-                1.0
-            ]);
-            if (map.getLayer('mexico-states-line')) {
-                map.setPaintProperty('mexico-states-line', 'line-opacity', [
-                    'case',
-                    ['==', ['get', 'name'], selectedName], 1.0,
-                    0.0
-                ]);
-            }
-        } else {
-            // VISTA NACIONAL - Todo el mapa transparente
-            map.setPaintProperty('mexico-states-fill', 'fill-color', 'rgba(0,0,0,0)');
-            map.setPaintProperty('mexico-states-fill', 'fill-opacity', 0.0);
-            if (map.getLayer('mexico-states-line')) {
-                map.setPaintProperty('mexico-states-line', 'line-opacity', 1.0);
-            }
-        }
-        return;
-    }
-    
-    // Mapeo de métrica a campo de ranking
-    let rankSuffix = 't';
-    if (metric === 'repatriados') rankSuffix = 'rep';
-    else if (metric === 'recibidos') rankSuffix = 'rec';
-    else if (metric === 'rescatados') rankSuffix = 'res';
-    else if (metric === 'ingresos') rankSuffix = 'ing';
-    else if (metric === 'tramites') rankSuffix = 'tra';
-    else if (metric === 'retornados') rankSuffix = 'ret';
-    else if (metric === 'inadmitidos') rankSuffix = 'ina';
-    else if (metric === 'instrucciones') rankSuffix = 'ins';
-
-    const rankFieldName = currentPeriod + '_color_' + rankSuffix;
-
-    // Rampa de colores: 31 niveles de verde para los rankings
-    // Usamos una interpolación con múltiples paradas para máxima distinción
-    const heatmapColorExpression = [
-        'interpolate',
-        ['linear'],
-        ['get', rankFieldName],
-        1,  '#00441b', // Rank 1 (Más activo)
-        8,  '#006d2c',
-        16, '#31a354',
-        24, '#a1d99b',
-        31, '#e5f5e0'  // Rank 31 (Menos activo)
-    ];
-        
     if (selectedName) {
-        // MODO ENFOQUE (VENTANA)
+        // MODO ENFOQUE (VENTANA) - Se destaca el estado seleccionado en transparente y el resto blanco
         map.setPaintProperty('mexico-states-fill', 'fill-color', [
             'case',
-            ['==', ['get', 'name'], selectedName], heatmapColorExpression,
+            ['==', ['get', 'name'], selectedName], 'rgba(0,0,0,0)',
             '#ffffff'
         ]);
         map.setPaintProperty('mexico-states-fill', 'fill-opacity', [
             'case',
-            ['==', ['get', 'name'], selectedName], 0.1,
+            ['==', ['get', 'name'], selectedName], 0.0,
             1.0
         ]);
         if (map.getLayer('mexico-states-line')) {
@@ -1425,249 +927,17 @@
             ]);
         }
     } else {
-        // VISTA NACIONAL
-        // El rango 32 se muestra blanco con 0.8 de opacidad
-        map.setPaintProperty('mexico-states-fill', 'fill-color', [
-            'case',
-            ['==', ['get', rankFieldName], 32], '#ffffff',
-            heatmapColorExpression
-        ]);
-        map.setPaintProperty('mexico-states-fill', 'fill-opacity', [
-            'case',
-            ['==', ['get', rankFieldName], 32], 0.8,
-            0.9
-        ]);
+        // VISTA NACIONAL - Todo el mapa transparente
+        map.setPaintProperty('mexico-states-fill', 'fill-color', 'rgba(0,0,0,0)');
+        map.setPaintProperty('mexico-states-fill', 'fill-opacity', 0.0);
         if (map.getLayer('mexico-states-line')) {
             map.setPaintProperty('mexico-states-line', 'line-opacity', 1.0);
         }
     }
   };
-
-  /**
-   * Obtiene las fechas actuales según el periodo seleccionado (CS, DT, PE)
-   */
-  window.getCurrentDates = function() {
-    const today = new Date().toISOString().split('T')[0];
-    const startCS = "2024-10-01";
-    const startDT = "2025-01-20";
-    
-    if (currentPeriod === 'cs') return { start: startCS, end: today };
-    if (currentPeriod === 'dt') return { start: startDT, end: today };
-    if (currentPeriod === 'pe') {
-        const s = document.getElementById('customStart')?.value || startCS;
-        const e = document.getElementById('customEnd')?.value || today;
-        return { start: s, end: e };
-    }
-    return { start: startCS, end: today };
-  };
-
-  let rankingChartAbortController = null;
-
-  /**
-   * Actualiza la gráfica de barras de ranking (Estados o Nacionalidades)
-   */
-  window.updateRankingChart = async function(metricInput) {
-    const metric = metricInput || document.querySelector('input[name="heatmap_metric"]:checked')?.value;
-    const container = document.getElementById('chartContainer');
-    const label = document.getElementById('chartMetricLabel');
-    
-    if (rankingChartAbortController) {
-        rankingChartAbortController.abort();
-    }
-    
-    if (!metric || metric === 'todos') {
-        container.classList.add('hidden');
-        return;
-    }
-    
-    const currentStateName = window.selectedStateData?.name || LABEL_NACIONAL;
-    container.classList.remove('hidden');
-
-    // MODO NACIONAL: Ranking de Estados
-    if (currentStateName === LABEL_NACIONAL) {
-        const metricDisplayName = METRIC_LABELS[metric] || metric;
-        label.innerText = `Ranking Nacional: ${metricDisplayName}`;
-        
-        // Obtener datos del GeoJSON
-        if (!geoDataJSON || !geoDataJSON.features) return;
-        
-        let combined = geoDataJSON.features.map(f => ({
-            name: f.properties.name,
-            value: f.properties[`${currentPeriod}_${metric}`] || 0
-        }));
-        
-        if (metric === 'instrucciones') {
-            label.innerText = `Ranking Nacional: % Avance`;
-            // De menor a mayor avance (más crítico a menos crítico)
-            combined.sort((a, b) => a.value - b.value);
-        } else {
-            combined.sort((a, b) => b.value - a.value);
-        }
-
-        const topData = combined.slice(0, 15);
-        renderRankingChart(
-            topData.map(d => d.name), 
-            topData.map(d => d.value), 
-            `${metricDisplayName}`
-        );
-    }
-    // MODO ESTADO: Ranking de Nacionalidades
-    else {
-        label.innerText = `Nacionalidades en ${currentStateName}: ${metric}`;
-        
-        const { start, end } = window.getCurrentDates();
-        const normState = normalizar_nombre(currentStateName);
-
-        rankingChartAbortController = new AbortController();
-        try {
-            const response = await fetch(`/mapa/api/nacionalidad-ranking?estado=${normState}&metric=${metric}&start=${start}&end=${end}`, {
-                signal: rankingChartAbortController.signal
-            });
-            const result = await response.json();
-
-            if (result.status === 'success') {
-                renderRankingChart(
-                    result.data.map(d => d.name),
-                    result.data.map(d => d.value),
-                    `Total ${metric}`
-                );
-            }
-        } catch (e) {
-            if (e.name !== 'AbortError') {
-                console.error("Error fetching nationality ranking:", e);
-            }
-        } finally {
-            if (rankingChartAbortController && !rankingChartAbortController.signal.aborted) {
-                rankingChartAbortController = null;
-            }
-        }
-    }
-  };
-
-  /**
-   * Renderiza o actualiza la instancia de Chart.js
-   */
-  function renderRankingChart(labels, counts, datasetLabel) {
-    const ctx = document.getElementById('rankingChart').getContext('2d');
-    
-    if (myRankingChart) {
-        myRankingChart.data.labels = labels;
-        myRankingChart.data.datasets[0].data = counts;
-        myRankingChart.data.datasets[0].label = datasetLabel;
-        myRankingChart.update();
-    } else {
-        myRankingChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: datasetLabel,
-                    data: counts,
-                    backgroundColor: '#005743',
-                    borderRadius: 8,
-                    borderSkipped: false,
-                }]
-            },
-            options: {
-                indexAxis: 'y',
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                return ` ${context.parsed.x.toLocaleString()}`;
-                            }
-                        }
-                    }
-                },
-                scales: {
-                    x: {
-                        grid: { display: false },
-                        ticks: { font: { size: 10 } }
-                    },
-                    y: {
-                        grid: { display: false },
-                        ticks: { font: { size: 10, weight: 'bold' } }
-                    }
-                }
-            }
-        });
-    }
-  }
-
-  // Función para mostrar el menú persistente (Long Press)
-  window.showLongPressMenu = function(data, x, y) {
-      const menu = document.getElementById('longPressMenu');
-      const prefix = window.currentPeriod || 'cs';
-      
-      let html = `
-          <div style="padding: 12px; min-width: 200px; font-family: Inter, system-ui, sans-serif;">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                  <span style="font-size: 15px; font-weight: 700; color: #1f2937;">${data.name}</span>
-                  <span style="font-size: 9px; font-weight: 800; color: #059669; background: #ecfdf5; padding: 2px 6px; border-radius: 6px; text-transform: uppercase;">${prefix.toUpperCase()}</span>
-              </div>
-              <div style="height: 1px; background: #f3f4f6; margin-bottom: 10px;"></div>
-      `;
-      
-      const config = [
-          { key: 'repatriados', label: 'Repatriados' },
-          { key: 'recibidos', label: 'Recibidos' },
-          { key: 'rescatados', label: 'Rescatados' },
-          { key: 'ingresos', label: 'Ingresos' },
-          { key: 'tramites', label: 'Trámites' },
-          { key: 'retornados', label: 'Retornados' },
-          { key: 'inadmitidos', label: 'Inadmitidos' }
-      ];
-      
-      config.forEach(item => {
-          const val = data[`${prefix}_str_${item.key}`] || '0';
-          html += `
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                  <span style="font-size: 11px; font-weight: 500; color: #6b7280;">${item.label}</span>
-                  <span style="font-size: 11px; font-weight: 700; color: #374151;">${val}</span>
-              </div>
-          `;
-      });
-      
-      html += `
-              <div style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed #e5e7eb; font-size: 9px; color: #9ca3af; text-align: center;">
-                  Toque en el mapa para cerrar
-              </div>
-          </div>
-      `;
-      
-      menu.innerHTML = html;
-      
-      // Ajustar posición
-      menu.style.left = '-1000px'; 
-      menu.classList.remove('hidden');
-      
-      const menuRect = menu.getBoundingClientRect();
-      let left = x + 20;
-      let top = y - (menuRect.height / 2);
-      
-      if (left + 220 > window.innerWidth) left = x - 230;
-      if (top + menuRect.height > window.innerHeight) top = window.innerHeight - menuRect.height - 20;
-      if (top < 20) top = 20;
-
-      menu.style.left = left + 'px';
-      menu.style.top = top + 'px';
-      
-      // Cerrar al hacer clic en cualquier parte después de un pequeño delay
-      setTimeout(() => {
-          const closeHandler = () => {
-              menu.classList.add('hidden');
-              document.removeEventListener('mousedown', closeHandler);
-          };
-          document.addEventListener('mousedown', closeHandler);
-      }, 100);
-  };
 </script>
 
-<!-- Scripts de Gráficos (Chart.js) -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 
 <!-- Scripts de MapLibre y Turf.js -->
 <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
@@ -1683,6 +953,13 @@
   const infraPtsDataJSON = {{ infra_pts_data_json|safe }};
   const prhPtsDataJSON = {{ prh_pts_data_json|safe }};
   const inmueblesPtsDataJSON = {{ inmuebles_pts_data_json|safe }};
+  
+  // Expose to window object so they are globally accessible across script blocks
+  window.geoDataJSON = geoDataJSON;
+  window.infraPtsDataJSON = infraPtsDataJSON;
+  window.prhPtsDataJSON = prhPtsDataJSON;
+  window.inmueblesPtsDataJSON = inmueblesPtsDataJSON;
+  
   window.instruccionesRawData = JSON.parse('{{ instrucciones_api_json|escapejs }}');
 
   let map; // Instancia global de MapLibre
@@ -1805,46 +1082,11 @@
           map.setFilter('mexico-states-fill-hover', ['==', 'name', stateName]);
           map.getCanvas().style.cursor = 'pointer';
           
-          const metric = window.currentMetric || 'todos';
-          const periodo = window.currentPeriod || 'cs';
-          
           let html = `
             <div style="padding: 4px; min-width: 150px; font-family: Arial, sans-serif;">
                 <div style="font-size: 14px; font-weight: bold; margin-bottom: 3px; color: #333;">${stateName}</div>
-                <div style="border-bottom: 1px solid #ddd; margin-bottom: 5px;"></div>
+            </div>
           `;
-          
-          if (metric === "todos") {
-              const cats = [
-                  { label: METRIC_LABELS.repatriados || 'Repatriados', key: 'repatriados' },
-                  { label: METRIC_LABELS.recibidos || 'Recibidos', key: 'recibidos' },
-                  { label: METRIC_LABELS.rescatados || 'Rescatados', key: 'rescatados' },
-                  { label: METRIC_LABELS.ingresos || 'Ingresos', key: 'ingresos' },
-                  { label: METRIC_LABELS.tramites || 'Trámites', key: 'tramites' },
-                  { label: METRIC_LABELS.retornados || 'Retornados', key: 'retornados' },
-                  { label: METRIC_LABELS.inadmitidos || 'Inadmitidos', key: 'inadmitidos' }
-              ];
-              cats.forEach(c => {
-                  const val = feature.properties[`${periodo}_str_${c.key}`] || '0';
-                  html += `
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
-                        <span style="font-size: 12px; color: #333;">${c.label}</span>
-                        <span style="font-size: 12px; font-weight: bold; color: #333;">${val}</span>
-                    </div>
-                  `;
-              });
-          } else {
-              const valStr = feature.properties[`${periodo}_str_${metric}`] || '0';
-              const labelMap = window.metricLabels || METRIC_LABELS || {};
-              const label = labelMap[metric] || metric;
-              html += `
-                <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
-                    <span style="font-size: 12px; color: #333; text-transform: capitalize;">${label}</span>
-                    <span style="font-size: 12px; font-weight: bold; color: #333;">${valStr}</span>
-                </div>
-              `;
-          }
-          html += `</div>`;
           
           statePopup.setLngLat(e.lngLat).setHTML(html).addTo(map);
         }
@@ -1865,38 +1107,14 @@
           const feature = e.features[0];
           const p = feature.properties;
           
-          const selectedRadio = document.querySelector('input[name="heatmap_metric"]:checked');
-          const metric = selectedRadio ? selectedRadio.value : 'todos';
-          
-          if (metric === 'instrucciones') {
-              window.openInstruccionesModal(p.name);
-              return;
-          }
-          
           const newStateData = {
-              name: p.name,
-              cs: {}, dt: {}, pe: {}
+              name: p.name
           };
-          
-          const keys = [
-            'todos', 'repatriados', 'rep_adultos', 'rep_menores', 'rep_nna_solo', 'rep_nna_acom', 'rep_terrestres', 'rep_vuelos',
-            'recibidos', 'rec_adultos', 'rec_menores',
-            'rescatados', 'res_una_vez', 'res_reincidente', 'res_estacion', 'res_dif', 'res_conduccion',
-            'ingresos', 'ing_aereos', 'ing_maritimos', 'ing_terrestres',
-            'tramites', 'tra_res_perm', 'tra_res_temp', 'tra_res_est', 'tra_vis_hum', 'tra_vis_adop', 'tra_vis_reg', 'tra_vis_trab',
-            'retornados', 'ret_deportado', 'ret_retornado', 'inadmitidos'
-          ];
-          
-          keys.forEach(k => {
-              newStateData.cs[k] = p[`cs_${k}`];
-              newStateData.dt[k] = p[`dt_${k}`];
-              newStateData.pe[k] = p[`pe_${k}`];
-          });
           
           window.selectedStateData = newStateData;
           
           if (window.animateToSelectedState) {
-              window.animateToSelectedState(newStateData.name); // En Bokeh usaba el índice, aquí pasamos el nombre
+              window.animateToSelectedState(newStateData.name);
           }
           if (window.updateInformationPanel) {
               window.updateInformationPanel();
@@ -2014,33 +1232,15 @@
       
       // Escuchar cambios de zoom para redimensionar iconos
       map.on('zoom', updateMarkerSizes);
-
-      // EVENTO LONG PRESS (Comentado según solicitud del usuario)
-      /*
-      let longPressTimer;
-      map.on('mousedown', 'mexico-states-fill', (e) => {
-          if(e.features.length === 0) return;
-          const f = e.features[0];
-          longPressTimer = setTimeout(() => {
-              // Simular apertura del menú contextual
-              if (window.showLongPressMenu) {
-                  // data required by menu: name, cs_todos, etc.
-                  const data = f.properties; 
-                  window.showLongPressMenu(data, e.point.x, e.point.y);
-              }
-          }, 1000);
-      });
-      map.on('mouseup', () => clearTimeout(longPressTimer));
-      map.on('mousemove', () => clearTimeout(longPressTimer));
-      map.on('touchstart', 'mexico-states-fill', (e) => {
-          // ... logic similar
-      });
-      */
     });
   });
   /**
    * FUNCIÓN CENTRAL DE FILTRADO: Combina Filtro de Categoría y Filtro Geográfico
    */
+  window.toggleFilter = function(type) {
+    filterInfraPoints(type);
+  };
+
   function applyMapFilters() {
     if (!window.mapMarkers) return;
 
@@ -2048,23 +1248,23 @@
     const activeCategory = window.currentInfraFilter; 
     const isNational = (selectedState === normalizar_nombre(LABEL_NACIONAL));
 
-    // Solo mostrar marcadores si la métrica del heatmap es "todos"
-    const heatmapMetric = window.currentMetric || 'todos';
-    const isHeatmapMetricTodos = (heatmapMetric === 'todos');
-
     window.mapMarkers.forEach(m => {
         const belongsToState = isNational || m.estado_norm === selectedState;
         
         let matchesCategory = false;
         if (!activeCategory) {
             matchesCategory = true;
-        } else if (activeCategory === 'PRH') {
-            matchesCategory = (m.type === 'prh');
+        } else if (activeCategory === 'PRH_ACTIVO') {
+            matchesCategory = (m.type === 'prh' && m.status === 'Activo');
+        } else if (activeCategory === 'PRH_INACTIVO') {
+            matchesCategory = (m.type === 'prh' && m.status === 'Inactivo');
+        } else if (activeCategory === 'INMUEBLE') {
+            matchesCategory = (m.type === 'inmuebles');
         } else {
             matchesCategory = (m.type === 'infra' && m.subtype === activeCategory);
         }
 
-        const shouldShow = (isHeatmapMetricTodos && belongsToState && matchesCategory);
+        const shouldShow = (belongsToState && matchesCategory);
         const currentDisplay = m.element.style.display;
         const targetDisplay = shouldShow ? 'block' : 'none';
         
@@ -2075,10 +1275,6 @@
   }
   window.applyMapFilters = applyMapFilters;
 
-  /**
-   * Filtra los iconos de infraestructura y PRH en el mapa por Categoría
-   * @param {string|null} type - El tipo a filtrar (AEREO, MARITIMO, TERRESTRE, ESTACION, PRH) o null para resetear
-   */
   window.filterInfraPoints = function(type) {
     if (type === window.currentInfraFilter) {
         window.currentInfraFilter = null;
@@ -2090,13 +1286,15 @@
     applyMapFilters();
 
     // Actualizar Estilos de las tarjetas de filtros
-    const types = ['ESTACION', 'AEREO', 'MARITIMO', 'TERRESTRE', 'PRH'];
+    const types = ['ESTACION', 'AEREO', 'MARITIMO', 'TERRESTRE', 'INMUEBLE', 'PRH_ACTIVO', 'PRH_INACTIVO'];
     const ids = {
-        'ESTACION': 'btn_infra_estacion',
-        'AEREO': 'btn_infra_aereo',
-        'MARITIMO': 'btn_infra_maritimo',
-        'TERRESTRE': 'btn_infra_terrestre',
-        'PRH': 'btn_infra_prh'
+        'ESTACION': 'card_estacion',
+        'AEREO': 'card_aereo',
+        'MARITIMO': 'card_maritimo',
+        'TERRESTRE': 'card_terrestre',
+        'INMUEBLE': 'card_inmuebles',
+        'PRH_ACTIVO': 'card_prh_activo',
+        'PRH_INACTIVO': 'card_prh_inactivo'
     };
 
     types.forEach(t => {
@@ -2104,14 +1302,15 @@
         if (!el) return;
         
         if (t === window.currentInfraFilter) {
-            el.classList.add('border-inm-verde-100', 'bg-inm-verde-100/5', 'shadow-sm', 'scale-[1.02]');
-            el.classList.remove('border-gray-100', 'bg-white');
+            el.classList.add('border-inm-verde-100', 'bg-inm-verde-100/10', 'shadow-md', 'scale-[1.02]');
+            el.classList.remove('bg-gray-200/80', 'border-gray-300/30');
         } else {
-            el.classList.remove('border-inm-verde-100', 'bg-inm-verde-100/5', 'shadow-sm', 'scale-[1.02]');
-            el.classList.add('border-gray-100', 'bg-white');
+            el.classList.remove('border-inm-verde-100', 'bg-inm-verde-100/10', 'shadow-md', 'scale-[1.02]');
+            el.classList.add('bg-gray-200/80', 'border-gray-300/30');
         }
     });
   };
+
 
   // --- CV MODAL LOGIC ---
   window.openCVModal = async function(titularId) {
