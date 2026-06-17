@@ -458,7 +458,7 @@
         </div>
 
         <!-- Expanded Responsible info -->
-        <div id="menuExpandedResponsible" class="flex flex-col items-center text-center bg-gray-50 border border-gray-100 rounded-3xl p-4 shadow-sm relative">
+        <div id="menuExpandedResponsible" class="hidden flex flex-col items-center text-center bg-gray-50 border border-gray-100 rounded-3xl p-4 shadow-sm relative">
             <div onclick="openResponsibleCV()" class="w-16 h-16 rounded-2xl overflow-hidden bg-gray-100 border border-gray-200 shadow-sm flex items-center justify-center cursor-pointer hover:border-inm-verde-100 hover:scale-105 active:scale-95 transition-all mb-2">
                 <img id="menuExpandedAvatarPhoto" src="" alt="Photo" class="w-full h-full object-cover hidden">
                 <div id="menuExpandedAvatarPlaceholder" class="text-inm-verde-100/70">
@@ -769,6 +769,16 @@
             stateLogo.classList.remove('hidden');
         } else {
             stateLogo.classList.add('hidden');
+        }
+    }
+
+    // Visibilidad de la tarjeta de Responsable (se oculta si no hay estado seleccionado/es Total Nacional)
+    const respCard = document.getElementById('menuExpandedResponsible');
+    if (respCard) {
+        if (isNational) {
+            respCard.classList.add('hidden');
+        } else {
+            respCard.classList.remove('hidden');
         }
     }
     
