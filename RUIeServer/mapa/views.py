@@ -472,6 +472,9 @@ def mapa_informacion(request):
             'estado_id': edo.id,
             'AEREO': 0, 'MARITIMO': 0, 'TERRESTRE': 0, 'ESTACION': 0,
             'PRH': 0,
+            'personal_total': 0,
+            'personal_activo': 0,
+            'personal_vacante': 0,
             'titular': 'Sin titular asignado',
             'titular_id': None,
             'foto': None,
@@ -500,6 +503,18 @@ def mapa_informacion(request):
         if edo_name in infra_data:
             infra_data[edo_name]['PRH'] = item['total']
 
+    # Personal por estado
+    personal_counts = PersonalINM.objects.values('estado__nombre', 'estatus__estatus').annotate(total=Count('id'))
+    for item in personal_counts:
+        edo_name = normalizar_nombre(item['estado__nombre'])
+        estatus_name = (item['estatus__estatus'] or '').upper()
+        if edo_name in infra_data:
+            infra_data[edo_name]['personal_total'] += item['total']
+            if estatus_name == 'ACTIVO':
+                infra_data[edo_name]['personal_activo'] += item['total']
+            elif estatus_name == 'VACANTE':
+                infra_data[edo_name]['personal_vacante'] += item['total']
+
     # Totales Nacionales
     infra_data[LABEL_NACIONAL] = {
         'estado_id': None,
@@ -508,6 +523,9 @@ def mapa_informacion(request):
         'TERRESTRE': PuntosInternacionEstacion.objects.filter(tipo='TERRESTRE').count(),
         'ESTACION': PuntosInternacionEstacion.objects.filter(tipo='ESTACION').count(),
         'PRH': PRHs.objects.count(),
+        'personal_total': PersonalINM.objects.count(),
+        'personal_activo': PersonalINM.objects.filter(estatus__estatus__iexact='ACTIVO').count(),
+        'personal_vacante': PersonalINM.objects.filter(estatus__estatus__iexact='VACANTE').count(),
         'titular': 'Datos Nacionales',
         'foto': None,
         'tipo_nombramiento': None
@@ -2492,6 +2510,9 @@ def mapa_interactivo(request):
             'estado_id': edo.id,
             'AEREO': 0, 'MARITIMO': 0, 'TERRESTRE': 0, 'ESTACION': 0,
             'PRH': 0,
+            'personal_total': 0,
+            'personal_activo': 0,
+            'personal_vacante': 0,
             'titular': 'Sin titular asignado',
             'titular_id': None,
             'foto': None,
@@ -2519,6 +2540,18 @@ def mapa_interactivo(request):
         if edo_name in infra_data:
             infra_data[edo_name]['PRH'] = item['total']
 
+    # Personal por estado
+    personal_counts = PersonalINM.objects.values('estado__nombre', 'estatus__estatus').annotate(total=Count('id'))
+    for item in personal_counts:
+        edo_name = normalizar_nombre(item['estado__nombre'])
+        estatus_name = (item['estatus__estatus'] or '').upper()
+        if edo_name in infra_data:
+            infra_data[edo_name]['personal_total'] += item['total']
+            if estatus_name == 'ACTIVO':
+                infra_data[edo_name]['personal_activo'] += item['total']
+            elif estatus_name == 'VACANTE':
+                infra_data[edo_name]['personal_vacante'] += item['total']
+
     # Totales Nacionales
     infra_data[LABEL_NACIONAL] = {
         'estado_id': None,
@@ -2527,6 +2560,9 @@ def mapa_interactivo(request):
         'TERRESTRE': PuntosInternacionEstacion.objects.filter(tipo='TERRESTRE').count(),
         'ESTACION': PuntosInternacionEstacion.objects.filter(tipo='ESTACION').count(),
         'PRH': PRHs.objects.count(),
+        'personal_total': PersonalINM.objects.count(),
+        'personal_activo': PersonalINM.objects.filter(estatus__estatus__iexact='ACTIVO').count(),
+        'personal_vacante': PersonalINM.objects.filter(estatus__estatus__iexact='VACANTE').count(),
         'titular': 'Datos Nacionales',
         'foto': None,
         'tipo_nombramiento': None
@@ -2988,9 +3024,9 @@ def api_get_inmueble_detalle(request, inmueble_id):
         if jefe:
             nombre_jefe = f"{jefe.nombre or ''} {jefe.apellido or ''}".strip()
             if not nombre_jefe:
-                nombre_jefe = "S/D"
+                nombre_jefe = "S/A"
         else:
-            nombre_jefe = "S/D"
+            nombre_jefe = "S/A"
             
         # 2. Personal conteo
         personal_qs = PersonalINM.objects.filter(lugar_asignado=inmueble)
@@ -3112,6 +3148,125 @@ def api_get_inmueble_detalle(request, inmueble_id):
 def api_get_estado_detalle(request, estado_id):
     """Retorna la información agregada de todos los inmuebles de un estado en formato JSON para el modal interactivo de estado."""
     try:
+        if estado_id == 0:
+            inmuebles = Inmueble.objects.all()
+            inmuebles_ids = list(inmuebles.values_list('id', flat=True))
+            inmueble_count = inmuebles.count()
+            
+            # 1. Personal
+            personal_qs = PersonalINM.objects.filter(lugar_asignado_id__in=inmuebles_ids)
+            total_personal = personal_qs.count()
+            activos = personal_qs.filter(estatus__estatus__iexact='ACTIVO').count()
+            inactivos = personal_qs.filter(estatus__estatus__iexact='VACANTE').count()
+            
+            # 2. PIPC (Programa IPC)
+            from .models import ProgramaIPC
+            pipc_qs = ProgramaIPC.objects.filter(inmueble_id__in=inmuebles_ids)
+            count_inm_pipc = pipc_qs.filter(inm_pipc=True).count()
+            count_comodante_pipc = pipc_qs.filter(comodante_pipc=True).count()
+            count_plan_emergencia = pipc_qs.filter(plan_emergencia=True).count()
+            
+            inm_pipc_list = list(Inmueble.objects.filter(id__in=list(pipc_qs.filter(inm_pipc=True).values_list('inmueble_id', flat=True))).values('id', 'nombre_inmueble'))
+            comodante_pipc_list = list(Inmueble.objects.filter(id__in=list(pipc_qs.filter(comodante_pipc=True).values_list('inmueble_id', flat=True))).values('id', 'nombre_inmueble'))
+            plan_emergencia_list = list(Inmueble.objects.filter(id__in=list(pipc_qs.filter(plan_emergencia=True).values_list('inmueble_id', flat=True))).values('id', 'nombre_inmueble'))
+            
+            # 3. Tipos de Oficina
+            from django.db.models import Count
+            from .models import TipoOficina
+            oficinas_conteo = TipoOficina.objects.filter(inmueble__isnull=False).annotate(total=Count('inmueble')).filter(total__gt=0).order_by('-total')
+            oficinas_data = []
+            for of in oficinas_conteo:
+                inms_list = list(Inmueble.objects.filter(tipo_oficina=of).values('id', 'nombre_inmueble'))
+                oficinas_data.append({
+                    'nombre': of.nombre,
+                    'total': of.total,
+                    'inmuebles': inms_list
+                })
+                
+            # 4. Actividades
+            from .models import TipoActividad
+            actividades_conteo = TipoActividad.objects.filter(inmueble__isnull=False).annotate(total=Count('inmueble')).filter(total__gt=0).order_by('-total')
+            actividades_data = []
+            for act in actividades_conteo:
+                inms_list = list(Inmueble.objects.filter(tipo_actividad=act).values('id', 'nombre_inmueble'))
+                actividades_data.append({
+                    'nombre': act.nombre,
+                    'total': act.total,
+                    'inmuebles': inms_list
+                })
+                
+            # 5. Superficies y Renta
+            from django.db.models import Sum
+            sums = inmuebles.aggregate(
+                total_construida=Sum('superficie_construida'),
+                total_utilizada=Sum('superficie_utilizada'),
+                total_renta=Sum('monto_renta')
+            )
+            
+            superficie_const = sums['total_construida'] or 0.0
+            superficie_util = sums['total_utilizada'] or 0.0
+            total_renta = sums['total_renta'] or 0.0
+            
+            # 6. Figura de Ocupación
+            from .models import FiguraOcupacion
+            figuras_conteo = FiguraOcupacion.objects.filter(inmueble__isnull=False).annotate(total=Count('inmueble')).filter(total__gt=0)
+            figuras_dict = {
+                'ARRENDADO': 0,
+                'PROPIO': 0,
+                'TERRENO': 0,
+                'COMODATO': 0
+            }
+            for fig in figuras_conteo:
+                fig_tipo = fig.tipo.upper()
+                if 'ARRENDADO' in fig_tipo:
+                    figuras_dict['ARRENDADO'] += fig.total
+                elif 'PROPIO' in fig_tipo:
+                    figuras_dict['PROPIO'] += fig.total
+                elif 'TERRENO' in fig_tipo:
+                    figuras_dict['TERRENO'] += fig.total
+                elif 'COMODATO' in fig_tipo:
+                    figuras_dict['COMODATO'] += fig.total
+                    
+            data = {
+                'estado_nombre': 'TOTAL NACIONAL',
+                'inmueble_count': inmueble_count,
+                'personal': {
+                    'total': total_personal,
+                    'activos': activos,
+                    'inactivos': inactivos
+                },
+                'vehiculos': {
+                    'total': "S/D",
+                    'activos': "S/D",
+                    'inactivos': "S/D"
+                },
+                'pipc': {
+                    'inm_pipc_count': count_inm_pipc,
+                    'inm_pipc_inmuebles': inm_pipc_list,
+                    'comodante_pipc_count': count_comodante_pipc,
+                    'comodante_pipc_inmuebles': comodante_pipc_list,
+                    'plan_emergencia_count': count_plan_emergencia,
+                    'plan_emergencia_inmuebles': plan_emergencia_list
+                },
+                'superficie_construida': f"{superficie_const:,.2f}" if superficie_const else "0.00",
+                'superficie_utilizada': f"{superficie_util:,.2f}" if superficie_util else "0.00",
+                'figura_ocupacion': figuras_dict,
+                'figura_ocupacion_inmuebles': {
+                    'ARRENDADO': list(Inmueble.objects.filter(figura_ocupacion__tipo__icontains='ARRENDADO').values('id', 'nombre_inmueble')),
+                    'PROPIO': list(Inmueble.objects.filter(figura_ocupacion__tipo__icontains='PROPIO').values('id', 'nombre_inmueble')),
+                    'TERRENO': list(Inmueble.objects.filter(figura_ocupacion__tipo__icontains='TERRENO').values('id', 'nombre_inmueble')),
+                    'COMODATO': list(Inmueble.objects.filter(figura_ocupacion__tipo__icontains='COMODATO').values('id', 'nombre_inmueble')),
+                },
+                'renta': f"${total_renta:,.2f}" if total_renta else "S/D",
+                'oficinas': oficinas_data,
+                'actividades': actividades_data
+            }
+            
+            return JsonResponse({
+                'status': 'success',
+                'data': data
+            })
+
         estado = Estado.objects.get(id=estado_id)
         
         # Inmuebles en este estado
@@ -3250,23 +3405,27 @@ def api_get_personal_stats(request, estado_id):
         import unicodedata
         today = date.today()
         
-        estado = Estado.objects.get(id=estado_id)
-        
-        # Check if filtering by specific inmueble
-        inmueble_id = request.GET.get('inmueble_id')
-        inmueble = None
-        if inmueble_id:
-            try:
-                inmueble = Inmueble.objects.get(id=inmueble_id)
-                qs_all = PersonalINM.objects.filter(lugar_asignado=inmueble).select_related('estatus', 'tipo_plaza')
-                estado_nombre_display = f"{estado.nombre} - {inmueble.nombre_inmueble}"
-                if inmueble.estado:
-                    estado = inmueble.estado
-            except Inmueble.DoesNotExist:
-                return JsonResponse({'status': 'error', 'message': 'El inmueble solicitado no existe.'}, status=404)
+        if estado_id == 0:
+            qs_all = PersonalINM.objects.all().select_related('estatus', 'tipo_plaza')
+            estado_nombre_display = "TOTAL NACIONAL"
         else:
-            qs_all = PersonalINM.objects.filter(estado=estado).select_related('estatus', 'tipo_plaza')
-            estado_nombre_display = estado.nombre
+            estado = Estado.objects.get(id=estado_id)
+            
+            # Check if filtering by specific inmueble
+            inmueble_id = request.GET.get('inmueble_id')
+            inmueble = None
+            if inmueble_id:
+                try:
+                    inmueble = Inmueble.objects.get(id=inmueble_id)
+                    qs_all = PersonalINM.objects.filter(lugar_asignado=inmueble).select_related('estatus', 'tipo_plaza')
+                    estado_nombre_display = f"{estado.nombre} - {inmueble.nombre_inmueble}"
+                    if inmueble.estado:
+                        estado = inmueble.estado
+                except Inmueble.DoesNotExist:
+                    return JsonResponse({'status': 'error', 'message': 'El inmueble solicitado no existe.'}, status=404)
+            else:
+                qs_all = PersonalINM.objects.filter(estado=estado).select_related('estatus', 'tipo_plaza')
+                estado_nombre_display = estado.nombre
             
         def clean_text(text):
             if not text:

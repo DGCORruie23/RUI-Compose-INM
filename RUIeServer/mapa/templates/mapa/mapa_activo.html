@@ -81,12 +81,12 @@
       padding: 0.5rem !important; 
       min-height: calc(100vh - 3.5rem) !important;
     }
-    #main-section > div.grid {
+    #main-section > div.flex {
       gap: 0.75rem !important;
     }
     
     /* Ajustar las alturas de mapa y panel lateral para que entren en pantalla sin hacer scroll de página */
-    #main-section > div.grid > :first-child, #right-panel { 
+    #main-section > div.flex > :first-child, #floatingMenu { 
       height: calc(100vh - 120px) !important; 
       max-height: calc(100vh - 120px) !important; 
       min-height: 400px !important; 
@@ -124,11 +124,11 @@
     .absolute.bottom-6.left-6 h3 { font-size: 0.55rem !important; }
     .absolute.bottom-6.left-6 span { font-size: 0.6rem !important; }
     
-    .absolute.bottom-8.right-6 {
+    .absolute.bottom-8.left-6 {
       bottom: 0.75rem !important;
-      right: 0.75rem !important;
+      left: 0.75rem !important;
     }
-    .absolute.bottom-8.right-6 .p-3 { padding: 0.5rem !important; }
+    .absolute.bottom-8.left-6 .p-3 { padding: 0.5rem !important; }
 
     /* --- OPTIMIZACIÓN DE TODOS LOS MODALES EN LANDSCAPE --- */
     
@@ -414,151 +414,12 @@
 {% block content %}
 <main class="page px-8 pt-4 pb-8 bg-gray-50 rounded-2xl shadow-lg opacity-0 translate-y-10 transition-[opacity,transform] duration-500 ease-out flex flex-col justify-start min-h-[calc(100vh-4rem)]" id="main-section">
 
-
-
-  <div class="grid grid-cols-1 md:grid-cols-7 gap-6 lg:gap-8 w-full max-w-[1700px] mx-auto">
-    <!-- Panel Izquierdo: Mapa Bokeh (Ampliado a 7 columnas) -->
-    <div class="col-span-1 md:col-span-7 bg-white p-4 rounded-xl shadow-md border border-gray-200 flex justify-center items-center overflow-hidden h-[calc(100vh-140px)] min-h-[500px] relative">
-      
-      <!-- New Floating Menu -->
-      <div id="floatingMenu" class="absolute top-6 left-6 z-20 bg-gray-100/90 backdrop-blur-md border border-gray-200/50 shadow-2xl rounded-[2.5rem] p-4 transition-all duration-300 flex flex-col gap-4 w-[100px] max-h-[calc(100vh-180px)] overflow-y-auto custom-scrollbar select-none">
-          <!-- State Title Card (Visible in colapsado and expandido states) -->
-          <div id="menuStateTitleCard" class="hidden w-full bg-white/80 border border-gray-200/50 rounded-2xl p-3 flex flex-col items-center justify-center text-center relative shadow-sm">
-             <div class="flex items-center justify-center gap-2">
-                 <button id="menuStateDetailBtn" onclick="openStateDetailModal()" class="hidden hover:scale-110 active:scale-95 transition-all p-1 bg-[#611232]/5 hover:bg-[#611232]/10 rounded-xl border border-[#611232]/15 shadow-sm" title="Ver detalle consolidado del Estado">
-                     <img src="/static/mapa/icons/OR_ACTIVO.svg" alt="Detalle" class="w-5 h-5 object-contain">
-                 </button>
-                 <h2 id="menuStateNameDisplay" class="text-xs font-black text-gray-800 tracking-tight leading-tight">Total Nacional</h2>
-                 <button id="menuStateOrganigramaBtn" onclick="showStateOrganigrama()" class="hidden hover:scale-110 active:scale-95 transition-all p-1.5 bg-emerald-50 hover:bg-emerald-100 rounded-xl border border-emerald-200 shadow-sm text-emerald-700" title="Ver Estructura Orgánica (PDF)">
-                     <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"></path></svg>
-                 </button>
-             </div>
-          </div>
-
-          <!-- Avatar container (Visible in general state) -->
-          <div id="menuGeneralAvatar" class="flex justify-center items-center">
-              <div onclick="openResponsibleCV()" class="w-14 h-14 rounded-2xl overflow-hidden bg-white border border-gray-200 shadow-sm flex items-center justify-center cursor-pointer hover:border-inm-verde-100 hover:scale-105 active:scale-95 transition-all">
-                  <img id="menuGeneralAvatarPhoto" src="" alt="Photo" class="w-full h-full object-cover hidden">
-                  <div id="menuGeneralAvatarPlaceholder" class="text-inm-verde-100/70">
-                      <svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
-                  </div>
-              </div>
-          </div>
-
-          <!-- Expanded Responsible info (Visible in expandido state) -->
-          <div id="menuExpandedResponsible" class="hidden flex flex-col items-center text-center bg-white border border-gray-100 rounded-3xl p-4 shadow-sm relative animate-fade-in">
-              <div onclick="openResponsibleCV()" class="w-16 h-16 rounded-2xl overflow-hidden bg-gray-50 border border-gray-200 shadow-sm flex items-center justify-center cursor-pointer hover:border-inm-verde-100 hover:scale-105 active:scale-95 transition-all mb-2">
-                  <img id="menuExpandedAvatarPhoto" src="" alt="Photo" class="w-full h-full object-cover hidden">
-                  <div id="menuExpandedAvatarPlaceholder" class="text-inm-verde-100/70">
-                      <svg class="w-9 h-9" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
-                  </div>
-              </div>
-              <div class="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Responsable</div>
-              <div id="menuTitularName" onclick="openResponsibleCV()" class="text-xs font-black text-gray-700 truncate w-full cursor-pointer hover:underline hover:text-inm-verde-100 transition-colors">-</div>
-              <div id="menuTitularStatus" class="text-[8px] font-bold text-inm-verde-100/60 uppercase tracking-tighter mt-0.5">Sin foto</div>
-          </div>
-
-          <!-- Infrastructure cards list (Visible in general and expandido states) -->
-          <div id="menuCardsList" class="flex flex-col gap-3 w-full">
-              <!-- Card: Internación Aérea -->
-              <div id="card_aereo" onclick="toggleFilter('AEREO')" class="bg-gray-200/80 border border-gray-300/30 p-2.5 rounded-2xl flex items-center justify-between cursor-pointer hover:bg-gray-200 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 group">
-                  <div class="flex items-center gap-3">
-                      <div class="w-10 h-10 rounded-full bg-[#800000] flex items-center justify-center flex-shrink-0 shadow-sm">
-                          <img src="/static/mapa/icons/aereo2.svg" class="w-6 h-6 object-contain" alt="Aéreo">
-                      </div>
-                      <span class="menu-label-text text-[11px] font-black text-gray-600 uppercase tracking-tight hidden">Internación Aérea</span>
-                  </div>
-                  <span id="menu_infra_aereo" class="text-base font-extrabold text-[#800000] pr-1">0</span>
-              </div>
-
-              <!-- Card: Internación Marítima -->
-              <div id="card_maritimo" onclick="toggleFilter('MARITIMO')" class="bg-gray-200/80 border border-gray-300/30 p-2.5 rounded-2xl flex items-center justify-between cursor-pointer hover:bg-gray-200 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 group">
-                  <div class="flex items-center gap-3">
-                      <div class="w-10 h-10 rounded-full bg-[#0080a0] flex items-center justify-center flex-shrink-0 shadow-sm">
-                          <img src="/static/mapa/icons/maritimo2.svg" class="w-6 h-6 object-contain" alt="Marítimo">
-                      </div>
-                      <span class="menu-label-text text-[11px] font-black text-gray-600 uppercase tracking-tight hidden">Internación Marítima</span>
-                  </div>
-                  <span id="menu_infra_maritimo" class="text-base font-extrabold text-[#0080a0] pr-1">0</span>
-              </div>
-
-              <!-- Card: Internación Terrestre -->
-              <div id="card_terrestre" onclick="toggleFilter('TERRESTRE')" class="bg-gray-200/80 border border-gray-300/30 p-2.5 rounded-2xl flex items-center justify-between cursor-pointer hover:bg-gray-200 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 group">
-                  <div class="flex items-center gap-3">
-                      <div class="w-10 h-10 rounded-full bg-[#f97316] flex items-center justify-center flex-shrink-0 shadow-sm">
-                          <img src="/static/mapa/icons/terrestre2.svg" class="w-6 h-6 object-contain" alt="Terrestre">
-                      </div>
-                      <span class="menu-label-text text-[11px] font-black text-gray-600 uppercase tracking-tight hidden">Internación Terrestre</span>
-                  </div>
-                  <span id="menu_infra_terrestre" class="text-base font-extrabold text-[#f97316] pr-1">0</span>
-              </div>
-
-              <!-- Card: Inmuebles -->
-              <div id="card_inmuebles" onclick="toggleFilter('INMUEBLE')" class="bg-gray-200/80 border border-gray-300/30 p-2.5 rounded-2xl flex items-center justify-between cursor-pointer hover:bg-gray-200 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 group">
-                  <div class="flex items-center gap-3">
-                      <div class="w-10 h-10 rounded-full bg-[#854d0e] flex items-center justify-center flex-shrink-0 shadow-sm">
-                          <img src="/static/mapa/icons/OR_ACTIVO.svg" class="w-6 h-6 object-contain" alt="Inmuebles">
-                      </div>
-                      <span class="menu-label-text text-[11px] font-black text-gray-600 uppercase tracking-tight hidden">Inmuebles</span>
-                  </div>
-                  <span id="menu_infra_inmuebles" class="text-base font-extrabold text-[#854d0e] pr-1">0</span>
-              </div>
-
-              <!-- Card: Estación Migratoria -->
-              <div id="card_estacion" onclick="toggleFilter('ESTACION')" class="bg-gray-200/80 border border-gray-300/30 p-2.5 rounded-2xl flex items-center justify-between cursor-pointer hover:bg-gray-200 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 group">
-                  <div class="flex items-center gap-3">
-                      <div class="w-10 h-10 rounded-full bg-[#ca8a04] flex items-center justify-center flex-shrink-0 shadow-sm">
-                          <img src="/static/mapa/icons/estacion2.svg" class="w-6 h-6 object-contain" alt="Estación">
-                      </div>
-                      <span class="menu-label-text text-[11px] font-black text-gray-600 uppercase tracking-tight hidden">Estación Migratoria</span>
-                  </div>
-                  <span id="menu_infra_estacion" class="text-base font-extrabold text-[#ca8a04] pr-1">0</span>
-              </div>
-
-              <!-- Card: PRH Activo -->
-              <div id="card_prh_activo" onclick="toggleFilter('PRH_ACTIVO')" class="bg-gray-200/80 border border-gray-300/30 p-2.5 rounded-2xl flex items-center justify-between cursor-pointer hover:bg-gray-200 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 group">
-                  <div class="flex items-center gap-3">
-                      <div class="w-10 h-10 rounded-full bg-[#15803d] flex items-center justify-center flex-shrink-0 shadow-sm">
-                          <img src="/static/mapa/icons/agente_activo2.svg" class="w-6 h-6 object-contain" alt="PRH Activo">
-                      </div>
-                      <span class="menu-label-text text-[11px] font-black text-gray-600 uppercase tracking-tight hidden">PRHs Activo</span>
-                  </div>
-                  <span id="menu_prh_activo" class="text-base font-extrabold text-[#15803d] pr-1">0</span>
-              </div>
-
-              <!-- Card: PRH Inactivo -->
-              <div id="card_prh_inactivo" onclick="toggleFilter('PRH_INACTIVO')" class="bg-gray-200/80 border border-gray-300/30 p-2.5 rounded-2xl flex items-center justify-between cursor-pointer hover:bg-gray-200 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 group">
-                  <div class="flex items-center gap-3">
-                      <div class="w-10 h-10 rounded-full bg-[#6b7280] flex items-center justify-center flex-shrink-0 shadow-sm">
-                          <img src="/static/mapa/icons/agente_inactivo2.svg" class="w-6 h-6 object-contain" alt="PRH Inactivo">
-                      </div>
-                      <span class="menu-label-text text-[11px] font-black text-gray-600 uppercase tracking-tight hidden">PRHs Inactivo</span>
-                  </div>
-                  <span id="menu_prh_inactivo" class="text-base font-extrabold text-[#6b7280] pr-1">0</span>
-              </div>
-          </div>
-
-          <!-- Navigation / Toggle state row -->
-          <div id="menuControlRow" class="flex items-center justify-center gap-3 mt-1 pt-2 border-t border-gray-300/40 w-full">
-              <!-- Button: Collapse (to colapsado state) -->
-              <button id="menuBtnCollapse" onclick="changeMenuState('colapsado')" class="p-2 bg-white hover:bg-gray-50 border border-gray-200/70 shadow-sm rounded-xl text-gray-500 hover:text-gray-700 transition-all hover:scale-105 active:scale-95 flex items-center justify-center" title="Colapsar Menú">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"></path></svg>
-              </button>
-
-              <!-- Button: Expand (to expandido state) -->
-              <button id="menuBtnExpand" onclick="changeMenuState('expandido')" class="p-2 bg-white hover:bg-gray-50 border border-gray-200/70 shadow-sm rounded-xl text-gray-500 hover:text-gray-700 transition-all hover:scale-105 active:scale-95 flex items-center justify-center" title="Expandir Menú">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"></path></svg>
-              </button>
-
-              <!-- Button: Return to General -->
-              <button id="menuBtnReturn" onclick="changeMenuState('general')" class="hidden p-2 bg-white hover:bg-gray-50 border border-gray-200/70 shadow-sm rounded-xl text-gray-500 hover:text-gray-700 transition-all hover:scale-105 active:scale-95 flex items-center justify-center" title="Volver al Menú General">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3"></path></svg>
-              </button>
-          </div>
-      </div>
+  <div class="flex gap-4 lg:gap-6 w-full max-w-[1700px] mx-auto">
+    <!-- Mapa principal -->
+    <div class="flex-1 bg-white p-4 rounded-xl shadow-md border border-gray-200 flex justify-center items-center overflow-hidden h-[calc(100vh-140px)] min-h-[500px] relative">
 
       <!-- Controles de Zoom Personalizados (Flotantes) -->
-      <div class="absolute bottom-8 right-6 flex flex-col gap-2 z-10 transition-all duration-500">
+      <div class="absolute bottom-8 left-6 flex flex-col gap-2 z-10 transition-all duration-500">
         {% if is_superuser %}
         <button onclick="resetMap()" title="Vista Nacional (Reiniciar)" class="bg-white/90 backdrop-blur-md p-3 rounded-2xl shadow-xl border border-gray-100 hover:bg-inm-verde-100 hover:text-white text-inm-verde-100 transition-all active:scale-95">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
@@ -575,10 +436,154 @@
       <!-- Contenedor del Mapa MapLibre -->
       <div id="map" class="w-full h-full rounded-xl"></div>
     </div>
+
+    <!-- Panel lateral derecho -->
+    <div id="floatingMenu" class="flex-shrink-0 w-[350px] bg-white border border-gray-200 shadow-md rounded-xl p-4 transition-all duration-300 flex flex-col gap-4 h-[calc(100vh-140px)] min-h-[500px] overflow-y-auto custom-scrollbar select-none">
+
+        <!-- Header Title -->
+        <div class="text-center text-[10px] font-black text-gray-400 uppercase tracking-widest pt-1">Mapa Orgánico</div>
+
+        <!-- State Title Card -->
+        <div id="menuStateTitleCard" class="w-full bg-gray-50 border border-gray-200/70 rounded-2xl p-3 flex flex-col items-center justify-center text-center relative shadow-sm">
+           <div class="flex items-center justify-center gap-2">
+               <button id="menuStateDetailBtn" onclick="openStateDetailModal()" class="hidden hover:scale-110 active:scale-95 transition-all p-1 bg-[#611232]/5 hover:bg-[#611232]/10 rounded-xl border border-[#611232]/15 shadow-sm" title="Ver detalle consolidado del Estado">
+                   <img src="/static/mapa/icons/OR_ACTIVO.svg" alt="Detalle" class="w-5 h-5 object-contain">
+               </button>
+               <img id="menuStateLogo" src="/static/mapa/icons/INM_logo.svg" alt="INM Logo" onclick="openStateDetailModal(0)" class="w-6 h-6 object-contain cursor-pointer hover:scale-110 active:scale-95 transition-all" title="Ver detalle consolidado Nacional">
+               <h2 id="menuStateNameDisplay" class="text-xs font-black text-gray-800 tracking-tight leading-tight">Total Nacional</h2>
+               <button id="menuStateOrganigramaBtn" onclick="showStateOrganigrama()" class="hidden hover:scale-110 active:scale-95 transition-all p-1.5 bg-emerald-50 hover:bg-emerald-100 rounded-xl border border-emerald-200 shadow-sm text-emerald-700" title="Ver Estructura Orgánica (PDF)">
+                   <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"></path></svg>
+               </button>
+           </div>
+        </div>
+
+        <!-- Expanded Responsible info -->
+        <div id="menuExpandedResponsible" class="flex flex-col items-center text-center bg-gray-50 border border-gray-100 rounded-3xl p-4 shadow-sm relative">
+            <div onclick="openResponsibleCV()" class="w-16 h-16 rounded-2xl overflow-hidden bg-gray-100 border border-gray-200 shadow-sm flex items-center justify-center cursor-pointer hover:border-inm-verde-100 hover:scale-105 active:scale-95 transition-all mb-2">
+                <img id="menuExpandedAvatarPhoto" src="" alt="Photo" class="w-full h-full object-cover hidden">
+                <div id="menuExpandedAvatarPlaceholder" class="text-inm-verde-100/70">
+                    <svg class="w-9 h-9" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                </div>
+            </div>
+            <div class="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Responsable</div>
+            <div id="menuTitularName" onclick="openResponsibleCV()" class="text-xs font-black text-gray-700 truncate w-full cursor-pointer hover:underline hover:text-inm-verde-100 transition-colors">-</div>
+            <div id="menuTitularStatus" class="text-[8px] font-bold text-inm-verde-100/60 uppercase tracking-tighter mt-0.5">Sin foto</div>
+        </div>
+
+        <div id="menuCardsList" class="grid grid-cols-2 gap-2 w-full">
+
+            <!-- Card: Internación Aérea -->
+            <div id="card_aereo" onclick="toggleFilter('AEREO')" class="bg-gray-100 border border-gray-200/60 px-2.5 py-2 rounded-xl flex flex-col items-center gap-1 cursor-pointer hover:bg-gray-200 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200">
+                <div class="flex items-center gap-1.5">
+                    <img src="/static/mapa/icons/aereo2.svg" class="w-4 h-4 object-contain flex-shrink-0" alt="Aéreos">
+                    <span class="menu-label-text text-[9px] font-black text-gray-600 uppercase tracking-tight leading-tight">Puntos de Internación Aérea</span>
+                </div>
+                <span id="menu_infra_aereo" class="text-sm font-extrabold text-[#800000] pl-0.5">0</span>
+            </div>
+
+            <!-- Card: Internación Marítima -->
+            <div id="card_maritimo" onclick="toggleFilter('MARITIMO')" class="bg-gray-100 border border-gray-200/60 px-2.5 py-2 rounded-xl flex flex-col items-center gap-1 cursor-pointer hover:bg-gray-200 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200">
+                <div class="flex items-center gap-1.5">
+                    <img src="/static/mapa/icons/maritimo2.svg" class="w-4 h-4 object-contain flex-shrink-0" alt="Marítimos">
+                    <span class="menu-label-text text-[9px] font-black text-gray-600 uppercase tracking-tight leading-tight">Puntos de Internación Marítima</span>
+                </div>
+                <span id="menu_infra_maritimo" class="text-sm font-extrabold text-[#0080a0] pl-0.5">0</span>
+            </div>
+
+            <!-- Card: Internación Terrestre -->
+            <div id="card_terrestre" onclick="toggleFilter('TERRESTRE')" class="bg-gray-100 border border-gray-200/60 px-2.5 py-2 rounded-xl flex flex-col items-center gap-1 cursor-pointer hover:bg-gray-200 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200">
+                <div class="flex items-center gap-1.5">
+                    <img src="/static/mapa/icons/terrestre2.svg" class="w-4 h-4 object-contain flex-shrink-0" alt="Terrestres">
+                    <span class="menu-label-text text-[8px] font-black text-gray-600 uppercase tracking-tight leading-tight">Puntos de Internación Terrestre</span>
+                </div>
+                <span id="menu_infra_terrestre" class="text-sm font-extrabold text-[#f97316] pl-0.5">0</span>
+            </div>
+
+            <!-- Card: Inmuebles -->
+            <div id="card_inmuebles" onclick="toggleFilter('INMUEBLE')" class="bg-gray-100 border border-gray-200/60 px-2.5 py-2 rounded-xl flex flex-col items-center gap-1 cursor-pointer hover:bg-gray-200 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200">
+                <div class="flex items-center gap-1.5">
+                    <img src="/static/mapa/icons/OR_ACTIVO.svg" class="w-4 h-4 object-contain flex-shrink-0" alt="Inmuebles">
+                    <span class="menu-label-text text-[9px] font-black text-gray-600 uppercase tracking-tight leading-tight">Inmuebles</span>
+                </div>
+                <span id="menu_infra_inmuebles" class="text-sm font-extrabold text-[#854d0e] pl-0.5">0</span>
+            </div>
+
+            <!-- Card: Estación Migratoria -->
+            <div id="card_estacion" onclick="toggleFilter('ESTACION')" class="bg-gray-100 border border-gray-200/60 px-2.5 py-2 rounded-xl flex flex-col items-center gap-1 cursor-pointer hover:bg-gray-200 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200">
+                <div class="flex items-center gap-1.5">
+                    <img src="/static/mapa/icons/estacion2.svg" class="w-4 h-4 object-contain flex-shrink-0" alt="Estación">
+                    <span class="menu-label-text text-[9px] font-black text-gray-600 uppercase tracking-tight leading-tight">Est. Migratoria</span>
+                </div>
+                <span id="menu_infra_estacion" class="text-sm font-extrabold text-[#ca8a04] pl-0.5">0</span>
+            </div>
+
+            <!-- Card: PRH Activo -->
+            <div id="card_prh_activo" onclick="toggleFilter('PRH_ACTIVO')" class="bg-gray-100 border border-gray-200/60 px-2.5 py-2 rounded-xl flex flex-col items-center gap-1 cursor-pointer hover:bg-gray-200 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200">
+                <div class="flex items-center gap-1.5">
+                    <img src="/static/mapa/icons/agente_activo2.svg" class="w-4 h-4 object-contain flex-shrink-0" alt="PRH Activo">
+                    <span class="menu-label-text text-[9px] font-black text-gray-600 uppercase tracking-tight leading-tight">PRHs Activo</span>
+                </div>
+                <span id="menu_prh_activo" class="text-sm font-extrabold text-[#15803d] pl-0.5">0</span>
+            </div>
+
+            <!-- Card: PRH Inactivo -->
+            <div id="card_prh_inactivo" onclick="toggleFilter('PRH_INACTIVO')" class="bg-gray-100 border border-gray-200/60 px-2.5 py-2 rounded-xl flex flex-col items-center gap-1 cursor-pointer hover:bg-gray-200 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200">
+                <div class="flex items-center gap-1.5">
+                    <img src="/static/mapa/icons/agente_inactivo2.svg" class="w-4 h-4 object-contain flex-shrink-0" alt="PRH Inactivo">
+                    <span class="menu-label-text text-[9px] font-black text-gray-600 uppercase tracking-tight leading-tight">PRHs Inactivo</span>
+                </div>
+                <span id="menu_prh_inactivo" class="text-sm font-extrabold text-[#6b7280] pl-0.5">0</span>
+            </div>
+
+            <!-- Card: Total de Personal -->
+            <div id="card_personal_total" onclick="openPersonalStatsModal('total')" class="bg-gray-100 border border-gray-200/60 px-2.5 py-2 rounded-xl flex flex-col items-center gap-1 cursor-pointer hover:bg-gray-200 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200" title="Ver Personal Total">
+                <div class="flex items-center gap-1.5">
+                    <img src="/static/mapa/icons/agente_activo2.svg" class="w-4 h-4 object-contain flex-shrink-0" alt="Personal Total">
+                    <span class="menu-label-text text-[9px] font-black text-gray-600 uppercase tracking-tight leading-tight">Plazas</span>
+                </div>
+                <span id="menu_personal_total" class="text-sm font-extrabold text-black pl-0.5">0</span>
+            </div>
+
+            <!-- Card: Personal Activo -->
+            <div id="card_personal_activo" onclick="openPersonalStatsModal('activos')" class="bg-gray-100 border border-gray-200/60 px-2.5 py-2 rounded-xl flex flex-col items-center gap-1 cursor-pointer hover:bg-gray-200 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200" title="Ver Personal Activo">
+                <div class="flex items-center gap-1.5">
+                    <img src="/static/mapa/icons/agente_activo2.svg" class="w-4 h-4 object-contain flex-shrink-0" alt="Personal Activo">
+                    <span class="menu-label-text text-[9px] font-black text-gray-600 uppercase tracking-tight leading-tight">Personal Activo</span>
+                </div>
+                <span id="menu_personal_activo" class="text-sm font-extrabold text-[#16a34a] pl-0.5">0</span>
+            </div>
+
+            <!-- Card: Personal Vacante -->
+            <div id="card_personal_vacante" onclick="openPersonalStatsModal('vacantes')" class="bg-gray-100 border border-gray-200/60 px-2.5 py-2 rounded-xl flex flex-col items-center gap-1 cursor-pointer hover:bg-gray-200 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200" title="Ver Personal Vacante (Vacantes)">
+                <div class="flex items-center gap-1.5">
+                    <img src="/static/mapa/icons/agente_inactivo2.svg" class="w-4 h-4 object-contain flex-shrink-0" alt="Personal Vacante">
+                    <span class="menu-label-text text-[9px] font-black text-gray-600 uppercase tracking-tight leading-tight">Vacantes</span>
+                </div>
+                <span id="menu_personal_vacante" class="text-sm font-extrabold text-stone-600 pl-0.5">0</span>
+            </div>
+        </div>
+
+        <!-- Spacer push buttons to bottom -->
+        <div class="flex-1"></div>
+
+        <!-- Navigation / Toggle state row -->
+        <div id="menuControlRow" class="flex items-center justify-center gap-3 pt-3 border-t border-gray-200 w-full">
+            <!-- Button: Collapse panel -->
+            <button id="menuBtnCollapse" onclick="changeMenuState('colapsado')" class="p-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-gray-500 hover:text-gray-700 transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-1.5 text-xs font-bold" title="Ocultar panel">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"></path></svg>
+                Ocultar
+            </button>
+            <!-- Button: Return to Expanded -->
+            <button id="menuBtnReturn" onclick="changeMenuState('expandido')" class="hidden p-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-gray-500 hover:text-gray-700 transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-1.5 text-xs font-bold" title="Mostrar panel">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"></path></svg>
+                Mostrar
+            </button>
+            <!-- Hidden expand button kept for JS compat -->
+            <button id="menuBtnExpand" class="hidden"></button>
+        </div>
+    </div>
   </div>
 </main>
-
-
 
 
 
@@ -587,7 +592,7 @@
 <script>
   const LABEL_NACIONAL = "{{ label_nacional }}";
   const METRIC_LABELS = {{ metric_labels_json|safe }};
-  window.menuState = 'general';
+  window.menuState = 'expandido';
 
   // ── Datos de puntos disponibles globalmente desde el inicio ──────────────
   // Se inicializan aquí para que updateFloatingMenu pueda accederlos
@@ -622,7 +627,7 @@
     }
 
     // Inicializar estado del menú flotante
-    changeMenuState('general');
+    changeMenuState('expandido');
 
     if (window.updateInformationPanel) {
         window.updateInformationPanel();
@@ -651,56 +656,46 @@
   };
 
   window.changeMenuState = function(state) {
+    // 'general' es alias de 'expandido' en layout de columna fija
+    if (state === 'general') state = 'expandido';
     window.menuState = state;
+
     const menu = document.getElementById('floatingMenu');
     if (!menu) return;
-    
-    // Resetear clases de estado y anchos
-    menu.classList.remove('menu-state-general', 'menu-state-expandido', 'menu-state-colapsado');
-    menu.classList.remove('w-[100px]', 'w-[300px]', 'w-[240px]');
-    
-    const titleCard = document.getElementById('menuStateTitleCard');
-    const genAvatar = document.getElementById('menuGeneralAvatar');
-    const expResp = document.getElementById('menuExpandedResponsible');
-    const cardsList = document.getElementById('menuCardsList');
-    const labels = document.querySelectorAll('.menu-label-text');
-    
+
     const btnCollapse = document.getElementById('menuBtnCollapse');
-    const btnExpand = document.getElementById('menuBtnExpand');
-    const btnReturn = document.getElementById('menuBtnReturn');
+    const btnReturn   = document.getElementById('menuBtnReturn');
 
     if (state === 'colapsado') {
-        menu.classList.add('menu-state-colapsado', 'w-[240px]');
-        if (titleCard) titleCard.classList.remove('hidden');
-        if (genAvatar) genAvatar.classList.add('hidden');
-        if (expResp) expResp.classList.add('hidden');
-        if (cardsList) cardsList.classList.add('hidden');
-        
-        if (btnCollapse) btnCollapse.classList.add('hidden');
-        if (btnExpand) btnExpand.classList.add('hidden');
-        if (btnReturn) btnReturn.classList.remove('hidden');
-    } else if (state === 'expandido') {
-        menu.classList.add('menu-state-expandido', 'w-[300px]');
-        if (titleCard) titleCard.classList.remove('hidden');
-        if (genAvatar) genAvatar.classList.add('hidden');
-        if (expResp) expResp.classList.remove('hidden');
-        if (cardsList) cardsList.classList.remove('hidden');
-        labels.forEach(lbl => lbl.classList.remove('hidden'));
-        
-        if (btnCollapse) btnCollapse.classList.add('hidden');
-        if (btnExpand) btnExpand.classList.add('hidden');
-        if (btnReturn) btnReturn.classList.remove('hidden');
-    } else { // general
-        menu.classList.add('menu-state-general', 'w-[100px]');
-        if (titleCard) titleCard.classList.add('hidden');
-        if (genAvatar) genAvatar.classList.remove('hidden');
-        if (expResp) expResp.classList.add('hidden');
-        if (cardsList) cardsList.classList.remove('hidden');
-        labels.forEach(lbl => lbl.classList.add('hidden'));
-        
+        // Ocultar la columna lateral completamente
+        menu.classList.add('hidden');
+        // Mostrar botón flotante sobre el mapa para restaurar el panel
+        let restoreBtn = document.getElementById('sidebarRestoreBtn');
+        if (!restoreBtn) {
+            restoreBtn = document.createElement('button');
+            restoreBtn.id = 'sidebarRestoreBtn';
+            restoreBtn.title = 'Mostrar panel';
+            restoreBtn.className = 'absolute top-6 right-6 z-20 bg-white/90 backdrop-blur-md border border-gray-200 shadow-xl rounded-2xl px-3 py-2 text-xs font-bold text-gray-600 hover:text-inm-verde-100 hover:border-inm-verde-100 transition-all flex items-center gap-1.5';
+            restoreBtn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/></svg>Panel';
+            restoreBtn.onclick = () => window.changeMenuState('expandido');
+            // Insertar dentro del contenedor del mapa (padre del floatingMenu)
+            const mapContainer = menu.parentElement;
+            if (mapContainer) mapContainer.style.position = 'relative';
+            const mapDiv = document.getElementById('map');
+            if (mapDiv && mapDiv.parentElement) mapDiv.parentElement.appendChild(restoreBtn);
+        }
+        restoreBtn.classList.remove('hidden');
+    } else {
+        // Mostrar columna lateral
+        menu.classList.remove('hidden');
+        // Ocultar botón flotante de restaurar si existe
+        const restoreBtn = document.getElementById('sidebarRestoreBtn');
+        if (restoreBtn) restoreBtn.classList.add('hidden');
+        // Controles internos
         if (btnCollapse) btnCollapse.classList.remove('hidden');
-        if (btnExpand) btnExpand.classList.remove('hidden');
         if (btnReturn) btnReturn.classList.add('hidden');
+        // Trigger resize para que el mapa se ajuste
+        setTimeout(() => { if (window.map) window.map.resize(); }, 310);
     }
   };
 
@@ -738,6 +733,16 @@
     const titleCard = document.getElementById('menuStateNameDisplay');
     if (titleCard) {
         titleCard.innerText = stateName;
+    }
+
+    // Visibilidad del logo del INM (sólo para Total Nacional)
+    const stateLogo = document.getElementById('menuStateLogo');
+    if (stateLogo) {
+        if (isNational) {
+            stateLogo.classList.remove('hidden');
+        } else {
+            stateLogo.classList.add('hidden');
+        }
     }
     
     // Visibilidad de los botones de detalle y organigrama
@@ -787,6 +792,13 @@
         expName.innerText = data.titular;
     }
 
+    // Sincronizar el ID del estado seleccionado actualmente
+    if (isNational) {
+        window.currentSelectedEstadoId = 0;
+    } else {
+        window.currentSelectedEstadoId = window.infraData[normalizedState]?.estado_id || null;
+    }
+
     // 3. Calcular cantidades del lado del cliente dinámicamente
     // Usar arrays vacíos como fallback si los datos aún no están disponibles
     const _infraPts = Array.isArray(window.infraPtsDataJSON) ? window.infraPtsDataJSON : [];
@@ -810,6 +822,11 @@
     _setCount('menu_infra_inmuebles', inmueblesCount);
     _setCount('menu_prh_activo', prhActivosCount);
     _setCount('menu_prh_inactivo', prhInactivosCount);
+
+    // Actualizar counts de personal agregados desde el backend
+    _setCount('menu_personal_total', data.personal_total || 0);
+    _setCount('menu_personal_activo', data.personal_activo || 0);
+    _setCount('menu_personal_vacante', data.personal_vacante || 0);
   };
 
   window.updateInformationPanel = function() {
@@ -998,7 +1015,7 @@
     });
 
     // Control de navegación
-    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-left');
 
     map.on('load', () => {
       // 1. Agregar Fuente GeoJSON
@@ -1220,6 +1237,7 @@
                   element: el, 
                   type: typeCategory, 
                   subtype: item.tipo || 'PRH', 
+                  status: item.status || '',
                   estado: item.estado,
                   estado_norm: normalizar_nombre(item.estado) 
               });
@@ -1654,19 +1672,23 @@
     document.body.style.overflow = 'auto';
   };
 
-  window.openStateDetailModal = async function() {
-    if (!window.selectedStateData) {
-        alert("Por favor seleccione un estado en el mapa para visualizar sus detalles.");
-        return;
-    }
+  window.openStateDetailModal = async function(forcedEstadoId) {
+    let estadoId = forcedEstadoId;
     
-    const stateName = window.selectedStateData.name;
-    const key = normalizar_nombre(stateName);
-    const estadoId = window.infraData[key]?.estado_id;
-    
-    if (!estadoId) {
-        alert("No se pudo identificar el identificador del estado.");
-        return;
+    if (estadoId === undefined) {
+        if (!window.selectedStateData) {
+            alert("Por favor seleccione un estado en el mapa para visualizar sus detalles.");
+            return;
+        }
+        
+        const stateName = window.selectedStateData.name;
+        const key = normalizar_nombre(stateName);
+        estadoId = window.infraData[key]?.estado_id;
+        
+        if (!estadoId) {
+            alert("No se pudo identificar el identificador del estado.");
+            return;
+        }
     }
     
     const modal = document.getElementById('estadoDetailModal');
@@ -1685,8 +1707,13 @@
             const data = result.data;
             
             // Header
-            document.getElementById('estStateName').innerText = `OFICINA DE REPRESENTACIÓN: ${data.estado_nombre || 'S/D'}`;
-            document.getElementById('estNombreHeader').innerText = data.estado_nombre || 'S/D';
+            if (estadoId === 0) {
+                document.getElementById('estStateName').innerText = `TOTAL NACIONAL`;
+                document.getElementById('estNombreHeader').innerText = `TOTAL NACIONAL`;
+            } else {
+                document.getElementById('estStateName').innerText = `OFICINA DE REPRESENTACIÓN: ${data.estado_nombre || 'S/D'}`;
+                document.getElementById('estNombreHeader').innerText = data.estado_nombre || 'S/D';
+            }
             
             // Personal
             document.getElementById('estPersTotal').innerText = data.personal.total;
@@ -2074,10 +2101,20 @@
   };
 
   window.openPersonalStatsModal = async function(type, isInmueble = false) {
-    const estadoId = window.currentSelectedEstadoId;
-    if (!estadoId) {
-        alert("No hay un estado seleccionado.");
-        return;
+    let estadoId = window.currentSelectedEstadoId;
+    if (estadoId === undefined || estadoId === null) {
+        if (window.selectedStateData) {
+            const stateName = window.selectedStateData.name;
+            const isNational = stateName === LABEL_NACIONAL || stateName === "Total Nacional" || stateName === "NACIONAL";
+            if (isNational) {
+                estadoId = 0;
+            } else {
+                const key = normalizar_nombre(stateName);
+                estadoId = window.infraData[key]?.estado_id || 0;
+            }
+        } else {
+            estadoId = 0;
+        }
     }
     
     const inmuebleId = isInmueble ? window.currentSelectedInmuebleId : null;
@@ -2099,7 +2136,7 @@
                 if (!modal) return;
                 
                 const isVacant = (type === 'vacantes');
-                document.getElementById('persTotalStateName').innerText = `OFICINA DE REPRESENTACIÓN: ${stateName}`;
+                document.getElementById('persTotalStateName').innerText = stateName === "TOTAL NACIONAL" ? "CONSOLIDADO: TOTAL NACIONAL" : `OFICINA DE REPRESENTACIÓN: ${stateName}`;
                 document.getElementById('persTotalHeader').innerText = isVacant ? 'PERSONAL - VACANTES' : 'PERSONAL TOTAL';
                 document.getElementById('persTotalSubtitle').innerText = isVacant ? 'VACANTES REGISTRADAS' : 'VISTA GENERAL';
                 
@@ -2210,7 +2247,7 @@
                 const modal = document.getElementById('personalStatsActivosModal');
                 if (!modal) return;
                 
-                document.getElementById('persActStateName').innerText = `OFICINA DE REPRESENTACIÓN: ${stateName}`;
+                document.getElementById('persActStateName').innerText = stateName === "TOTAL NACIONAL" ? "CONSOLIDADO: TOTAL NACIONAL" : `OFICINA DE REPRESENTACIÓN: ${stateName}`;
                 
                 const stats = data.activos;
                 
