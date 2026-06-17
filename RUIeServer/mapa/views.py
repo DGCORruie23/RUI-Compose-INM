@@ -1030,7 +1030,7 @@ def api_get_personal(request, personal_id):
             'puesto_especifico': personal.puesto_especifico,
             'sueldo_bruto': personal.sueldo_bruto,
             'sueldo_neto': personal.sueldo_neto,
-            'actividad_id': personal.actividad_id or '',
+            'actividad_ids': list(personal.actividad.values_list('id', flat=True)),
             'jefe_oficina': personal.jefe_oficina,
             'lugar_asignado_id': personal.lugar_asignado_id or '',
         }
@@ -1116,10 +1116,15 @@ def guardar_personal(request):
             'puesto_especifico': normalizar_nombre(request.POST.get('puesto_especifico', '')),
             'sueldo_bruto': sueldo_bruto,
             'sueldo_neto': sueldo_neto,
-            'actividad_id': request.POST.get('actividad_id') or None,
             'jefe_oficina': request.POST.get('jefe_oficina') == 'on',
             'lugar_asignado_id': request.POST.get('lugar_asignado_id') or None,
         }
+
+        actividad_ids = request.POST.getlist('actividad_ids[]')
+        # También aceptar actividad_ids como campo único separado por comas (fallback)
+        if not actividad_ids:
+            raw = request.POST.get('actividad_ids', '')
+            actividad_ids = [v.strip() for v in raw.split(',') if v.strip()]
 
         if personal_id:
             personal = PersonalINM.objects.get(id=personal_id)
@@ -1128,9 +1133,11 @@ def guardar_personal(request):
             for key, val in defaults.items():
                 setattr(personal, key, val)
             personal.save()
+            personal.actividad.set(actividad_ids)
             messages.success(request, "Registro de personal actualizado correctamente.")
         else:
-            PersonalINM.objects.create(**defaults)
+            personal = PersonalINM.objects.create(**defaults)
+            personal.actividad.set(actividad_ids)
             messages.success(request, "Nuevo personal registrado correctamente.")
             
     except Exception as e:

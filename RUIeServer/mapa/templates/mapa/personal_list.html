@@ -142,7 +142,27 @@
         const lugarSel = form.querySelector('[name="lugar_asignado_id"]');
         if (lugarSel) lugarSel.value = '';
         
+        // Limpiar checkboxes de actividades
+        form.querySelectorAll('input[name="actividad_ids[]"]').forEach(cb => cb.checked = false);
+        updatePersonalActividadesDisplay();
+        
         filterLugarAsignadoByEstado();
+    }
+
+    function togglePersonalActividadSelector() {
+        const dropdown = document.getElementById('personal-actividad-dropdown');
+        if (dropdown) dropdown.classList.toggle('hidden');
+    }
+
+    function updatePersonalActividadesDisplay() {
+        const checkboxes = document.querySelectorAll('input[name="actividad_ids[]"]');
+        const label = document.getElementById('personal-actividades-label');
+        if (!label) return;
+        const selected = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.dataset.nombre);
+        label.innerText = selected.length > 0 ? selected.join(', ') : 'Seleccionar Actividades...';
+        label.className = selected.length > 0
+            ? 'text-sm font-bold text-gray-700 overflow-hidden text-ellipsis whitespace-nowrap'
+            : 'text-sm font-medium text-gray-400 overflow-hidden text-ellipsis whitespace-nowrap';
     }
 
     async function editPersonal(id) {
@@ -180,7 +200,15 @@
                 form.querySelector('[name="puesto_especifico"]').value = data.puesto_especifico;
                 form.querySelector('[name="sueldo_bruto"]').value = data.sueldo_bruto || '';
                 form.querySelector('[name="sueldo_neto"]').value = data.sueldo_neto || '';
-                form.querySelector('[name="actividad_id"]').value = data.actividad_id || '';
+                // Marcar checkboxes de actividades
+                form.querySelectorAll('input[name="actividad_ids[]"]').forEach(cb => cb.checked = false);
+                if (data.actividad_ids && data.actividad_ids.length > 0) {
+                    data.actividad_ids.forEach(actId => {
+                        const cb = form.querySelector(`input[name="actividad_ids[]"][value="${actId}"]`);
+                        if (cb) cb.checked = true;
+                    });
+                }
+                updatePersonalActividadesDisplay();
                 
                 const jefeChk = form.querySelector('[name="jefe_oficina"]');
                 if (jefeChk) jefeChk.checked = data.jefe_oficina || false;
@@ -672,7 +700,11 @@
                                     <span class="ml-1 px-2 py-0.5 inline-block text-[8px] font-black rounded bg-purple-50 text-purple-700 border border-purple-100 uppercase">JEFE</span>
                                     {% endif %}
                                 </div>
-                                <div class="text-[10px] font-bold text-gray-400">Act: {{ pers.actividad.nombre|default:"SIN ACTIVIDAD ASOCIADA" }}</div>
+                                <div class="text-[10px] font-bold text-gray-400">
+                                    {% with actividades=pers.actividad.all %}
+                                        {% if actividades %}Act: {% for act in actividades %}{{ act.nombre }}{% if not forloop.last %}, {% endif %}{% endfor %}{% else %}SIN ACTIVIDAD ASOCIADA{% endif %}
+                                    {% endwith %}
+                                </div>
                                 <div class="text-[9px] font-bold text-emerald-600 mt-1 uppercase tracking-tight">📍 {{ pers.lugar_asignado.nombre_inmueble|default:"SIN LUGAR ASIGNADO" }}</div>
                             </td>
                             <td class="px-8 py-6">
@@ -905,14 +937,22 @@
                             <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Nivel</label>
                             <input type="text" name="nivel" required maxlength="4" placeholder="Ej: 27A" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold uppercase text-sm focus:ring-2 focus:ring-inm-verde-100 transition-all">
                         </div>
-                        <div>
-                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Actividad</label>
-                            <select name="actividad_id" class="custom-select block w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-inm-verde-100 transition-all outline-none font-bold text-gray-700">
-                                <option value="">--- Ninguna ---</option>
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Actividad(es)</label>
+                            <button type="button" id="personal-actividad-btn" onclick="togglePersonalActividadSelector()" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl flex justify-between items-center outline-none transition-all focus:ring-2 focus:ring-inm-verde-100">
+                                <span id="personal-actividades-label" class="text-sm font-medium text-gray-400 overflow-hidden text-ellipsis whitespace-nowrap">Seleccionar Actividades...</span>
+                                <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                            </button>
+                            <div id="personal-actividad-dropdown" class="hidden relative left-0 right-0 mt-2 p-4 bg-white border border-gray-200 rounded-2xl shadow-2xl z-50 max-h-52 overflow-y-auto">
                                 {% for act in actividades_list %}
-                                <option value="{{ act.id }}">{{ act.nombre }}</option>
+                                <label class="flex items-center gap-3 py-1.5 cursor-pointer hover:bg-gray-50 rounded-lg px-2">
+                                    <input type="checkbox" name="actividad_ids[]" value="{{ act.id }}" data-nombre="{{ act.nombre }}" onchange="updatePersonalActividadesDisplay()" class="w-5 h-5 text-inm-verde-100 border-gray-300 rounded focus:ring-inm-verde-100">
+                                    <span class="text-sm font-medium text-gray-700">{{ act.nombre }}</span>
+                                </label>
+                                {% empty %}
+                                <p class="text-sm text-gray-400 text-center py-2">No hay tipos de actividad registrados.</p>
                                 {% endfor %}
-                            </select>
+                            </div>
                         </div>
                         <div class="md:col-span-2">
                             <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Puesto Específico</label>

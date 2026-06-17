@@ -538,7 +538,7 @@ class PersonalINM(models.Model):
     puesto_especifico = models.CharField(max_length=200)
     sueldo_bruto = models.FloatField(null=True, blank=True)
     sueldo_neto = models.FloatField(null=True, blank=True)
-    actividad = models.ForeignKey(TipoActividad, on_delete=models.SET_NULL, null=True, blank=True)
+    actividad = models.ManyToManyField(TipoActividad, blank=True)
     jefe_oficina = models.BooleanField(default=False, null=True, blank=True)
     lugar_asignado = models.ForeignKey('Inmueble', on_delete=models.CASCADE, related_name='inmuebleAsignado', blank=True, null=True)
     fecha_nacimiento = models.DateField(null=True, blank=True)
