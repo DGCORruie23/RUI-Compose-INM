@@ -142,7 +142,7 @@
         const lugarSel = form.querySelector('[name="lugar_asignado_id"]');
         if (lugarSel) lugarSel.value = '';
         
-        // Limpiar checkboxes de actividades
+        // Limpiar checkboxes de dependencias
         form.querySelectorAll('input[name="actividad_ids[]"]').forEach(cb => cb.checked = false);
         updatePersonalActividadesDisplay();
         
@@ -159,7 +159,7 @@
         const label = document.getElementById('personal-actividades-label');
         if (!label) return;
         const selected = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.dataset.nombre);
-        label.innerText = selected.length > 0 ? selected.join(', ') : 'Seleccionar Actividades...';
+        label.innerText = selected.length > 0 ? selected.join(', ') : 'Seleccionar Dependencias...';
         label.className = selected.length > 0
             ? 'text-sm font-bold text-gray-700 overflow-hidden text-ellipsis whitespace-nowrap'
             : 'text-sm font-medium text-gray-400 overflow-hidden text-ellipsis whitespace-nowrap';
@@ -701,8 +701,8 @@
                                     {% endif %}
                                 </div>
                                 <div class="text-[10px] font-bold text-gray-400">
-                                    {% with actividades=pers.actividad.all %}
-                                        {% if actividades %}Act: {% for act in actividades %}{{ act.nombre }}{% if not forloop.last %}, {% endif %}{% endfor %}{% else %}SIN ACTIVIDAD ASOCIADA{% endif %}
+                                    {% with dependencias=pers.actividad.all %}
+                                        {% if dependencias %}Dep: {% for dep in dependencias %}{{ dep.nombre }}{% if not forloop.last %}, {% endif %}{% endfor %}{% else %}SIN DEPENDENCIA ASOCIADA{% endif %}
                                     {% endwith %}
                                 </div>
                                 <div class="text-[9px] font-bold text-emerald-600 mt-1 uppercase tracking-tight">📍 {{ pers.lugar_asignado.nombre_inmueble|default:"SIN LUGAR ASIGNADO" }}</div>
@@ -938,9 +938,9 @@
                             <input type="text" name="nivel" required maxlength="4" placeholder="Ej: 27A" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold uppercase text-sm focus:ring-2 focus:ring-inm-verde-100 transition-all">
                         </div>
                         <div class="md:col-span-2">
-                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Actividad(es)</label>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Dependencia(s)</label>
                             <button type="button" id="personal-actividad-btn" onclick="togglePersonalActividadSelector()" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl flex justify-between items-center outline-none transition-all focus:ring-2 focus:ring-inm-verde-100">
-                                <span id="personal-actividades-label" class="text-sm font-medium text-gray-400 overflow-hidden text-ellipsis whitespace-nowrap">Seleccionar Actividades...</span>
+                                <span id="personal-actividades-label" class="text-sm font-medium text-gray-400 overflow-hidden text-ellipsis whitespace-nowrap">Seleccionar Dependencias...</span>
                                 <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                             </button>
                             <div id="personal-actividad-dropdown" class="hidden relative left-0 right-0 mt-2 p-4 bg-white border border-gray-200 rounded-2xl shadow-2xl z-50 max-h-52 overflow-y-auto">
@@ -950,7 +950,7 @@
                                     <span class="text-sm font-medium text-gray-700">{{ act.nombre }}</span>
                                 </label>
                                 {% empty %}
-                                <p class="text-sm text-gray-400 text-center py-2">No hay tipos de actividad registrados.</p>
+                                <p class="text-sm text-gray-400 text-center py-2">No hay dependencias registradas.</p>
                                 {% endfor %}
                             </div>
                         </div>

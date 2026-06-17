@@ -10,7 +10,7 @@ from .models import (Estado, Nacionalidad, Repatriados, Recibidos,
                     PRHs, Titular, Estudio, GradoAcademico, TelefonoTitular, CorreoTitular, 
                     TipoNombramiento, TrayectoriaLaboral, ExperienciaProfesional, TipoProcendencia,
                     Comodato, FiguraOcupacion, TipoInmueble, SituacionActual, TipoActividad, Inmueble, HistoricoComentarios, TipoOficina,
-                    ProgramaIPC, PersonalINM, OrganigramaF, EstatusPersonal, TipoPlaza)
+                    ProgramaIPC, PersonalINM, OrganigramaF, EstatusPersonal, TipoPlaza, TipoDependencia)
 from usuarioL.models import usuarioL
 
 from datetime import datetime
@@ -475,6 +475,9 @@ def mapa_informacion(request):
             'personal_total': 0,
             'personal_activo': 0,
             'personal_vacante': 0,
+            'subrep_federal': 0,
+            'subrep_local': 0,
+            'rep_local': 0,
             'titular': 'Sin titular asignado',
             'titular_id': None,
             'foto': None,
@@ -504,18 +507,36 @@ def mapa_informacion(request):
             infra_data[edo_name]['PRH'] = item['total']
 
     # Personal por estado
-    personal_counts = PersonalINM.objects.values('estado__nombre', 'estatus__estatus').annotate(total=Count('id'))
-    for item in personal_counts:
-        edo_name = normalizar_nombre(item['estado__nombre'])
-        estatus_name = (item['estatus__estatus'] or '').upper()
+    personal_qs = PersonalINM.objects.all().select_related('estado', 'estatus')
+    for p in personal_qs:
+        if not p.estado:
+            continue
+        edo_name = normalizar_nombre(p.estado.nombre)
         if edo_name in infra_data:
-            infra_data[edo_name]['personal_total'] += item['total']
+            infra_data[edo_name]['personal_total'] += 1
+            estatus_name = (p.estatus.estatus if p.estatus else '').upper()
             if estatus_name == 'ACTIVO':
-                infra_data[edo_name]['personal_activo'] += item['total']
+                infra_data[edo_name]['personal_activo'] += 1
             elif estatus_name == 'VACANTE':
-                infra_data[edo_name]['personal_vacante'] += item['total']
+                infra_data[edo_name]['personal_vacante'] += 1
+            
+            puesto_clean = normalizar_nombre(p.puesto_especifico)
+            if 'SUB REPRESENTACION FEDERAL' in puesto_clean:
+                infra_data[edo_name]['subrep_federal'] += 1
+            elif 'SUB REPRESENTACION LOCAL' in puesto_clean:
+                infra_data[edo_name]['subrep_local'] += 1
+            elif 'REPRESENTACION LOCAL' in puesto_clean:
+                infra_data[edo_name]['rep_local'] += 1
 
     # Totales Nacionales
+    subrep_federal_nat = 0
+    subrep_local_nat = 0
+    rep_local_nat = 0
+    for key, val in infra_data.items():
+        subrep_federal_nat += val.get('subrep_federal', 0)
+        subrep_local_nat += val.get('subrep_local', 0)
+        rep_local_nat += val.get('rep_local', 0)
+
     infra_data[LABEL_NACIONAL] = {
         'estado_id': None,
         'AEREO': PuntosInternacionEstacion.objects.filter(tipo='AEREO').count(),
@@ -526,6 +547,9 @@ def mapa_informacion(request):
         'personal_total': PersonalINM.objects.count(),
         'personal_activo': PersonalINM.objects.filter(estatus__estatus__iexact='ACTIVO').count(),
         'personal_vacante': PersonalINM.objects.filter(estatus__estatus__iexact='VACANTE').count(),
+        'subrep_federal': subrep_federal_nat,
+        'subrep_local': subrep_local_nat,
+        'rep_local': rep_local_nat,
         'titular': 'Datos Nacionales',
         'foto': None,
         'tipo_nombramiento': None
@@ -628,7 +652,7 @@ def mapa_informacion(request):
         })
 
     # --- Capa de Inmuebles (Icono OR_ACTIVO) ---
-    inmuebles_objs = Inmueble.objects.all()
+    inmuebles_objs = Inmueble.objects.all().prefetch_related('tipo_oficina')
     if user_state:
         inmuebles_objs = inmuebles_objs.filter(estado=user_state)
     inmuebles_pts_data = []
@@ -640,6 +664,7 @@ def mapa_informacion(request):
             'nombre': pt.nombre_inmueble,
             'estado': normalizar_nombre(pt.estado.nombre),
             'tipo': 'INMUEBLE',
+            'tipo_oficina': [normalizar_nombre(to.nombre) for to in pt.tipo_oficina.all()],
             'url': f"{settings.STATIC_URL}mapa/icons/OR_ACTIVO.svg"
         })
 
@@ -1005,7 +1030,7 @@ def personal_list(request):
     return render(request, 'mapa/personal_list.html', {
         'estados_list': estados_list,
         'estados_list_all': estados_list_all,
-        'actividades_list': TipoActividad.objects.all().order_by('nombre'),
+        'actividades_list': TipoDependencia.objects.all().order_by('nombre'),
         'inmuebles_list': inmuebles_list,
         'personal_list': page_obj,
         'total_matched': total_matched,
@@ -2505,6 +2530,7 @@ def mapa_interactivo(request):
     titulares_raw = Titular.objects.all().select_related('estado', 'tipo_nombramiento')
     
     infra_data = {}
+    # Estructura base para todos los estados
     for edo in Estado.objects.all():
         infra_data[normalizar_nombre(edo.nombre)] = {
             'estado_id': edo.id,
@@ -2513,6 +2539,9 @@ def mapa_interactivo(request):
             'personal_total': 0,
             'personal_activo': 0,
             'personal_vacante': 0,
+            'subrep_federal': 0,
+            'subrep_local': 0,
+            'rep_local': 0,
             'titular': 'Sin titular asignado',
             'titular_id': None,
             'foto': None,
@@ -2541,18 +2570,36 @@ def mapa_interactivo(request):
             infra_data[edo_name]['PRH'] = item['total']
 
     # Personal por estado
-    personal_counts = PersonalINM.objects.values('estado__nombre', 'estatus__estatus').annotate(total=Count('id'))
-    for item in personal_counts:
-        edo_name = normalizar_nombre(item['estado__nombre'])
-        estatus_name = (item['estatus__estatus'] or '').upper()
+    personal_qs = PersonalINM.objects.all().select_related('estado', 'estatus')
+    for p in personal_qs:
+        if not p.estado:
+            continue
+        edo_name = normalizar_nombre(p.estado.nombre)
         if edo_name in infra_data:
-            infra_data[edo_name]['personal_total'] += item['total']
+            infra_data[edo_name]['personal_total'] += 1
+            estatus_name = (p.estatus.estatus if p.estatus else '').upper()
             if estatus_name == 'ACTIVO':
-                infra_data[edo_name]['personal_activo'] += item['total']
+                infra_data[edo_name]['personal_activo'] += 1
             elif estatus_name == 'VACANTE':
-                infra_data[edo_name]['personal_vacante'] += item['total']
+                infra_data[edo_name]['personal_vacante'] += 1
+            
+            puesto_clean = normalizar_nombre(p.puesto_especifico)
+            if 'SUB REPRESENTACION FEDERAL' in puesto_clean:
+                infra_data[edo_name]['subrep_federal'] += 1
+            elif 'SUB REPRESENTACION LOCAL' in puesto_clean:
+                infra_data[edo_name]['subrep_local'] += 1
+            elif 'REPRESENTACION LOCAL' in puesto_clean:
+                infra_data[edo_name]['rep_local'] += 1
 
     # Totales Nacionales
+    subrep_federal_nat = 0
+    subrep_local_nat = 0
+    rep_local_nat = 0
+    for key, val in infra_data.items():
+        subrep_federal_nat += val.get('subrep_federal', 0)
+        subrep_local_nat += val.get('subrep_local', 0)
+        rep_local_nat += val.get('rep_local', 0)
+
     infra_data[LABEL_NACIONAL] = {
         'estado_id': None,
         'AEREO': PuntosInternacionEstacion.objects.filter(tipo='AEREO').count(),
@@ -2563,6 +2610,9 @@ def mapa_interactivo(request):
         'personal_total': PersonalINM.objects.count(),
         'personal_activo': PersonalINM.objects.filter(estatus__estatus__iexact='ACTIVO').count(),
         'personal_vacante': PersonalINM.objects.filter(estatus__estatus__iexact='VACANTE').count(),
+        'subrep_federal': subrep_federal_nat,
+        'subrep_local': subrep_local_nat,
+        'rep_local': rep_local_nat,
         'titular': 'Datos Nacionales',
         'foto': None,
         'tipo_nombramiento': None
@@ -2639,7 +2689,7 @@ def mapa_interactivo(request):
         })
 
     # --- Capa de Inmuebles (Icono OR_ACTIVO) ---
-    inmuebles_objs = Inmueble.objects.all()
+    inmuebles_objs = Inmueble.objects.all().prefetch_related('tipo_oficina')
     if user_state:
         inmuebles_objs = inmuebles_objs.filter(estado=user_state)
     inmuebles_pts_data = []
@@ -2651,6 +2701,7 @@ def mapa_interactivo(request):
             'nombre': pt.nombre_inmueble,
             'estado': normalizar_nombre(pt.estado.nombre),
             'tipo': 'INMUEBLE',
+            'tipo_oficina': [normalizar_nombre(to.nombre) for to in pt.tipo_oficina.all()],
             'url': f"{settings.STATIC_URL}mapa/icons/OR_ACTIVO.svg"
         })
 

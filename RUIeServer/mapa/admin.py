@@ -8,7 +8,7 @@ from .models import (
     CorreoTitular, TipoNombramiento, TipoProcendencia,
     Comodato, FiguraOcupacion, TipoInmueble, SituacionActual,
     TipoActividad, Inmueble, HistoricoComentarios, TipoOficina,
-    ProgramaIPC, PersonalINM, OrganigramaF, EstatusPersonal, TipoPlaza
+    ProgramaIPC, PersonalINM, OrganigramaF, EstatusPersonal, TipoPlaza, TipoDependencia
 )
 
 @admin.register(Estado)
@@ -162,6 +162,11 @@ class SituacionActualAdmin(admin.ModelAdmin):
 
 @admin.register(TipoActividad)
 class TipoActividadAdmin(admin.ModelAdmin):
+    list_display = ('nombre',)
+    search_fields = ('nombre',)
+
+@admin.register(TipoDependencia)
+class TipoDependenciaAdmin(admin.ModelAdmin):
     list_display = ('nombre',)
     search_fields = ('nombre',)
 

@@ -401,6 +401,17 @@ class SituacionActual(models.Model):
         verbose_name = "Situación Actual"
         verbose_name_plural = "Situaciones Actuales"
 
+class TipoDependencia(models.Model):
+    actividad = models.ForeignKey('TipoActividad', on_delete=models.CASCADE, related_name='actividad')
+    nombre = models.CharField(max_length=200, unique=True)
+
+    def __str__(self):
+        return self.nombre
+
+    class Meta:
+        verbose_name = "Tipo de Dependencia"
+        verbose_name_plural = "Tipos de Dependencias"
+
 class TipoActividad(models.Model):
     nombre = models.CharField(max_length=200, unique=True)
 
@@ -538,7 +549,7 @@ class PersonalINM(models.Model):
     puesto_especifico = models.CharField(max_length=200)
     sueldo_bruto = models.FloatField(null=True, blank=True)
     sueldo_neto = models.FloatField(null=True, blank=True)
-    actividad = models.ManyToManyField(TipoActividad, blank=True)
+    actividad = models.ManyToManyField(TipoDependencia, blank=True)
     jefe_oficina = models.BooleanField(default=False, null=True, blank=True)
     lugar_asignado = models.ForeignKey('Inmueble', on_delete=models.CASCADE, related_name='inmuebleAsignado', blank=True, null=True)
     fecha_nacimiento = models.DateField(null=True, blank=True)

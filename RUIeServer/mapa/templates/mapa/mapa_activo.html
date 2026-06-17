@@ -561,6 +561,33 @@
                 </div>
                 <span id="menu_personal_vacante" class="text-sm font-extrabold text-stone-600 pl-0.5">0</span>
             </div>
+
+            <!-- Card: Sub Representación Federal -->
+            <div id="card_subrep_fed" onclick="openPersonalStatsModal('total')" class="bg-gray-100 border border-gray-200/60 px-2.5 py-2 rounded-xl flex flex-col items-center gap-1 cursor-pointer hover:bg-gray-200 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200" title="Ver Personal - Sub Representaciones Federales">
+                <div class="flex items-center gap-1.5">
+                    <img src="/static/mapa/icons/OR_ACTIVO.svg" class="w-4 h-4 object-contain flex-shrink-0" alt="Sub Rep Federal">
+                    <span class="menu-label-text text-[9px] font-black text-gray-600 uppercase tracking-tight leading-tight">Sub Rep. Federal</span>
+                </div>
+                <span id="menu_subrep_fed" class="text-sm font-extrabold text-[#1d4ed8] pl-0.5">0</span>
+            </div>
+
+            <!-- Card: Sub Representación Local -->
+            <div id="card_subrep_local" onclick="openPersonalStatsModal('total')" class="bg-gray-100 border border-gray-200/60 px-2.5 py-2 rounded-xl flex flex-col items-center gap-1 cursor-pointer hover:bg-gray-200 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200" title="Ver Personal - Sub Representaciones Locales">
+                <div class="flex items-center gap-1.5">
+                    <img src="/static/mapa/icons/OR_ACTIVO.svg" class="w-4 h-4 object-contain flex-shrink-0" alt="Sub Rep Local">
+                    <span class="menu-label-text text-[9px] font-black text-gray-600 uppercase tracking-tight leading-tight">Sub Rep. Local</span>
+                </div>
+                <span id="menu_subrep_local" class="text-sm font-extrabold text-[#7c3aed] pl-0.5">0</span>
+            </div>
+
+            <!-- Card: Representación Local -->
+            <div id="card_rep_local" onclick="openPersonalStatsModal('total')" class="bg-gray-100 border border-gray-200/60 px-2.5 py-2 rounded-xl flex flex-col items-center gap-1 cursor-pointer hover:bg-gray-200 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200" title="Ver Personal - Representaciones Locales">
+                <div class="flex items-center gap-1.5">
+                    <img src="/static/mapa/icons/OR_ACTIVO.svg" class="w-4 h-4 object-contain flex-shrink-0" alt="Rep Local">
+                    <span class="menu-label-text text-[9px] font-black text-gray-600 uppercase tracking-tight leading-tight">Rep. Local</span>
+                </div>
+                <span id="menu_rep_local" class="text-sm font-extrabold text-[#db2777] pl-0.5">0</span>
+            </div>
         </div>
 
         <!-- Spacer push buttons to bottom -->
@@ -827,6 +854,11 @@
     _setCount('menu_personal_total', data.personal_total || 0);
     _setCount('menu_personal_activo', data.personal_activo || 0);
     _setCount('menu_personal_vacante', data.personal_vacante || 0);
+
+    // Actualizar counts de sub-representaciones de personal agregados desde el backend
+    _setCount('menu_subrep_fed', data.subrep_federal || 0);
+    _setCount('menu_subrep_local', data.subrep_local || 0);
+    _setCount('menu_rep_local', data.rep_local || 0);
   };
 
   window.updateInformationPanel = function() {
@@ -1239,7 +1271,8 @@
                   subtype: item.tipo || 'PRH', 
                   status: item.status || '',
                   estado: item.estado,
-                  estado_norm: normalizar_nombre(item.estado) 
+                  estado_norm: normalizar_nombre(item.estado),
+                  tipo_oficina: item.tipo_oficina || ''
               });
           });
       };
