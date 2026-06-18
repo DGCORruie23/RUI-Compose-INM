@@ -314,11 +314,11 @@ def calc_national(totals_dict):
 
 def get_global_update_date():
     """Calcula el mínimo de los máximos para determinar la fecha de integridad total."""
-    from .models import Repatriados, Recibidos, ExtRescatados, Ingresos, Tramites, Retornados, Inadmitidos, Encuentros
+    from .models import Repatriados, Recibidos, ExtRescatados, Ingresos, Tramites, Retornados, Inadmitidos
     
     models_to_check = [
         Repatriados, Recibidos, ExtRescatados, Ingresos, 
-        Tramites, Retornados, Inadmitidos, Encuentros
+        Tramites, Retornados, Inadmitidos
     ]
     
     max_dates = []
