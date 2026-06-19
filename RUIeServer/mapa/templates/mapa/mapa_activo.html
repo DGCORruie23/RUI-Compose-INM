@@ -1828,18 +1828,25 @@
             
             const getIconFilename = (name) => {
                 const n = normalizar(name);
-                if (n.includes("ADMINISTRATIVO") || n.includes("OFICINA")) return "icon_administrativos.svg";
+                //ADMINISTRACION
+                if (n.includes("ADMINISTRACIÓN") || n.includes("OFICINA")) return "icon_rec_financieros.svg";
+                //ALMACEN-OTRO
                 if (n.includes("ALMACEN") || n.includes("BODEGA")) return "icon_almacen.svg";
-                if (n.includes("REPATRIACION")) return "icon_repatriacion.svg";
-                if (n.includes("TRAMITE")) return "icon_tramites.svg";
+                //PROTECCION
+                if (n.includes("PROTECCIÓN")) return "icon_repatriacion.svg";
+                //REGULACION
+                if (n.includes("REGULACIÓN")) return "icon_tramites.svg";
+                //ASUNTOS JURIDICOS
                 if (n.includes("JURIDICO") || n.includes("LEGAL")) return "icon_juridico.svg";
                 if (n.includes("RECURSOS HUMANOS") || n.includes("HUMANOS") || n.includes("PERSONAL")) return "icon_rec_humano.svg";
                 if (n.includes("MATERIALES") || n.includes("ADQUISICION")) return "icon_rec_materiales.svg";
+                //CONTROL
                 if (n.includes("CONTROL") || n.includes("MIGRATORIO")) return "icon_control.svg";
                 if (n.includes("ESTACIONAMIENTO")) return "icon_estacionamiento.svg";
                 if (n.includes("FINANCIEROS")) return "icon_rec_financieros.svg";
                 if (n.includes("BETA")) return "icon_beta.svg";
-                if (n.includes("ESTADISTICA")) return "icon_estadistica.svg";
+                //TECNOLOGIAS
+                if (n.includes("TECNOLOGIAS")) return "icon_estadistica.svg";
                 if (n.includes("VEHICULO")) return "icon_vehiculo.svg";
                 if (n.includes("RENTA")) return "icon_renta.svg";
                 return "icon_personal.svg";
