@@ -507,10 +507,15 @@ def mapa_informacion(request):
             infra_data[edo_name]['PRH'] = item['total']
 
     # Personal por estado
-    personal_qs = PersonalINM.objects.all().select_related('estado', 'estatus')
+    personal_qs = PersonalINM.objects.all().select_related('estado', 'estatus', 'tipo_plaza')
     for p in personal_qs:
         if not p.estado:
             continue
+        
+        tipo_plaza = (p.tipo_plaza.plazaT if p.tipo_plaza else '').upper()
+        if tipo_plaza not in ['BASE', 'CONFIANZA']:
+            continue
+
         edo_name = normalizar_nombre(p.estado.nombre)
         if edo_name in infra_data:
             infra_data[edo_name]['personal_total'] += 1
@@ -2570,10 +2575,15 @@ def mapa_interactivo(request):
             infra_data[edo_name]['PRH'] = item['total']
 
     # Personal por estado
-    personal_qs = PersonalINM.objects.all().select_related('estado', 'estatus')
+    personal_qs = PersonalINM.objects.all().select_related('estado', 'estatus', 'tipo_plaza')
     for p in personal_qs:
         if not p.estado:
             continue
+        
+        tipo_plaza = (p.tipo_plaza.plazaT if p.tipo_plaza else '').upper()
+        if tipo_plaza not in ['BASE', 'CONFIANZA']:
+            continue
+
         edo_name = normalizar_nombre(p.estado.nombre)
         if edo_name in infra_data:
             infra_data[edo_name]['personal_total'] += 1
