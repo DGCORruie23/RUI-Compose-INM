@@ -3647,3 +3647,493 @@ def api_get_personal_stats(request, estado_id):
         return JsonResponse({'status': 'error', 'message': 'El estado solicitado no existe.'}, status=404)
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+
+def vehiculos_list(request):
+    """Vista para la gestión de Vehículos con paginación y filtros en el servidor."""
+    if not request.user.is_authenticated:
+        return redirect('/log-in/?next=%s' % request.path)
+    
+    from .models import VehiculosOR, TipoVeh, TipoAsignacionVeh, Estado, Inmueble, SituacionVeh
+    
+    user_state = get_user_state(request)
+    
+    # 1. Obtener filtros de la solicitud GET
+    placa_query = request.GET.get('placa', '').strip()
+    marca_query = request.GET.get('marca', '').strip()
+    estado_id_query = request.GET.get('estado_id', '').strip()
+    page_number = request.GET.get('page', 1)
+    
+    # 2. Filtrar queryset de vehículos
+    vehiculos_qs = VehiculosOR.objects.all().select_related('tipoVeh', 'asignacion', 'estado', 'inmueble', 'fotografias', 'situacion')
+    
+    if user_state:
+        vehiculos_qs = vehiculos_qs.filter(estado=user_state)
+        estados_list_all = [user_state]
+    else:
+        estados_list_all = Estado.objects.all().order_by('nombre')
+        if estado_id_query:
+            vehiculos_qs = vehiculos_qs.filter(estado_id=estado_id_query)
+            
+    if placa_query:
+        vehiculos_qs = vehiculos_qs.filter(placa__icontains=placa_query)
+        
+    if marca_query:
+        vehiculos_qs = vehiculos_qs.filter(marca__icontains=marca_query)
+        
+    vehiculos_qs = vehiculos_qs.order_by('estado__nombre', 'marca', 'modelo')
+    total_matched = vehiculos_qs.count()
+    
+    # 3. Paginación de resultados (50 por página)
+    from django.core.paginator import Paginator
+    paginator = Paginator(vehiculos_qs, 50)
+    page_obj = paginator.get_page(page_number)
+    
+    # 4. Listados para formularios de creación/edición
+    tipo_veh_list = TipoVeh.objects.all().order_by('tipo_veh')
+    asignacion_list = TipoAsignacionVeh.objects.all().order_by('tipo')
+    situacion_list = SituacionVeh.objects.all().order_by('situacion')
+    
+    if user_state:
+        estados_list = [user_state]
+        inmuebles_list = Inmueble.objects.filter(estado=user_state).order_by('nombre_inmueble')
+    else:
+        estados_list = Estado.objects.all().order_by('nombre')
+        inmuebles_list = Inmueble.objects.all().order_by('nombre_inmueble')
+        
+    return render(request, 'mapa/vehiculos_list.html', {
+        'estados_list': estados_list,
+        'estados_list_all': estados_list_all,
+        'inmuebles_list': inmuebles_list,
+        'tipo_veh_list': tipo_veh_list,
+        'asignacion_list': asignacion_list,
+        'situacion_list': situacion_list,
+        'vehiculos_list': page_obj,
+        'total_matched': total_matched,
+        'placa_query': placa_query,
+        'marca_query': marca_query,
+        'estado_id_query': estado_id_query,
+    })
+
+
+def guardar_vehiculo(request):
+    if not request.user.is_authenticated:
+        return redirect('/log-in/')
+        
+    if request.method != 'POST':
+        return redirect('vehiculos_list')
+    
+    user_state = get_user_state(request)
+    from .models import VehiculosOR, FotosVeh
+    from django.contrib import messages
+    
+    try:
+        vehiculo_id = request.POST.get('vehiculo_id')
+        estado_id = request.POST.get('estado_id')
+        
+        # Validación de seguridad: el estado enviado debe coincidir con el del usuario
+        if user_state and str(user_state.id) != str(estado_id):
+            raise PermissionError("No tienes permisos para registrar vehículos en este estado.")
+            
+        anio_year = request.POST.get('anio') or None
+        anio = None
+        if anio_year and anio_year.strip().isdigit():
+            from datetime import date
+            anio = date(int(anio_year), 1, 1)
+            
+        fecha_disp_comb = request.POST.get('fecha_disp_comb') or None
+        
+        # Procesar fotos de vehículos
+        fotos_id = request.POST.get('fotografias_id') or None
+        fotos_obj = None
+        
+        frente_file = request.FILES.get('foto_frente')
+        lateral_file = request.FILES.get('foto_lateral')
+        trasera_file = request.FILES.get('foto_trasera')
+        
+        if frente_file or lateral_file or trasera_file or fotos_id:
+            if fotos_id:
+                fotos_obj = FotosVeh.objects.get(id=fotos_id)
+            else:
+                fotos_obj = FotosVeh()
+                
+            if frente_file:
+                fotos_obj.frente = frente_file
+            if lateral_file:
+                fotos_obj.lateral = lateral_file
+            if trasera_file:
+                fotos_obj.trasera = trasera_file
+                
+            fotos_obj.save()
+            
+        monto_raw = request.POST.get('monto') or '0'
+        # Limpiar caracteres como signo de pesos o comas
+        monto_raw = monto_raw.replace('$', '').replace(',', '').strip()
+        monto = float(monto_raw) if monto_raw else 0.0
+            
+        defaults = {
+            'marca': request.POST.get('marca', '').strip().upper(),
+            'modelo': request.POST.get('modelo', '').strip().upper(),
+            'anio': anio,
+            'placa': request.POST.get('placa', '').strip().upper(),
+            'no_motor': request.POST.get('no_motor', '').strip().upper(),
+            'tarjeta_asig': request.POST.get('tarjeta_asig', '').strip().upper() or None,
+            'fecha_disp_comb': fecha_disp_comb,
+            'monto': monto,
+            'tipoVeh_id': request.POST.get('tipoVeh_id') or None,
+            'asignacion_id': request.POST.get('asignacion_id'),
+            'estado_id': estado_id,
+            'inmueble_id': request.POST.get('inmueble_id') or None,
+            'fotografias': fotos_obj,
+            'situacion_id': request.POST.get('situacion_id') or None,
+        }
+        
+        if vehiculo_id:
+            vehiculo = VehiculosOR.objects.get(id=vehiculo_id)
+            if user_state and vehiculo.estado != user_state:
+                raise PermissionError("No tienes permisos para modificar este registro.")
+            for key, value in defaults.items():
+                setattr(vehiculo, key, value)
+            vehiculo.save()
+            messages.success(request, "Vehículo actualizado exitosamente.")
+        else:
+            vehiculo = VehiculosOR.objects.create(**defaults)
+            
+            # --- REGISTROS INICIALES OPCIONALES ---
+            from .models import Kilometraje, PrestadoDe, Siniestros, Capufe, CombustibleExt
+            
+            # 1. Kilometraje
+            init_odometro = request.POST.get('init_odometro')
+            if init_odometro:
+                tipo_unidad = request.POST.get('init_tipo_unidad', 'KM')
+                evidencia = request.FILES.get('init_evidencia')
+                Kilometraje.objects.create(
+                    vehiculo=vehiculo,
+                    fecha=fecha_disp_comb or anio,
+                    tipo=tipo_unidad,
+                    odometro=float(init_odometro),
+                    evidencia=evidencia
+                )
+                
+            # 2. Préstamo
+            init_prestado_estado_id = request.POST.get('init_prestado_estado_id')
+            if init_prestado_estado_id:
+                PrestadoDe.objects.create(
+                    vehiculo=vehiculo,
+                    estado_id=init_prestado_estado_id,
+                    inmueble_id=request.POST.get('init_prestado_inmueble_id') or None,
+                    fecha_prestamo=request.POST.get('init_prestado_fecha') or None
+                )
+                
+            # 3. Siniestro
+            init_siniestro_fecha = request.POST.get('init_siniestro_fecha')
+            if init_siniestro_fecha:
+                Siniestros.objects.create(
+                    vehiculo=vehiculo,
+                    fecha=init_siniestro_fecha,
+                    folio=request.POST.get('init_siniestro_folio', '').strip().upper() or None
+                )
+                
+            # 4. Capufe
+            init_capufe_fecha_inicio = request.POST.get('init_capufe_fecha_inicio')
+            if init_capufe_fecha_inicio:
+                Capufe.objects.create(
+                    vehiculo=vehiculo,
+                    fecha_inicio=init_capufe_fecha_inicio,
+                    fecha_termino=request.POST.get('init_capufe_fecha_termino') or None
+                )
+                
+            # 5. Combustible Extra
+            init_combustible_monto = request.POST.get('init_combustible_monto')
+            if init_combustible_monto:
+                monto_comb = init_combustible_monto.replace('$', '').replace(',', '').strip()
+                if monto_comb:
+                    CombustibleExt.objects.create(
+                        vehiculo=vehiculo,
+                        fecha=request.POST.get('init_combustible_fecha') or None,
+                        monto=float(monto_comb)
+                    )
+            
+            messages.success(request, "Vehículo registrado exitosamente con sus datos iniciales.")
+            
+    except Exception as e:
+        messages.error(request, f"Error al guardar el vehículo: {str(e)}")
+        
+    return redirect('vehiculos_list')
+
+
+def eliminar_vehiculo(request, vehiculo_id):
+    if not request.user.is_authenticated:
+        return redirect('/log-in/')
+        
+    from .models import VehiculosOR
+    from django.contrib import messages
+    
+    user_state = get_user_state(request)
+    
+    try:
+        vehiculo = VehiculosOR.objects.get(id=vehiculo_id)
+        if user_state and vehiculo.estado != user_state:
+            raise PermissionError("No tienes permisos para eliminar este registro.")
+            
+        fotos_obj = vehiculo.fotografias
+        vehiculo.delete()
+        
+        # Eliminar registro de fotos física y de BD si existe
+        if fotos_obj:
+            fotos_obj.delete()
+            
+        messages.success(request, "Vehículo eliminado exitosamente.")
+    except Exception as e:
+        messages.error(request, f"Error al eliminar el vehículo: {str(e)}")
+        
+    return redirect('vehiculos_list')
+
+
+def api_get_vehiculo(request, vehiculo_id):
+    if not request.user.is_authenticated:
+        return JsonResponse({'status': 'error', 'message': 'No autenticado'}, status=401)
+        
+    from .models import VehiculosOR
+    user_state = get_user_state(request)
+    
+    try:
+        vehiculo = VehiculosOR.objects.select_related('fotografias').get(id=vehiculo_id)
+        if user_state and vehiculo.estado != user_state:
+            return JsonResponse({'status': 'error', 'message': 'Sin permisos'}, status=403)
+            
+        data = {
+            'id': vehiculo.id,
+            'marca': vehiculo.marca,
+            'modelo': vehiculo.modelo,
+            'anio': str(vehiculo.anio.year) if vehiculo.anio else '',
+            'placa': vehiculo.placa,
+            'no_motor': vehiculo.no_motor,
+            'tarjeta_asig': vehiculo.tarjeta_asig or '',
+            'fecha_disp_comb': vehiculo.fecha_disp_comb.strftime('%Y-%m-%d') if vehiculo.fecha_disp_comb else '',
+            'monto': str(vehiculo.monto),
+            'tipoVeh_id': vehiculo.tipoVeh_id or '',
+            'asignacion_id': vehiculo.asignacion_id,
+            'estado_id': vehiculo.estado_id,
+            'inmueble_id': vehiculo.inmueble_id or '',
+            'fotografias_id': vehiculo.fotografias_id or '',
+            'foto_frente_url': vehiculo.fotografias.frente.url if (vehiculo.fotografias and vehiculo.fotografias.frente) else '',
+            'foto_lateral_url': vehiculo.fotografias.lateral.url if (vehiculo.fotografias and vehiculo.fotografias.lateral) else '',
+            'foto_trasera_url': vehiculo.fotografias.trasera.url if (vehiculo.fotografias and vehiculo.fotografias.trasera) else '',
+            'situacion_id': vehiculo.situacion_id or '',
+        }
+        return JsonResponse({'status': 'success', 'data': data})
+    except VehiculosOR.DoesNotExist:
+        return JsonResponse({'status': 'error', 'message': 'Vehículo no encontrado'}, status=404)
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
+
+def api_get_vehiculo_historial(request, vehiculo_id):
+    if not request.user.is_authenticated:
+        return JsonResponse({'status': 'error', 'message': 'No autenticado'}, status=401)
+        
+    from .models import VehiculosOR, Kilometraje, PrestadoDe, Siniestros, Capufe, CombustibleExt
+    user_state = get_user_state(request)
+    
+    try:
+        vehiculo = VehiculosOR.objects.get(id=vehiculo_id)
+        if user_state and vehiculo.estado != user_state:
+            return JsonResponse({'status': 'error', 'message': 'Sin permisos'}, status=403)
+            
+        kms = Kilometraje.objects.filter(vehiculo_id=vehiculo_id).order_by('-fecha', '-id')
+        prestados = PrestadoDe.objects.filter(vehiculo_id=vehiculo_id).select_related('estado', 'inmueble').order_by('-fecha_prestamo')
+        siniestros = Siniestros.objects.filter(vehiculo_id=vehiculo_id).order_by('-fecha')
+        capufes = Capufe.objects.filter(vehiculo_id=vehiculo_id).order_by('-fecha_inicio')
+        combustibles = CombustibleExt.objects.filter(vehiculo_id=vehiculo_id).order_by('-fecha')
+        
+        data = {
+            'vehiculo': {
+                'id': vehiculo.id,
+                'placa': vehiculo.placa,
+                'marca': vehiculo.marca,
+                'modelo': vehiculo.modelo,
+            },
+            'kilometraje': [{
+                'id': k.id,
+                'fecha': k.fecha.strftime('%Y-%m-%d') if k.fecha else 'S/F',
+                'tipo': k.tipo,
+                'odometro': str(k.odometro),
+                'evidencia_url': k.evidencia.url if k.evidencia else ''
+            } for k in kms],
+            'prestados': [{
+                'id': p.id,
+                'fecha_prestamo': p.fecha_prestamo.strftime('%Y-%m-%d') if p.fecha_prestamo else 'S/F',
+                'estado': p.estado.nombre,
+                'inmueble': p.inmueble.nombre_inmueble if p.inmueble else 'Sin Asignar'
+            } for p in prestados],
+            'siniestros': [{
+                'id': s.id,
+                'fecha': s.fecha.strftime('%Y-%m-%d') if s.fecha else 'S/F',
+                'folio': s.folio or 'S/F'
+            } for s in siniestros],
+            'capufes': [{
+                'id': c.id,
+                'fecha_inicio': c.fecha_inicio.strftime('%Y-%m-%d') if c.fecha_inicio else 'S/F',
+                'fecha_termino': c.fecha_termino.strftime('%Y-%m-%d') if c.fecha_termino else 'S/F'
+            } for c in capufes],
+            'combustibles': [{
+                'id': co.id,
+                'fecha': co.fecha.strftime('%Y-%m-%d') if co.fecha else 'S/F',
+                'monto': str(co.monto)
+            } for co in combustibles],
+        }
+        return JsonResponse({'status': 'success', 'data': data})
+    except VehiculosOR.DoesNotExist:
+        return JsonResponse({'status': 'error', 'message': 'Vehículo no encontrado'}, status=404)
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
+
+def guardar_kilometraje(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'status': 'error', 'message': 'No autenticado'}, status=401)
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Método no permitido'}, status=405)
+        
+    from .models import VehiculosOR, Kilometraje
+    user_state = get_user_state(request)
+    
+    try:
+        vehiculo_id = request.POST.get('vehiculo_id')
+        vehiculo = VehiculosOR.objects.get(id=vehiculo_id)
+        if user_state and vehiculo.estado != user_state:
+            return JsonResponse({'status': 'error', 'message': 'Sin permisos'}, status=403)
+            
+        fecha = request.POST.get('fecha') or None
+        tipo = request.POST.get('tipo', 'KM')
+        odometro = float(request.POST.get('odometro') or 0.0)
+        evidencia = request.FILES.get('evidencia')
+        
+        Kilometraje.objects.create(
+            vehiculo=vehiculo,
+            fecha=fecha,
+            tipo=tipo,
+            odometro=odometro,
+            evidencia=evidencia
+        )
+        return JsonResponse({'status': 'success', 'message': 'Kilometraje registrado exitosamente'})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
+
+def guardar_prestado(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'status': 'error', 'message': 'No autenticado'}, status=401)
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Método no permitido'}, status=405)
+        
+    from .models import VehiculosOR, PrestadoDe
+    user_state = get_user_state(request)
+    
+    try:
+        vehiculo_id = request.POST.get('vehiculo_id')
+        vehiculo = VehiculosOR.objects.get(id=vehiculo_id)
+        if user_state and vehiculo.estado != user_state:
+            return JsonResponse({'status': 'error', 'message': 'Sin permisos'}, status=403)
+            
+        estado_id = request.POST.get('estado_id')
+        inmueble_id = request.POST.get('inmueble_id') or None
+        fecha_prestamo = request.POST.get('fecha_prestamo') or None
+        
+        PrestadoDe.objects.create(
+            vehiculo=vehiculo,
+            estado_id=estado_id,
+            inmueble_id=inmueble_id,
+            fecha_prestamo=fecha_prestamo
+        )
+        return JsonResponse({'status': 'success', 'message': 'Préstamo registrado exitosamente'})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
+
+def guardar_siniestro(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'status': 'error', 'message': 'No autenticado'}, status=401)
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Método no permitido'}, status=405)
+        
+    from .models import VehiculosOR, Siniestros
+    user_state = get_user_state(request)
+    
+    try:
+        vehiculo_id = request.POST.get('vehiculo_id')
+        vehiculo = VehiculosOR.objects.get(id=vehiculo_id)
+        if user_state and vehiculo.estado != user_state:
+            return JsonResponse({'status': 'error', 'message': 'Sin permisos'}, status=403)
+            
+        fecha = request.POST.get('fecha') or None
+        folio = request.POST.get('folio', '').strip().upper() or None
+        
+        Siniestros.objects.create(
+            vehiculo=vehiculo,
+            fecha=fecha,
+            folio=folio
+        )
+        return JsonResponse({'status': 'success', 'message': 'Siniestro registrado exitosamente'})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
+
+def guardar_capufe(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'status': 'error', 'message': 'No autenticado'}, status=401)
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Método no permitido'}, status=405)
+        
+    from .models import VehiculosOR, Capufe
+    user_state = get_user_state(request)
+    
+    try:
+        vehiculo_id = request.POST.get('vehiculo_id')
+        vehiculo = VehiculosOR.objects.get(id=vehiculo_id)
+        if user_state and vehiculo.estado != user_state:
+            return JsonResponse({'status': 'error', 'message': 'Sin permisos'}, status=403)
+            
+        fecha_inicio = request.POST.get('fecha_inicio') or None
+        fecha_termino = request.POST.get('fecha_termino') or None
+        
+        Capufe.objects.create(
+            vehiculo=vehiculo,
+            fecha_inicio=fecha_inicio,
+            fecha_termino=fecha_termino
+        )
+        return JsonResponse({'status': 'success', 'message': 'Registro de Capufe guardado exitosamente'})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
+
+def guardar_combustible(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'status': 'error', 'message': 'No autenticado'}, status=401)
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Método no permitido'}, status=405)
+        
+    from .models import VehiculosOR, CombustibleExt
+    user_state = get_user_state(request)
+    
+    try:
+        vehiculo_id = request.POST.get('vehiculo_id')
+        vehiculo = VehiculosOR.objects.get(id=vehiculo_id)
+        if user_state and vehiculo.estado != user_state:
+            return JsonResponse({'status': 'error', 'message': 'Sin permisos'}, status=403)
+            
+        fecha = request.POST.get('fecha') or None
+        monto_raw = request.POST.get('monto') or '0'
+        monto_raw = monto_raw.replace('$', '').replace(',', '').strip()
+        monto = float(monto_raw) if monto_raw else 0.0
+        
+        CombustibleExt.objects.create(
+            vehiculo=vehiculo,
+            fecha=fecha,
+            monto=monto
+        )
+        return JsonResponse({'status': 'success', 'message': 'Registro de Combustible guardado exitosamente'})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+

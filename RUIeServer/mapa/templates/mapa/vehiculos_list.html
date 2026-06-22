@@ -1,0 +1,1167 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}Control de Vehículos - RUIE{% endblock title %}
+
+{% block scripts %}
+<script>
+    function toggleInitCollapse(containerId, iconId) {
+        const container = document.getElementById(containerId);
+        const icon = document.getElementById(iconId);
+        if (container.classList.contains('hidden')) {
+            container.classList.remove('hidden');
+            icon.innerText = '−';
+        } else {
+            container.classList.add('hidden');
+            icon.innerText = '+';
+        }
+    }
+
+    function openVehiculoModal() {
+        const modal = document.getElementById('vehiculoModal');
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeVehiculoModal() {
+        const modal = document.getElementById('vehiculoModal');
+        modal.classList.add('hidden');
+        document.body.style.overflow = 'auto';
+    }
+
+    let allInmueblesOptions = null;
+
+    function filterInmuebleByEstado(forceValue) {
+        const form = document.getElementById('vehiculoForm');
+        if (!form) return;
+        const estadoSelect = form.querySelector('[name="estado_id"]');
+        const inmuebleSelect = form.querySelector('[name="inmueble_id"]');
+        if (!estadoSelect || !inmuebleSelect) return;
+        
+        // Cargar y cachear todas las opciones la primera vez
+        if (!allInmueblesOptions) {
+            allInmueblesOptions = [];
+            const options = inmuebleSelect.querySelectorAll('option');
+            options.forEach(opt => {
+                allInmueblesOptions.push({
+                    value: opt.value,
+                    text: opt.innerText,
+                    estadoId: opt.getAttribute('data-estado')
+                });
+            });
+        }
+        
+        const selectedEstadoId = estadoSelect.value;
+        const currentValue = (forceValue !== undefined) ? forceValue : inmuebleSelect.value;
+        
+        // Limpiar select
+        inmuebleSelect.innerHTML = '';
+        
+        // Opción vacía por defecto
+        const defaultEl = document.createElement('option');
+        defaultEl.value = '';
+        defaultEl.innerText = '-- Sin Asignar --';
+        inmuebleSelect.appendChild(defaultEl);
+        
+        let hasSelectedStillAvailable = false;
+        
+        allInmueblesOptions.forEach(opt => {
+            if (opt.value === '') return;
+            
+            // Filtrar por estado seleccionado o si no se ha seleccionado estado
+            if (!selectedEstadoId || opt.estadoId == selectedEstadoId) {
+                const el = document.createElement('option');
+                el.value = opt.value;
+                el.innerText = opt.text;
+                lugarAttr = opt.estadoId;
+                el.setAttribute('data-estado', opt.estadoId);
+                inmuebleSelect.appendChild(el);
+                
+                if (opt.value == currentValue) {
+                    hasSelectedStillAvailable = true;
+                }
+            }
+        });
+        
+        if (hasSelectedStillAvailable) {
+            inmuebleSelect.value = currentValue;
+        } else {
+            inmuebleSelect.value = '';
+        }
+    }
+
+    function resetVehiculoForm() {
+        const form = document.getElementById('vehiculoForm');
+        if (form) form.reset();
+        
+        document.getElementById('vehiculo_id').value = '';
+        document.getElementById('fotografias_id').value = '';
+        document.getElementById('vehiculo-modal-title').innerText = 'Registrar Vehículo';
+        document.getElementById('vehiculo-modal-subtitle').innerText = 'Registro';
+        
+        // Limpiar previsualización de imágenes
+        document.getElementById('prev_frente').classList.add('hidden');
+        document.getElementById('prev_lateral').classList.add('hidden');
+        document.getElementById('prev_trasera').classList.add('hidden');
+        
+        // Mostrar secciones de datos iniciales en registro nuevo
+        const secKm = document.getElementById('seccion-kilometraje-inicial');
+        if (secKm) {
+            secKm.classList.remove('hidden');
+            document.getElementById('init_odometro_input').required = true;
+        }
+        
+        const secInit = document.getElementById('seccion-iniciales-opcionales');
+        if (secInit) secInit.classList.remove('hidden');
+        
+        // Colapsar sub-secciones opcionales
+        ['init-collapse-prestado', 'init-collapse-siniestro', 'init-collapse-capufe', 'init-collapse-combustible'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.add('hidden');
+        });
+        ['icon-collapse-prestado', 'icon-collapse-siniestro', 'icon-collapse-capufe', 'icon-collapse-combustible'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.innerText = '+';
+        });
+        
+        filterInmuebleByEstado();
+    }
+
+    async function editVehiculo(id) {
+        try {
+            const response = await fetch(`/mapa/api/get-vehiculo/${id}`);
+            const result = await response.json();
+            
+            if (result.status === 'success') {
+                resetVehiculoForm();
+                
+                document.getElementById('vehiculo-modal-title').innerText = 'Editar Vehículo';
+                document.getElementById('vehiculo-modal-subtitle').innerText = 'Actualización';
+                
+                const data = result.data;
+                const form = document.getElementById('vehiculoForm');
+                if (!form) return;
+                
+                form.querySelector('[name="vehiculo_id"]').value = data.id;
+                form.querySelector('[name="marca"]').value = data.marca;
+                form.querySelector('[name="modelo"]').value = data.modelo;
+                form.querySelector('[name="anio"]').value = data.anio || '';
+                form.querySelector('[name="placa"]').value = data.placa;
+                form.querySelector('[name="no_motor"]').value = data.no_motor;
+                form.querySelector('[name="tarjeta_asig"]').value = data.tarjeta_asig || '';
+                form.querySelector('[name="fecha_disp_comb"]').value = data.fecha_disp_comb || '';
+                form.querySelector('[name="monto"]').value = data.monto;
+                form.querySelector('[name="tipoVeh_id"]').value = data.tipoVeh_id || '';
+                form.querySelector('[name="asignacion_id"]').value = data.asignacion_id;
+                form.querySelector('[name="estado_id"]').value = data.estado_id;
+                form.querySelector('[name="fotografias_id"]').value = data.fotografias_id || '';
+                form.querySelector('[name="situacion_id"]').value = data.situacion_id || '';
+                
+                // Ocultar secciones de datos iniciales en edición
+                const secKm = document.getElementById('seccion-kilometraje-inicial');
+                if (secKm) {
+                    secKm.classList.add('hidden');
+                    document.getElementById('init_odometro_input').required = false;
+                }
+                const secInit = document.getElementById('seccion-iniciales-opcionales');
+                if (secInit) secInit.classList.add('hidden');
+                
+                // Cargar previsualizaciones
+                if (data.foto_frente_url) {
+                    const prev = document.getElementById('prev_frente');
+                    prev.src = data.foto_frente_url;
+                    prev.classList.remove('hidden');
+                }
+                if (data.foto_lateral_url) {
+                    const prev = document.getElementById('prev_lateral');
+                    prev.src = data.foto_lateral_url;
+                    prev.classList.remove('hidden');
+                }
+                if (data.foto_trasera_url) {
+                    const prev = document.getElementById('prev_trasera');
+                    prev.src = data.foto_trasera_url;
+                    prev.classList.remove('hidden');
+                }
+                
+                filterInmuebleByEstado(data.inmueble_id || '');
+                openVehiculoModal();
+            } else {
+                alert('Error al cargar datos: ' + result.message);
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Error en la solicitud al servidor.');
+        }
+    }
+
+    function confirmDelete(id, placa) {
+        if (confirm(`¿Está seguro de que desea eliminar el vehículo con placa: ${placa}? Esta acción no se puede deshacer.`)) {
+            window.location.href = `/mapa/eliminar-vehiculo/${id}`;
+        }
+    }
+</script>
+{% endblock scripts %}
+
+{% block styles %}
+<style>
+    .glass-card {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    @keyframes slideUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .animate-slide-up {
+        animation: slideUp 0.5s ease-out forwards;
+    }
+
+    header.header-style {
+        display: none !important;
+    }
+    body > div.flex.justify-center.mt-4.space-x-2 {
+        display: none !important;
+    }
+</style>
+{% endblock styles %}
+
+{% block content %}
+<main class="min-h-screen bg-gray-50/50 p-6 md:p-12">
+    <div class="max-w-7xl mx-auto">
+        <!-- Cabecera -->
+        <div class="mb-12 animate-slide-up">
+            <div class="flex items-center space-x-3 mb-4">
+                <a href="{% url 'carga_datos' %}" class="px-4 py-1.5 bg-gray-100 text-gray-600 text-[10px] font-bold uppercase tracking-[0.2em] rounded-full hover:bg-gray-200 transition-colors">
+                    &larr; Volver
+                </a>
+                <span class="px-4 py-1.5 bg-emerald-50 text-inm-verde-100 text-[10px] font-bold uppercase tracking-[0.2em] rounded-full border border-emerald-100/50">Vehículos</span>
+            </div>
+            <div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
+                <div>
+                    <h1 class="text-5xl font-black text-gray-900 tracking-tight mb-4">Vehículos OR<span class="text-inm-verde-100">.</span></h1>
+                    <p class="text-lg text-gray-500 max-w-2xl font-medium font-sans">Administración de unidades vehiculares, asignación estatal, combustible y evidencia fotográfica.</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-3">
+                    <button onclick="resetVehiculoForm(); openVehiculoModal();" class="px-8 py-4 bg-stone-800 text-white rounded-2xl font-bold shadow-xl shadow-stone-900/20 hover:bg-stone-900 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center">
+                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
+                        Registrar Vehículo
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notificaciones de Django -->
+        {% if messages %}
+        <div class="mb-10 w-full animate-slide-up">
+            {% for message in messages %}
+            <div class="p-4 rounded-2xl mb-3 flex items-center {% if message.tags == 'success' %}bg-emerald-50 text-emerald-800 border border-emerald-100{% else %}bg-rose-50 text-rose-800 border border-rose-100{% endif %} shadow-sm">
+                <div class="flex-shrink-0">
+                    {% if message.tags == 'success' %}
+                    <svg class="h-5 w-5 text-emerald-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
+                    {% else %}
+                    <svg class="h-5 w-5 text-rose-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" /></svg>
+                    {% endif %}
+                </div>
+                <div class="ml-3"><p class="text-sm font-bold">{{ message }}</p></div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Panel de Búsqueda y Tabla -->
+        <div class="bg-white border border-gray-100 rounded-[2.5rem] shadow-sm overflow-hidden mb-12 animate-slide-up" style="animation-delay: 0.1s;">
+            <div class="p-8 border-b border-gray-50">
+                <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
+                    <div>
+                        <h2 class="text-xl font-bold text-gray-900">Vehículos Registrados</h2>
+                        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Gestión interna de unidades vehiculares</p>
+                    </div>
+                    <div class="flex items-center space-x-2 px-4 py-3 bg-gray-50 rounded-xl">
+                        <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                        <span class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{{ total_matched }} Unidades Coincidentes</span>
+                    </div>
+                </div>
+
+                <!-- Formulario de Filtros Servidor -->
+                <form method="GET" action="{% url 'vehiculos_list' %}" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end bg-gray-50/50 p-6 rounded-3xl border border-gray-100">
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Placa</label>
+                        <div class="relative">
+                            <input type="text" name="placa" value="{{ placa_query }}" placeholder="Buscar por placa..." class="w-full pl-4 pr-10 py-3 bg-white border border-gray-200 rounded-xl outline-none text-xs font-bold text-gray-700 placeholder-gray-400 focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all">
+                            <span class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-400">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Marca / Modelo</label>
+                        <div class="relative">
+                            <input type="text" name="marca" value="{{ marca_query }}" placeholder="Buscar marca..." class="w-full pl-4 pr-10 py-3 bg-white border border-gray-200 rounded-xl outline-none text-xs font-bold text-gray-700 placeholder-gray-400 focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all">
+                            <span class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-400">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10M13 16h6a1 1 0 001-1v-4a1 1 0 00-.3-.7l-2.7-2.7a1 1 0 00-.7-.3H13v9z"></path></svg>
+                            </span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Estado (OR)</label>
+                        <select name="estado_id" class="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none text-xs font-bold text-gray-700 focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all appearance-none cursor-pointer">
+                            {% if estados_list_all|length > 1 %}
+                                <option value="">Todos los Estados</option>
+                            {% endif %}
+                            {% for est in estados_list_all %}
+                                <option value="{{ est.id }}" {% if estado_id_query == est.id|slugify %}selected{% endif %}>{{ est.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="flex gap-2">
+                        <button type="submit" class="flex-1 py-3 px-6 bg-inm-verde-100 hover:bg-inm-verde-200 text-white rounded-xl font-bold text-xs shadow-md transition-all">
+                            Buscar
+                        </button>
+                        <a href="{% url 'vehiculos_list' %}" class="py-3 px-6 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-bold text-xs text-center transition-all">
+                            Limpiar
+                        </a>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Tabla de Resultados -->
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-gray-50 border-b border-gray-100">
+                            <th class="p-6 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Vehículo</th>
+                            <th class="p-6 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Placa / Motor</th>
+                            <th class="p-6 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Año</th>
+                            <th class="p-6 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Estado (OR)</th>
+                            <th class="p-6 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Situación</th>
+                            <th class="p-6 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Inmueble Asignado</th>
+                            <th class="p-6 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Asignación / Monto</th>
+                            <th class="p-6 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Fotos</th>
+                            <th class="p-6 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-50">
+                        {% for veh in vehiculos_list %}
+                        <tr class="hover:bg-gray-50/50 transition-colors">
+                            <td class="p-6">
+                                <div class="font-bold text-gray-800 text-sm">{{ veh.marca }}</div>
+                                <div class="text-xs text-gray-500 font-medium mt-0.5">{{ veh.modelo }}</div>
+                                <span class="inline-block mt-2 px-2.5 py-1 bg-emerald-50 border border-emerald-100/50 text-inm-verde-100 rounded-lg text-[9px] font-bold uppercase tracking-wider">
+                                    {{ veh.tipoVeh.tipo_veh|default:"S/T" }}
+                                </span>
+                            </td>
+                            <td class="p-6 font-mono text-xs font-bold text-gray-700">
+                                <div>{{ veh.placa }}</div>
+                                <div class="text-[10px] text-gray-400 font-medium mt-1">Motor: {{ veh.no_motor }}</div>
+                            </td>
+                            <td class="p-6 font-medium text-xs text-gray-500">
+                                {{ veh.anio|date:"Y"|default:"N/A" }}
+                            </td>
+                            <td class="p-6">
+                                <span class="px-3 py-1.5 bg-stone-100 text-stone-700 rounded-xl text-xs font-bold uppercase tracking-wider">
+                                    {{ veh.estado.nombre }}
+                                </span>
+                            </td>
+                            <td class="p-6">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {% if veh.situacion.situacion == 'ACTIVO' or veh.situacion.situacion == 'OPERATIVO' %}bg-green-100 text-green-800{% elif veh.situacion.situacion == 'TALLER' or veh.situacion.situacion == 'MANTENIMIENTO' %}bg-amber-100 text-amber-800{% else %}bg-gray-100 text-gray-800{% endif %}">
+                                    {{ veh.situacion.situacion|default:"Sin Registrar" }}
+                                </span>
+                            </td>
+                            <td class="p-6">
+                                <div class="font-bold text-gray-800 text-xs">{{ veh.inmueble.nombre_inmueble|default:"Sin Asignar" }}</div>
+                                <div class="text-[10px] text-gray-400 font-medium mt-0.5">{{ veh.inmueble.tipo_oficina.nombre|default:"" }}</div>
+                            </td>
+                            <td class="p-6">
+                                <div class="font-bold text-gray-800 text-xs">{{ veh.asignacion.tipo }}</div>
+                                <div class="text-[10px] text-emerald-600 font-bold mt-1">${{ veh.monto|floatformat:2 }}</div>
+                            </td>
+                            <td class="p-6">
+                                <div class="flex items-center space-x-1">
+                                    {% if veh.fotografias.frente %}
+                                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-500" title="Foto Frente disponible"></span>
+                                    {% endif %}
+                                    {% if veh.fotografias.lateral %}
+                                        <span class="w-2.5 h-2.5 rounded-full bg-blue-500" title="Foto Lateral disponible"></span>
+                                    {% endif %}
+                                    {% if veh.fotografias.trasera %}
+                                        <span class="w-2.5 h-2.5 rounded-full bg-purple-500" title="Foto Trasera disponible"></span>
+                                    {% endif %}
+                                    {% if not veh.fotografias.frente and not veh.fotografias.lateral and not veh.fotografias.trasera %}
+                                        <span class="text-xs text-gray-400 font-medium">Sin Evidencia</span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td class="p-6">
+                                <div class="flex items-center justify-center space-x-2">
+                                    <button onclick="openHistorialModal({{ veh.id }})" class="p-2.5 bg-emerald-50 text-inm-verde-100 rounded-xl hover:bg-emerald-100 transition-colors shadow-sm" title="Bitácora e Historial">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    </button>
+                                    <button onclick="editVehiculo({{ veh.id }})" class="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors shadow-sm" title="Editar">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                                    </button>
+                                    <button onclick="confirmDelete({{ veh.id }}, '{{ veh.placa }}')" class="p-2.5 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-100 transition-colors shadow-sm" title="Eliminar">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="p-12 text-center text-gray-400 font-medium font-sans">
+                                <svg class="w-12 h-12 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                No se encontraron vehículos que coincidan con la búsqueda.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Paginación -->
+            {% if vehiculos_list.has_other_pages %}
+            <div class="p-8 border-t border-gray-50 flex items-center justify-between">
+                <span class="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                    Página {{ vehiculos_list.number }} de {{ vehiculos_list.paginator.num_pages }}
+                </span>
+                <div class="flex items-center space-x-2">
+                    {% if vehiculos_list.has_previous %}
+                        <a href="?page={{ vehiculos_list.previous_page_number }}&placa={{ placa_query }}&marca={{ marca_query }}&estado_id={{ estado_id_query }}" class="px-4 py-2 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 transition-all">&larr; Anterior</a>
+                    {% endif %}
+                    {% if vehiculos_list.has_next %}
+                        <a href="?page={{ vehiculos_list.next_page_number }}&placa={{ placa_query }}&marca={{ marca_query }}&estado_id={{ estado_id_query }}" class="px-4 py-2 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 transition-all">Siguiente &rarr;</a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</main>
+
+<!-- Modal Registro / Edición -->
+<div id="vehiculoModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-md transition-opacity" onclick="closeVehiculoModal()"></div>
+    
+    <div class="relative bg-white rounded-[2.5rem] shadow-2xl w-full max-w-4xl overflow-hidden border border-gray-100 animate-slide-up max-h-[90vh] flex flex-col">
+        <div class="p-4 border-b border-gray-50 flex justify-between items-start">
+            <div>
+                <span id="vehiculo-modal-subtitle" class="text-[10px] font-bold uppercase tracking-widest text-inm-verde-100">Registro</span>
+                <h2 id="vehiculo-modal-title" class="text-3xl font-black text-gray-900 mt-1">Registrar Vehículo</h2>
+            </div>
+            <button onclick="closeVehiculoModal()" class="text-gray-400 hover:text-gray-600 transition-colors bg-gray-50 p-2.5 rounded-2xl hover:bg-gray-100">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+
+        <div class="overflow-y-auto p-8 flex-1">
+            <form id="vehiculoForm" method="POST" action="{% url 'guardar_vehiculo' %}" enctype="multipart/form-data" class="space-y-6">
+                {% csrf_token %}
+                <input type="hidden" name="vehiculo_id" id="vehiculo_id">
+                <input type="hidden" name="fotografias_id" id="fotografias_id">
+
+                <!-- 1. Datos del Vehículo -->
+                <div class="bg-gray-50/50 p-6 rounded-3xl border border-gray-100 space-y-4">
+                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-2">Información de la Unidad</h3>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 ml-1">Marca *</label>
+                            <input type="text" name="marca" required class="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none text-xs font-bold text-gray-700 focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 ml-1">Modelo *</label>
+                            <input type="text" name="modelo" required class="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none text-xs font-bold text-gray-700 focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 ml-1">Año</label>
+                            <input type="number" min="1900" max="2100" name="anio" placeholder="Ej: 2024" class="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none text-xs font-bold text-gray-700 focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 ml-1">Placa *</label>
+                            <input type="text" name="placa" required class="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none text-xs font-bold text-gray-700 focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 ml-1">No. Motor *</label>
+                            <input type="text" name="no_motor" required class="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none text-xs font-bold text-gray-700 focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Dispersion de Gasolina -->
+                <div class="bg-gray-50/50 p-6 rounded-3xl border border-gray-100 space-y-4">
+                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-2">Dispersion de Gasolina</h3>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 ml-1">Tarjeta Asignada</label>
+                            <input type="text" name="tarjeta_asig" class="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none text-xs font-bold text-gray-700 focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 ml-1">Fecha Disp. Combustible</label>
+                            <input type="date" name="fecha_disp_comb" class="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none text-xs font-bold text-gray-700 focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 ml-1">Monto ($) *</label>
+                            <input type="text" name="monto" required placeholder="0.00" class="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none text-xs font-bold text-gray-700 focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Asignación y Tipo -->
+                <div class="bg-gray-50/50 p-6 rounded-3xl border border-gray-100 space-y-4">
+                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-2">Asignación y Logística</h3>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 ml-1">Tipo de Vehículo</label>
+                            <select name="tipoVeh_id" class="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none text-xs font-bold text-gray-700 focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all appearance-none cursor-pointer">
+                                <option value="">-- Seleccionar --</option>
+                                {% for tipo in tipo_veh_list %}
+                                    <option value="{{ tipo.id }}">{{ tipo.tipo_veh }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 ml-1">Tipo de Asignación *</label>
+                            <select name="asignacion_id" required class="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none text-xs font-bold text-gray-700 focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all appearance-none cursor-pointer">
+                                <option value="" disabled selected>-- Seleccionar --</option>
+                                {% for asig in asignacion_list %}
+                                    <option value="{{ asig.id }}">{{ asig.tipo }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 ml-1">Situación</label>
+                            <select name="situacion_id" class="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none text-xs font-bold text-gray-700 focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all appearance-none cursor-pointer">
+                                <option value="">-- Seleccionar --</option>
+                                {% for sit in situacion_list %}
+                                    <option value="{{ sit.id }}">{{ sit.situacion }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 ml-1">Oficina de Representación</label>
+                            <select name="estado_id" required onchange="filterInmuebleByEstado()" class="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none text-xs font-bold text-gray-700 focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all appearance-none cursor-pointer">
+                                {% if estados_list|length > 1 %}
+                                    <option value="" disabled selected>-- Seleccionar --</option>
+                                {% endif %}
+                                {% for est in estados_list %}
+                                    <option value="{{ est.id }}">{{ est.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 ml-1">Inmueble Destino</label>
+                            <select name="inmueble_id" class="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none text-xs font-bold text-gray-700 focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all appearance-none cursor-pointer">
+                                <option value="">-- Sin Asignar --</option>
+                                {% for inm in inmuebles_list %}
+                                    <option value="{{ inm.id }}" data-estado="{{ inm.estado_id }}">{{ inm.nombre_inmueble }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                    </div>
+                </div>
+
+                <!-- 3. Fotografías de Evidencia -->
+                <div class="bg-gray-50/50 p-6 rounded-3xl border border-gray-100 space-y-4">
+                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-2">Evidencia Fotográfica</h3>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <!-- Frente -->
+                        <div class="space-y-2">
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest ml-1">Vista Frente</label>
+                            <input type="file" name="foto_frente" accept="image/*" class="w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-gray-200 file:text-gray-700 hover:file:bg-gray-300">
+                            <img id="prev_frente" src="" class="hidden w-full h-32 object-cover rounded-xl mt-2 border border-gray-200">
+                        </div>
+                        <!-- Lateral -->
+                        <div class="space-y-2">
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest ml-1">Vista Lateral</label>
+                            <input type="file" name="foto_lateral" accept="image/*" class="w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-gray-200 file:text-gray-700 hover:file:bg-gray-300">
+                            <img id="prev_lateral" src="" class="hidden w-full h-32 object-cover rounded-xl mt-2 border border-gray-200">
+                        </div>
+                        <!-- Trasera -->
+                        <div class="space-y-2">
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest ml-1">Vista Trasera</label>
+                            <input type="file" name="foto_trasera" accept="image/*" class="w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-gray-200 file:text-gray-700 hover:file:bg-gray-300">
+                            <img id="prev_trasera" src="" class="hidden w-full h-32 object-cover rounded-xl mt-2 border border-gray-200">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. Kilometraje Inicial (Obligatorio para Registro Nuevo) -->
+                <div id="seccion-kilometraje-inicial" class="bg-gray-50/50 p-6 rounded-3xl border border-gray-100 space-y-4">
+                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-2">Kilometraje Inicial (Obligatorio)</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 ml-1">Odómetro Inicial *</label>
+                            <input type="number" step="0.01" name="init_odometro" id="init_odometro_input" required placeholder="0.00" class="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none text-xs font-bold text-gray-700 focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 ml-1">Tipo de Unidad *</label>
+                            <select name="init_tipo_unidad" class="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none text-xs font-bold text-gray-700 focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all appearance-none cursor-pointer">
+                                <option value="KM">Kilómetro (KM)</option>
+                                <option value="MI">Milla (MI)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 ml-1">Evidencia Fotográfica</label>
+                            <input type="file" name="init_evidencia" accept="image/*" class="w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-gray-200 file:text-gray-700 hover:file:bg-gray-300">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 5. Registros Iniciales Opcionales (Colapsados) -->
+                <div id="seccion-iniciales-opcionales" class="bg-gray-50/50 p-6 rounded-3xl border border-gray-100 space-y-4">
+                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-2">Información Inicial Opcional</h3>
+                    
+                    <div class="space-y-4">
+                        <!-- Préstamo Inicial -->
+                        <div class="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
+                            <button type="button" onclick="toggleInitCollapse('init-collapse-prestado', 'icon-collapse-prestado')" class="w-full p-4 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition-colors">
+                                <span class="text-xs font-bold text-gray-700 uppercase tracking-wider">Agregar Préstamo Inicial</span>
+                                <span id="icon-collapse-prestado" class="w-6 h-6 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded-full font-bold text-gray-600 text-sm transition-all">+</span>
+                            </button>
+                            <div id="init-collapse-prestado" class="hidden p-6 border-t border-gray-50 grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label class="block text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Estado Destino</label>
+                                    <select name="init_prestado_estado_id" class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg outline-none text-xs text-gray-750 font-bold">
+                                        <option value="">-- Seleccionar --</option>
+                                        {% for est in estados_list %}
+                                            <option value="{{ est.id }}">{{ est.nombre }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Inmueble Destino</label>
+                                    <select name="init_prestado_inmueble_id" class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg outline-none text-xs text-gray-750 font-bold">
+                                        <option value="">-- Sin Especificar --</option>
+                                        {% for inm in inmuebles_list %}
+                                            <option value="{{ inm.id }}" data-estado="{{ inm.estado_id }}">{{ inm.nombre_inmueble }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Fecha Préstamo</label>
+                                    <input type="date" name="init_prestado_fecha" class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg outline-none text-xs text-gray-750 font-bold">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Siniestro Inicial -->
+                        <div class="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
+                            <button type="button" onclick="toggleInitCollapse('init-collapse-siniestro', 'icon-collapse-siniestro')" class="w-full p-4 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition-colors">
+                                <span class="text-xs font-bold text-gray-700 uppercase tracking-wider">Agregar Siniestro Inicial</span>
+                                <span id="icon-collapse-siniestro" class="w-6 h-6 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded-full font-bold text-gray-600 text-sm transition-all">+</span>
+                            </button>
+                            <div id="init-collapse-siniestro" class="hidden p-6 border-t border-gray-50 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Fecha Siniestro</label>
+                                    <input type="date" name="init_siniestro_fecha" class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg outline-none text-xs text-gray-750 font-bold">
+                                </div>
+                                <div>
+                                    <label class="block text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Folio</label>
+                                    <input type="text" name="init_siniestro_folio" placeholder="Folio" class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg outline-none text-xs text-gray-750 font-bold">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Capufe Inicial -->
+                        <div class="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
+                            <button type="button" onclick="toggleInitCollapse('init-collapse-capufe', 'icon-collapse-capufe')" class="w-full p-4 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition-colors">
+                                <span class="text-xs font-bold text-gray-700 uppercase tracking-wider">Agregar Capufe Inicial</span>
+                                <span id="icon-collapse-capufe" class="w-6 h-6 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded-full font-bold text-gray-600 text-sm transition-all">+</span>
+                            </button>
+                            <div id="init-collapse-capufe" class="hidden p-6 border-t border-gray-50 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Inicio Vigencia</label>
+                                    <input type="date" name="init_capufe_fecha_inicio" class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg outline-none text-xs text-gray-750 font-bold">
+                                </div>
+                                <div>
+                                    <label class="block text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Término Vigencia</label>
+                                    <input type="date" name="init_capufe_fecha_termino" class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg outline-none text-xs text-gray-750 font-bold">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Combustible Extra Inicial -->
+                        <div class="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
+                            <button type="button" onclick="toggleInitCollapse('init-collapse-combustible', 'icon-collapse-combustible')" class="w-full p-4 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition-colors">
+                                <span class="text-xs font-bold text-gray-700 uppercase tracking-wider">Agregar Combustible Extra Inicial</span>
+                                <span id="icon-collapse-combustible" class="w-6 h-6 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded-full font-bold text-gray-600 text-sm transition-all">+</span>
+                            </button>
+                            <div id="init-collapse-combustible" class="hidden p-6 border-t border-gray-50 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Monto ($)</label>
+                                    <input type="text" name="init_combustible_monto" placeholder="0.00" class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg outline-none text-xs text-gray-750 font-bold">
+                                </div>
+                                <div>
+                                    <label class="block text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Fecha Registro</label>
+                                    <input type="date" name="init_combustible_fecha" class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg outline-none text-xs text-gray-750 font-bold">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-end space-x-3 pt-6 border-t border-gray-50">
+                    <button type="button" onclick="closeVehiculoModal()" class="px-6 py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl font-bold text-xs transition-all">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="px-8 py-3.5 bg-inm-verde-100 hover:bg-inm-verde-200 text-white rounded-xl font-bold text-xs shadow-md transition-all">
+                        Guardar Registro
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Historial y Bitácora -->
+<div id="historialModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-md transition-opacity" onclick="closeHistorialModal()"></div>
+    
+    <div class="relative bg-white rounded-[2.5rem] shadow-2xl w-full max-w-5xl overflow-hidden border border-gray-100 animate-slide-up max-h-[90vh] flex flex-col">
+        <div class="p-8 border-b border-gray-50 flex justify-between items-start">
+            <div>
+                <span class="text-[10px] font-bold uppercase tracking-widest text-inm-verde-100">Bitácora e Historial</span>
+                <h2 id="historial-modal-title" class="text-3xl font-black text-gray-900 mt-1">Historial del Vehículo</h2>
+                <p id="historial-modal-subtitle" class="text-xs text-gray-500 font-sans mt-0.5"></p>
+            </div>
+            <button onclick="closeHistorialModal()" class="text-gray-400 hover:text-gray-600 transition-colors bg-gray-50 p-2.5 rounded-2xl hover:bg-gray-100">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+
+        <!-- Pestañas (Tabs) -->
+        <div class="flex border-b border-gray-100 bg-gray-50/50 px-8">
+            <button onclick="switchHistorialTab('tab-kilometraje')" id="btn-tab-kilometraje" class="tab-btn py-4 px-6 text-xs font-bold border-b-2 border-transparent text-gray-500 hover:text-gray-800 transition-all">
+                Kilometraje
+            </button>
+            <button onclick="switchHistorialTab('tab-prestados')" id="btn-tab-prestados" class="tab-btn py-4 px-6 text-xs font-bold border-b-2 border-transparent text-gray-500 hover:text-gray-800 transition-all">
+                Préstamos
+            </button>
+            <button onclick="switchHistorialTab('tab-siniestros')" id="btn-tab-siniestros" class="tab-btn py-4 px-6 text-xs font-bold border-b-2 border-transparent text-gray-500 hover:text-gray-800 transition-all">
+                Siniestros
+            </button>
+            <button onclick="switchHistorialTab('tab-capufe')" id="btn-tab-capufe" class="tab-btn py-4 px-6 text-xs font-bold border-b-2 border-transparent text-gray-500 hover:text-gray-800 transition-all">
+                Capufe
+            </button>
+            <button onclick="switchHistorialTab('tab-combustible')" id="btn-tab-combustible" class="tab-btn py-4 px-6 text-xs font-bold border-b-2 border-transparent text-gray-500 hover:text-gray-800 transition-all">
+                Combustible Extra
+            </button>
+        </div>
+
+        <div class="overflow-y-auto p-8 flex-1">
+            <input type="hidden" id="historial_vehiculo_id">
+
+            <!-- 1. Tab Kilometraje -->
+            <div id="tab-kilometraje" class="tab-content hidden space-y-6">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Formulario de Registro (Izquierda) -->
+                    <div class="bg-gray-50/50 p-6 rounded-3xl border border-gray-100 h-fit space-y-4">
+                        <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-2">Registrar Lectura</h4>
+                        <form id="formKilometraje" onsubmit="submitSubModelForm(event, '/mapa/guardar-kilometraje', 'formKilometraje')" class="space-y-4">
+                            {% csrf_token %}
+                            <input type="hidden" name="vehiculo_id" class="sub_model_veh_id">
+                            <div>
+                                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Fecha</label>
+                                <input type="date" name="fecha" required class="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl outline-none text-xs font-bold text-gray-700">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Tipo Unidad</label>
+                                <select name="tipo" class="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl outline-none text-xs font-bold text-gray-700">
+                                    <option value="KM">Kilómetro (KM)</option>
+                                    <option value="MI">Milla (MI)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Odómetro</label>
+                                <input type="number" step="0.01" name="odometro" required placeholder="0.00" class="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl outline-none text-xs font-bold text-gray-700">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Evidencia (Foto)</label>
+                                <input type="file" name="evidencia" accept="image/*" class="w-full text-[10px] text-gray-500 file:mr-2 file:py-1 file:px-3 file:rounded-xl file:border-0 file:text-[10px] file:font-bold file:bg-gray-200 file:text-gray-700 hover:file:bg-gray-300">
+                            </div>
+                            <button type="submit" class="w-full py-2.5 bg-inm-verde-100 hover:bg-inm-verde-200 text-white rounded-xl font-bold text-xs transition-all shadow-md">
+                                Registrar
+                            </button>
+                        </form>
+                    </div>
+                    <!-- Listado (Derecha) -->
+                    <div class="lg:col-span-2 space-y-4">
+                        <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Historial Registrado</h4>
+                        <div class="overflow-x-auto border border-gray-100 rounded-2xl">
+                            <table class="w-full text-left text-xs border-collapse">
+                                <thead>
+                                    <tr class="bg-gray-50 text-[10px] text-gray-400 uppercase tracking-wider border-b border-gray-100">
+                                        <th class="p-4">Fecha</th>
+                                        <th class="p-4">Unidad</th>
+                                        <th class="p-4">Lectura</th>
+                                        <th class="p-4">Evidencia</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="list-kilometraje" class="divide-y divide-gray-50 text-gray-700 font-medium"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. Tab Préstamos -->
+            <div id="tab-prestados" class="tab-content hidden space-y-6">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Formulario de Registro (Izquierda) -->
+                    <div class="bg-gray-50/50 p-6 rounded-3xl border border-gray-100 h-fit space-y-4">
+                        <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-2">Registrar Préstamo</h4>
+                        <form id="formPrestado" onsubmit="submitSubModelForm(event, '/mapa/guardar-prestado', 'formPrestado')" class="space-y-4">
+                            {% csrf_token %}
+                            <input type="hidden" name="vehiculo_id" class="sub_model_veh_id">
+                            <div>
+                                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Fecha Préstamo</label>
+                                <input type="date" name="fecha_prestamo" required class="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl outline-none text-xs font-bold text-gray-700">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Estado Destino</label>
+                                <select name="estado_id" required class="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl outline-none text-xs font-bold text-gray-700">
+                                    <option value="" disabled selected>-- Seleccionar --</option>
+                                    {% for est in estados_list %}
+                                        <option value="{{ est.id }}">{{ est.nombre }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Inmueble Destino</label>
+                                <select name="inmueble_id" class="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl outline-none text-xs font-bold text-gray-700">
+                                    <option value="">-- Sin Especificar --</option>
+                                    {% for inm in inmuebles_list %}
+                                        <option value="{{ inm.id }}" data-estado="{{ inm.estado_id }}">{{ inm.nombre_inmueble }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <button type="submit" class="w-full py-2.5 bg-inm-verde-100 hover:bg-inm-verde-200 text-white rounded-xl font-bold text-xs transition-all shadow-md">
+                                Registrar Préstamo
+                            </button>
+                        </form>
+                    </div>
+                    <!-- Listado (Derecha) -->
+                    <div class="lg:col-span-2 space-y-4">
+                        <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Historial de Préstamos</h4>
+                        <div class="overflow-x-auto border border-gray-100 rounded-2xl">
+                            <table class="w-full text-left text-xs border-collapse">
+                                <thead>
+                                    <tr class="bg-gray-50 text-[10px] text-gray-400 uppercase tracking-wider border-b border-gray-100">
+                                        <th class="p-4">Fecha</th>
+                                        <th class="p-4">Estado Destino</th>
+                                        <th class="p-4">Inmueble</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="list-prestados" class="divide-y divide-gray-50 text-gray-700 font-medium"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. Tab Siniestros -->
+            <div id="tab-siniestros" class="tab-content hidden space-y-6">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Formulario de Registro (Izquierda) -->
+                    <div class="bg-gray-50/50 p-6 rounded-3xl border border-gray-100 h-fit space-y-4">
+                        <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-2">Registrar Siniestro</h4>
+                        <form id="formSiniestro" onsubmit="submitSubModelForm(event, '/mapa/guardar-siniestro', 'formSiniestro')" class="space-y-4">
+                            {% csrf_token %}
+                            <input type="hidden" name="vehiculo_id" class="sub_model_veh_id">
+                            <div>
+                                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Fecha</label>
+                                <input type="date" name="fecha" required class="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl outline-none text-xs font-bold text-gray-700">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Folio del Siniestro</label>
+                                <input type="text" name="folio" placeholder="Ej: SIN-12345" class="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl outline-none text-xs font-bold text-gray-700">
+                            </div>
+                            <button type="submit" class="w-full py-2.5 bg-inm-verde-100 hover:bg-inm-verde-200 text-white rounded-xl font-bold text-xs transition-all shadow-md">
+                                Registrar Siniestro
+                            </button>
+                        </form>
+                    </div>
+                    <!-- Listado (Derecha) -->
+                    <div class="lg:col-span-2 space-y-4">
+                        <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Historial de Siniestros</h4>
+                        <div class="overflow-x-auto border border-gray-100 rounded-2xl">
+                            <table class="w-full text-left text-xs border-collapse">
+                                <thead>
+                                    <tr class="bg-gray-50 text-[10px] text-gray-400 uppercase tracking-wider border-b border-gray-100">
+                                        <th class="p-4">Fecha</th>
+                                        <th class="p-4">Folio</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="list-siniestros" class="divide-y divide-gray-50 text-gray-700 font-medium"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. Tab Capufe -->
+            <div id="tab-capufe" class="tab-content hidden space-y-6">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Formulario de Registro (Izquierda) -->
+                    <div class="bg-gray-50/50 p-6 rounded-3xl border border-gray-100 h-fit space-y-4">
+                        <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-2">Registrar Período Capufe</h4>
+                        <form id="formCapufe" onsubmit="submitSubModelForm(event, '/mapa/guardar-capufe', 'formCapufe')" class="space-y-4">
+                            {% csrf_token %}
+                            <input type="hidden" name="vehiculo_id" class="sub_model_veh_id">
+                            <div>
+                                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Fecha Inicio</label>
+                                <input type="date" name="fecha_inicio" required class="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl outline-none text-xs font-bold text-gray-700">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Fecha Término</label>
+                                <input type="date" name="fecha_termino" required class="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl outline-none text-xs font-bold text-gray-700">
+                            </div>
+                            <button type="submit" class="w-full py-2.5 bg-inm-verde-100 hover:bg-inm-verde-200 text-white rounded-xl font-bold text-xs transition-all shadow-md">
+                                Registrar Período
+                            </button>
+                        </form>
+                    </div>
+                    <!-- Listado (Derecha) -->
+                    <div class="lg:col-span-2 space-y-4">
+                        <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Períodos Capufe</h4>
+                        <div class="overflow-x-auto border border-gray-100 rounded-2xl">
+                            <table class="w-full text-left text-xs border-collapse">
+                                <thead>
+                                    <tr class="bg-gray-50 text-[10px] text-gray-400 uppercase tracking-wider border-b border-gray-100">
+                                        <th class="p-4">Fecha Inicio</th>
+                                        <th class="p-4">Fecha Término</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="list-capufe" class="divide-y divide-gray-50 text-gray-700 font-medium"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 5. Tab Combustible Extra -->
+            <div id="tab-combustible" class="tab-content hidden space-y-6">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Formulario de Registro (Izquierda) -->
+                    <div class="bg-gray-50/50 p-6 rounded-3xl border border-gray-100 h-fit space-y-4">
+                        <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-2">Registrar Combustible Extra</h4>
+                        <form id="formCombustible" onsubmit="submitSubModelForm(event, '/mapa/guardar-combustible', 'formCombustible')" class="space-y-4">
+                            {% csrf_token %}
+                            <input type="hidden" name="vehiculo_id" class="sub_model_veh_id">
+                            <div>
+                                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Fecha</label>
+                                <input type="date" name="fecha" required class="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl outline-none text-xs font-bold text-gray-700">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Monto ($)</label>
+                                <input type="text" name="monto" required placeholder="0.00" class="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl outline-none text-xs font-bold text-gray-700">
+                            </div>
+                            <button type="submit" class="w-full py-2.5 bg-inm-verde-100 hover:bg-inm-verde-200 text-white rounded-xl font-bold text-xs transition-all shadow-md">
+                                Registrar Monto
+                            </button>
+                        </form>
+                    </div>
+                    <!-- Listado (Derecha) -->
+                    <div class="lg:col-span-2 space-y-4">
+                        <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Combustibles Extra Registrados</h4>
+                        <div class="overflow-x-auto border border-gray-100 rounded-2xl">
+                            <table class="w-full text-left text-xs border-collapse">
+                                <thead>
+                                    <tr class="bg-gray-50 text-[10px] text-gray-400 uppercase tracking-wider border-b border-gray-100">
+                                        <th class="p-4">Fecha</th>
+                                        <th class="p-4">Monto</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="list-combustible" class="divide-y divide-gray-50 text-gray-700 font-medium"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function openHistorialModal(id) {
+        document.getElementById('historial_vehiculo_id').value = id;
+        
+        // Asignar el ID de vehículo a todos los sub-formularios
+        const inputs = document.querySelectorAll('.sub_model_veh_id');
+        inputs.forEach(input => input.value = id);
+        
+        // Cargar datos
+        loadHistorialData(id);
+        
+        // Pestaña inicial por defecto
+        switchHistorialTab('tab-kilometraje');
+        
+        const modal = document.getElementById('historialModal');
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeHistorialModal() {
+        const modal = document.getElementById('historialModal');
+        modal.classList.add('hidden');
+        document.body.style.overflow = 'auto';
+    }
+
+    function switchHistorialTab(tabId) {
+        // Ocultar todos los contenidos de pestaña
+        const contents = document.querySelectorAll('.tab-content');
+        contents.forEach(content => content.classList.add('hidden'));
+        
+        // Mostrar la activa
+        document.getElementById(tabId).classList.remove('hidden');
+        
+        // Deseleccionar todas las pestañas visualmente
+        const buttons = document.querySelectorAll('.tab-btn');
+        buttons.forEach(btn => {
+            btn.classList.remove('border-inm-verde-100', 'text-inm-verde-100');
+            btn.classList.add('border-transparent', 'text-gray-500');
+        });
+        
+        // Seleccionar activa visualmente
+        const activeBtn = document.getElementById('btn-' + tabId);
+        activeBtn.classList.remove('border-transparent', 'text-gray-500');
+        activeBtn.classList.add('border-inm-verde-100', 'text-inm-verde-100');
+    }
+
+    async function loadHistorialData(id) {
+        try {
+            const response = await fetch(`/mapa/api/get-vehiculo-historial/${id}`);
+            const result = await response.json();
+            
+            if (result.status === 'success') {
+                const data = result.data;
+                
+                // Set Header
+                document.getElementById('historial-modal-subtitle').innerText = `${data.vehiculo.marca} ${data.vehiculo.modelo} | Placa: ${data.vehiculo.placa}`;
+                
+                // 1. Kilometraje List
+                const listKm = document.getElementById('list-kilometraje');
+                listKm.innerHTML = '';
+                data.kilometraje.forEach(k => {
+                    const tr = document.createElement('tr');
+                    tr.className = 'border-b border-gray-50 hover:bg-gray-50/50';
+                    tr.innerHTML = `
+                        <td class="p-4">${k.fecha}</td>
+                        <td class="p-4">${k.tipo}</td>
+                        <td class="p-4 font-mono font-bold">${parseFloat(k.odometro).toLocaleString()}</td>
+                        <td class="p-4">
+                            ${k.evidencia_url ? `<a href="${k.evidencia_url}" target="_blank" class="px-2.5 py-1 bg-emerald-50 text-inm-verde-100 border border-emerald-100 rounded-lg text-[10px] font-bold">Ver Foto</a>` : '<span class="text-gray-400 font-medium text-[10px]">Sin evidencia</span>'}
+                        </td>
+                    `;
+                    listKm.appendChild(tr);
+                });
+                
+                // 2. Préstamos List
+                const listPr = document.getElementById('list-prestados');
+                listPr.innerHTML = '';
+                data.prestados.forEach(p => {
+                    const tr = document.createElement('tr');
+                    tr.className = 'border-b border-gray-50 hover:bg-gray-50/50';
+                    tr.innerHTML = `
+                        <td class="p-4">${p.fecha_prestamo}</td>
+                        <td class="p-4"><span class="px-2 py-1 bg-stone-100 rounded text-[10px] font-bold">${p.estado}</span></td>
+                        <td class="p-4">${p.inmueble}</td>
+                    `;
+                    listPr.appendChild(tr);
+                });
+                
+                // 3. Siniestros List
+                const listSi = document.getElementById('list-siniestros');
+                listSi.innerHTML = '';
+                data.siniestros.forEach(s => {
+                    const tr = document.createElement('tr');
+                    tr.className = 'border-b border-gray-50 hover:bg-gray-50/50';
+                    tr.innerHTML = `
+                        <td class="p-4">${s.fecha}</td>
+                        <td class="p-4 font-mono font-bold text-rose-600">${s.folio}</td>
+                    `;
+                    listSi.appendChild(tr);
+                });
+
+                // 4. Capufe List
+                const listCa = document.getElementById('list-capufe');
+                listCa.innerHTML = '';
+                data.capufes.forEach(c => {
+                    const tr = document.createElement('tr');
+                    tr.className = 'border-b border-gray-50 hover:bg-gray-50/50';
+                    tr.innerHTML = `
+                        <td class="p-4">${c.fecha_inicio}</td>
+                        <td class="p-4">${c.fecha_termino}</td>
+                    `;
+                    listCa.appendChild(tr);
+                });
+
+                // 5. Combustible List
+                const listCo = document.getElementById('list-combustible');
+                listCo.innerHTML = '';
+                data.combustibles.forEach(co => {
+                    const tr = document.createElement('tr');
+                    tr.className = 'border-b border-gray-50 hover:bg-gray-50/50';
+                    tr.innerHTML = `
+                        <td class="p-4">${co.fecha}</td>
+                        <td class="p-4 text-emerald-600 font-bold">$${parseFloat(co.monto).toLocaleString()}</td>
+                    `;
+                    listCo.appendChild(tr);
+                });
+            } else {
+                alert('Error al obtener datos históricos: ' + result.message);
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Error al comunicarse con el servidor.');
+        }
+    }
+
+    async function submitSubModelForm(event, url, formId) {
+        event.preventDefault();
+        const form = document.getElementById(formId);
+        const formData = new FormData(form);
+        const submitBtn = form.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                body: formData
+            });
+            const result = await response.json();
+            
+            if (result.status === 'success') {
+                form.reset();
+                const vId = document.getElementById('historial_vehiculo_id').value;
+                // Re-inicializar el ID de vehículo en el formulario limpio
+                form.querySelector('.sub_model_veh_id').value = vId;
+                // Recargar listados
+                loadHistorialData(vId);
+            } else {
+                alert('Error al registrar: ' + result.message);
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Error de conexión.');
+        } finally {
+            submitBtn.disabled = false;
+        }
+    }
+</script>
+{% endblock content %}

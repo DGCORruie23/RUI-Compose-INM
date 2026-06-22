@@ -573,3 +573,114 @@ class OrganigramaF(models.Model):
         verbose_name = "Organigrama"
         verbose_name_plural = "Organigramas"
         unique_together = ['estado']
+
+#---------------------------------------------------------------------
+# Vehiculos
+#---------------------------------------------------------------------
+
+class TipoVeh(models.Model):
+    tipo_veh = models.CharField(max_length=100)
+
+    def __str__(self):
+        return self.tipo_veh
+
+class TipoAsignacionVeh(models.Model):
+    tipo = models.CharField(max_length=20)
+
+    def __str__(self):
+        return self.tipo
+    
+class SituacionVeh(models.Model):
+    situacion = models.CharField(max_length=50)
+
+    def __str__(self):
+        return self.situacion
+
+class FotosVeh(models.Model):
+    frente = models.FileField(upload_to='fotosVeh', null=True, blank=True)
+    lateral = models.FileField(upload_to='fotosVeh', null=True, blank=True)
+    trasera = models.FileField(upload_to='fotosVeh', null=True, blank=True)
+
+    def __str__(self):
+        return str(self.id)
+
+class VehiculosOR(models.Model):
+    marca = models.CharField(max_length=200)
+    modelo = models.CharField(max_length=200)
+    anio = models.DateField(null=True, blank=True)
+    placa = models.CharField(max_length=20)
+    no_motor = models.CharField(max_length=20)
+    tarjeta_asig = models.CharField(max_length=30, null=True, blank=True)
+    fecha_disp_comb = models.DateField(null=True, blank=True)
+    monto = models.DecimalField(max_digits=10, decimal_places=2) 
+    tipoVeh = models.ForeignKey(TipoVeh, on_delete=models.CASCADE, null=True, blank=True)
+    asignacion = models.ForeignKey(TipoAsignacionVeh, on_delete=models.CASCADE, db_index=True)
+    estado = models.ForeignKey(Estado, on_delete=models.CASCADE, db_index=True)
+    inmueble = models.ForeignKey(Inmueble, on_delete=models.CASCADE, null=True, blank=True, db_index=True)
+    fotografias = models.ForeignKey(FotosVeh, on_delete=models.CASCADE, null=True, blank=True)
+    situacion = models.ForeignKey(SituacionVeh, on_delete=models.CASCADE, null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.marca} {self.modelo} ({self.placa})"
+
+class PrestadoDe(models.Model):
+    vehiculo = models.ForeignKey(VehiculosOR, on_delete=models.CASCADE, db_index=True)
+    estado = models.ForeignKey(Estado, on_delete=models.CASCADE, db_index=True)
+    inmueble = models.ForeignKey(Inmueble, on_delete=models.CASCADE, null=True, blank=True, db_index=True)
+    fecha_prestamo = models.DateField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.vehiculo} - Prestado a {self.estado}"
+
+class CatalogoMotivoBaja(models.Model):
+    nombre = models.CharField(max_length=100, unique=True)
+
+    def __str__(self):
+        return self.nombre
+
+class MotivoBaja(models.Model):
+    vehiculo = models.ForeignKey(VehiculosOR, on_delete=models.CASCADE, db_index=True)
+    motivo = models.ForeignKey(CatalogoMotivoBaja, on_delete=models.PROTECT)
+    comentario = models.CharField(max_length=200, blank=True, null=True)
+
+    def __str__(self):
+        return f"Baja de {self.vehiculo} ({self.motivo.nombre})"
+
+class Siniestros(models.Model):
+    vehiculo = models.ForeignKey(VehiculosOR, on_delete=models.CASCADE, db_index=True)
+    fecha = models.DateField(null=True, blank=True)
+    folio = models.CharField(max_length=200, blank=True, null=True)
+
+    def __str__(self):
+        return f"Siniestro de {self.vehiculo} - Folio {self.folio or 'S/F'}"
+
+class Kilometraje(models.Model):
+    TIPO_UNIDAD_CHOICES = (
+        ('KM', 'kilometro'),
+        ('MI', 'Milla'),
+    )
+    vehiculo = models.ForeignKey(VehiculosOR, on_delete=models.CASCADE, db_index=True)
+    fecha = models.DateField(null=True, blank=True)
+    tipo = models.CharField(max_length=20, choices=TIPO_UNIDAD_CHOICES)
+    odometro = models.DecimalField(max_digits=10, decimal_places=2) 
+    evidencia = models.FileField(upload_to='fotosVeh', null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.vehiculo} - {self.odometro} {self.tipo}"
+
+class Capufe(models.Model):
+    vehiculo = models.ForeignKey(VehiculosOR, on_delete=models.CASCADE, db_index=True)
+    fecha_inicio = models.DateField(null=True, blank=True)
+    fecha_termino = models.DateField(null=True, blank=True)
+
+    def __str__(self):
+        return f"Capufe {self.vehiculo} ({self.fecha_inicio} a {self.fecha_termino})"
+
+class CombustibleExt(models.Model):
+    vehiculo = models.ForeignKey(VehiculosOR, on_delete=models.CASCADE, db_index=True)
+    fecha = models.DateField(null=True, blank=True)
+    monto = models.DecimalField(max_digits=10, decimal_places=2) 
+
+    def __str__(self):
+        return f"Combustible Ext. {self.vehiculo} - ${self.monto}" 
+

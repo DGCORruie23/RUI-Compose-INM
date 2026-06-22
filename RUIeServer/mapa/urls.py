@@ -37,4 +37,16 @@ urlpatterns = [
     path('guardar-organigrama', views.guardar_organigrama, name="guardar_organigrama"),
     path('eliminar-organigrama/<int:org_id>', views.eliminar_organigrama, name="eliminar_organigrama"),
     path('api/get-organigrama/<int:estado_id>', views.api_get_organigrama, name="api_get_organigrama"),
+    
+    path('vehiculos', views.vehiculos_list, name="vehiculos_list"),
+    path('guardar-vehiculo', views.guardar_vehiculo, name="guardar_vehiculo"),
+    path('eliminar-vehiculo/<int:vehiculo_id>', views.eliminar_vehiculo, name="eliminar_vehiculo"),
+    path('api/get-vehiculo/<int:vehiculo_id>', views.api_get_vehiculo, name="api_get_vehiculo"),
+    
+    path('api/get-vehiculo-historial/<int:vehiculo_id>', views.api_get_vehiculo_historial, name="api_get_vehiculo_historial"),
+    path('guardar-kilometraje', views.guardar_kilometraje, name="guardar_kilometraje"),
+    path('guardar-prestado', views.guardar_prestado, name="guardar_prestado"),
+    path('guardar-siniestro', views.guardar_siniestro, name="guardar_siniestro"),
+    path('guardar-capufe', views.guardar_capufe, name="guardar_capufe"),
+    path('guardar-combustible', views.guardar_combustible, name="guardar_combustible"),
 ]
