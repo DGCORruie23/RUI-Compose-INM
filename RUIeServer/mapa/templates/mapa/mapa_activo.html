@@ -589,6 +589,15 @@
                 <span id="menu_subrep_local" class="text-sm font-extrabold text-[#7c3aed] pl-0.5">0</span>
             </div>
 
+            <!-- Card: Supervision -->
+            <div id="card_supervision" onclick="openInstruccionesModal()" class="bg-gray-100 border border-gray-200/60 px-2.5 py-2 rounded-xl flex flex-col items-center gap-1 cursor-pointer hover:bg-gray-200 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200" title="Ver Visitas de Supervision">
+                <div class="flex items-center gap-1.5">
+                    <img src="/static/mapa/icons/supervision.svg" class="w-4 h-4 object-contain flex-shrink-0" alt="Supervisiones">
+                    <span class="menu-label-text text-[9px] font-black text-gray-600 uppercase tracking-tight leading-tight">Supervisiones</span>
+                </div>
+                <span id="menu_supervision" class="text-sm font-extrabold text-[#7c3aed] pl-0.5">0</span>
+            </div>
+
         </div>
 
         <!-- Spacer push buttons to bottom -->
@@ -870,6 +879,24 @@
     _setCount('menu_subrep_fed', data.subrep_federal || 0);
     _setCount('menu_subrep_local', data.subrep_local || 0);
     _setCount('menu_rep_local', data.rep_local || 0);
+
+    // Calcular cantidad de supervisiones (visitas) dinámicamente
+    let supervisionCount = 0;
+    if (window.instruccionesRawData) {
+        if (isNational) {
+            for (const key in window.instruccionesRawData) {
+                supervisionCount += (window.instruccionesRawData[key] || []).length;
+            }
+        } else {
+            for (const key in window.instruccionesRawData) {
+                if (normalizar_nombre(key) === normalizedState) {
+                    supervisionCount = (window.instruccionesRawData[key] || []).length;
+                    break;
+                }
+            }
+        }
+    }
+    _setCount('menu_supervision', supervisionCount);
   };
 
   window.updateInformationPanel = function() {
@@ -2084,27 +2111,49 @@
       }, 100);
   };
 
-  // --- Modal de Instrucciones (Seguimiento de Acuerdos) ---
   window.openInstruccionesModal = function(stateName) {
       if (!window.instruccionesRawData) {
           alert("No hay datos de instrucciones cargados.");
           return;
       }
       
-      const edoKeyNormalized = normalizar_nombre(stateName);
-      let apiStateKey = null;
-      
-      for (const key in window.instruccionesRawData) {
-          if (normalizar_nombre(key) === edoKeyNormalized) {
-              apiStateKey = key;
-              break;
-          }
+      if (!stateName && window.selectedStateData) {
+          stateName = window.selectedStateData.name;
+      }
+      if (!stateName) {
+          stateName = "Nacional";
       }
       
-      const visits = apiStateKey ? window.instruccionesRawData[apiStateKey] : [];
+      const isNat = stateName === "Nacional" || stateName === "Total Nacional" || stateName === "NACIONAL" || stateName === LABEL_NACIONAL;
+      
+      let listToDisplay = [];
+      if (isNat) {
+          for (const key in window.instruccionesRawData) {
+              const stateVisits = window.instruccionesRawData[key] || [];
+              stateVisits.forEach(v => {
+                  listToDisplay.push({
+                      ...v,
+                      estadoOriginal: key
+                  });
+              });
+          }
+      } else {
+          const edoKeyNormalized = normalizar_nombre(stateName);
+          let apiStateKey = null;
+          
+          for (const key in window.instruccionesRawData) {
+              if (normalizar_nombre(key) === edoKeyNormalized) {
+                  apiStateKey = key;
+                  break;
+              }
+          }
+          
+          const visits = apiStateKey ? window.instruccionesRawData[apiStateKey] : [];
+          listToDisplay = visits.map(v => ({ ...v, estadoOriginal: stateName }));
+      }
       
       // Filter active visits: pendiente > 0
-      const activeVisits = visits.filter(v => v.pendiente > 0);
+      const activeVisits = listToDisplay.filter(v => v.pendiente > 0);
       
       // Compute average progress
       let avgProgress = 100;
@@ -2112,8 +2161,32 @@
           avgProgress = Math.round(activeVisits.reduce((sum, v) => sum + v.avance, 0) / activeVisits.length);
       }
       
-      document.getElementById('insStateName').innerText = stateName;
+      document.getElementById('insStateName').innerText = isNat ? "Total Nacional" : stateName;
       document.getElementById('insSubtitle').innerText = `Avance de Seguimiento: ${avgProgress}%`;
+      
+      const headerRow = document.getElementById('insTableHeaderRow');
+      if (headerRow) {
+          if (isNat) {
+              headerRow.innerHTML = `
+                  <th class="px-6 py-4 bg-gray-500 border border-gray-200"># Visitas</th>
+                  <th class="px-6 py-4 bg-stone-900 border border-gray-200">Estado</th>
+                  <th class="px-6 py-4 bg-stone-900 border border-gray-200">Fecha</th>
+                  <th class="px-6 py-4 bg-gray-500 border border-gray-200"># Acuerdos</th>
+                  <th class="px-6 py-4 bg-stone-900 border border-gray-200"># Atendidos</th>
+                  <th class="px-6 py-4 bg-gray-500 border border-gray-200"># Pendientes</th>
+                  <th class="px-6 py-4 bg-gray-500 border border-gray-200">% Avance</th>
+              `;
+          } else {
+              headerRow.innerHTML = `
+                  <th class="px-6 py-4 bg-gray-500 border border-gray-200"># Visitas</th>
+                  <th class="px-6 py-4 bg-stone-900 border border-gray-200">Fecha</th>
+                  <th class="px-6 py-4 bg-gray-500 border border-gray-200"># Acuerdos</th>
+                  <th class="px-6 py-4 bg-stone-900 border border-gray-200"># Atendidos</th>
+                  <th class="px-6 py-4 bg-gray-500 border border-gray-200"># Pendientes</th>
+                  <th class="px-6 py-4 bg-gray-500 border border-gray-200">% Avance</th>
+              `;
+          }
+      }
       
       const tableBody = document.getElementById('insTableBody');
       tableBody.innerHTML = '';
@@ -2121,8 +2194,8 @@
       if (activeVisits.length === 0) {
           tableBody.innerHTML = `
               <tr>
-                  <td colspan="6" class="px-6 py-8 text-sm text-gray-400 italic">
-                      No hay visitas activas con acuerdos pendientes en este estado.
+                  <td colspan="${isNat ? 7 : 6}" class="px-6 py-8 text-sm text-gray-400 italic">
+                      No hay visitas activas con acuerdos pendientes.
                   </td>
               </tr>
           `;
@@ -2131,14 +2204,26 @@
               const tr = document.createElement('tr');
               tr.className = 'hover:bg-gray-50 transition-colors';
               
-              tr.innerHTML = `
-                  <td class="px-6 py-4 border border-gray-200 font-bold">${index + 1}</td>
-                  <td class="px-6 py-4 border border-gray-200">${v.fecha || '-'}</td>
-                  <td class="px-6 py-4 border border-gray-200">${v.total || 0}</td>
-                  <td class="px-6 py-4 border border-gray-200">${v.atendido || 0}</td>
-                  <td class="px-6 py-4 border border-gray-200 bg-pink-100 text-red-600 font-extrabold text-base">${v.pendiente || 0}</td>
-                  <td class="px-6 py-4 border border-gray-200 font-bold">${v.avance || 0}%</td>
-              `;
+              if (isNat) {
+                  tr.innerHTML = `
+                      <td class="px-6 py-4 border border-gray-200 font-bold">${index + 1}</td>
+                      <td class="px-6 py-4 border border-gray-200 uppercase font-black text-[#10312B]">${v.estadoOriginal || '-'}</td>
+                      <td class="px-6 py-4 border border-gray-200">${v.fecha || '-'}</td>
+                      <td class="px-6 py-4 border border-gray-200">${v.total || 0}</td>
+                      <td class="px-6 py-4 border border-gray-200">${v.atendido || 0}</td>
+                      <td class="px-6 py-4 border border-gray-200 bg-pink-100 text-red-600 font-extrabold text-base">${v.pendiente || 0}</td>
+                      <td class="px-6 py-4 border border-gray-200 font-bold">${v.avance || 0}%</td>
+                  `;
+              } else {
+                  tr.innerHTML = `
+                      <td class="px-6 py-4 border border-gray-200 font-bold">${index + 1}</td>
+                      <td class="px-6 py-4 border border-gray-200">${v.fecha || '-'}</td>
+                      <td class="px-6 py-4 border border-gray-200">${v.total || 0}</td>
+                      <td class="px-6 py-4 border border-gray-200">${v.atendido || 0}</td>
+                      <td class="px-6 py-4 border border-gray-200 bg-pink-100 text-red-600 font-extrabold text-base">${v.pendiente || 0}</td>
+                      <td class="px-6 py-4 border border-gray-200 font-bold">${v.avance || 0}%</td>
+                  `;
+              }
               tableBody.appendChild(tr);
           });
       }
@@ -2149,6 +2234,7 @@
           document.body.style.overflow = 'hidden';
       }
   };
+
 
   window.closeInstruccionesModal = function() {
       const modal = document.getElementById('instruccionesModal');
@@ -3416,7 +3502,7 @@
                 <div class="overflow-hidden border border-gray-200 rounded-[1.5rem] shadow-sm bg-white">
                     <table class="w-full border-collapse text-left text-sm text-gray-500">
                         <thead>
-                            <tr class="text-xs uppercase tracking-wider font-extrabold text-white text-center">
+                            <tr id="insTableHeaderRow" class="text-xs uppercase tracking-wider font-extrabold text-white text-center">
                                 <th class="px-6 py-4 bg-gray-500 border border-gray-200"># Visitas</th>
                                 <th class="px-6 py-4 bg-stone-900 border border-gray-200">Fecha</th>
                                 <th class="px-6 py-4 bg-gray-500 border border-gray-200"># Acuerdos</th>
