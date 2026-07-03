@@ -21,6 +21,7 @@ import unicodedata
 import base64
 import openpyxl
 import requests
+import urllib3
 
 from django.contrib import messages
 from django.shortcuts import render, redirect
@@ -2519,7 +2520,15 @@ def mapa_interactivo(request):
     totals_cs = {}
     totals_dt = {}
     
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
     api_instrucciones = {}
+    try:
+        api_res = requests.get('https://172.16.16.167/api/mapa-datos/', verify=False, timeout=2.5)
+        if api_res.status_code == 200:
+            api_instrucciones = api_res.json()
+    except Exception as e:
+        print(f"Error al obtener instrucciones de la API: {str(e)}")
+    
     instrucciones_avance = {}
     instrucciones_totales_dict = {}
     instrucciones_color_rank = {}
