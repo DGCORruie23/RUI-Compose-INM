@@ -8,7 +8,10 @@ from .models import (
     CorreoTitular, TipoNombramiento, TipoProcendencia,
     Comodato, FiguraOcupacion, TipoInmueble, SituacionActual,
     TipoActividad, Inmueble, HistoricoComentarios, TipoOficina,
-    ProgramaIPC, PersonalINM, OrganigramaF, EstatusPersonal, TipoPlaza, TipoDependencia
+    ProgramaIPC, PersonalINM, OrganigramaF, EstatusPersonal, TipoPlaza, TipoDependencia,
+    TipoVeh, TipoAsignacionVeh, SituacionVeh, FotosVeh, VehiculosOR,
+    PrestadoDe, CatalogoMotivoBaja, MotivoBaja, Siniestros, Kilometraje,
+    Capufe, CombustibleExt
 )
 
 @admin.register(Estado)
@@ -233,6 +236,75 @@ class TipoPlazaAdmin(admin.ModelAdmin):
 class EstatusPersonalAdmin(admin.ModelAdmin):
     list_display = ('estatus',)
     search_fields = ('estatus',)
+
+
+# --- Vehículos ---
+
+@admin.register(TipoVeh)
+class TipoVehAdmin(admin.ModelAdmin):
+    list_display = ('tipo_veh',)
+    search_fields = ('tipo_veh',)
+
+@admin.register(TipoAsignacionVeh)
+class TipoAsignacionVehAdmin(admin.ModelAdmin):
+    list_display = ('tipo',)
+    search_fields = ('tipo',)
+
+@admin.register(SituacionVeh)
+class SituacionVehAdmin(admin.ModelAdmin):
+    list_display = ('situacion',)
+    search_fields = ('situacion',)
+
+@admin.register(FotosVeh)
+class FotosVehAdmin(admin.ModelAdmin):
+    list_display = ('id', 'frente', 'lateral', 'trasera')
+
+@admin.register(VehiculosOR)
+class VehiculosORAdmin(admin.ModelAdmin):
+    list_display = ('marca', 'modelo', 'placa', 'estado', 'inmueble', 'situacion', 'monto')
+    list_filter = ('estado', 'tipoVeh', 'asignacion', 'situacion')
+    search_fields = ('marca', 'modelo', 'placa', 'no_motor', 'tarjeta_asig')
+
+@admin.register(PrestadoDe)
+class PrestadoDeAdmin(admin.ModelAdmin):
+    list_display = ('vehiculo', 'estado', 'inmueble', 'fecha_prestamo')
+    list_filter = ('estado', 'fecha_prestamo')
+    search_fields = ('vehiculo__placa', 'vehiculo__marca', 'vehiculo__modelo')
+
+@admin.register(CatalogoMotivoBaja)
+class CatalogoMotivoBajaAdmin(admin.ModelAdmin):
+    list_display = ('nombre',)
+    search_fields = ('nombre',)
+
+@admin.register(MotivoBaja)
+class MotivoBajaAdmin(admin.ModelAdmin):
+    list_display = ('vehiculo', 'motivo', 'comentario')
+    list_filter = ('motivo',)
+    search_fields = ('vehiculo__placa', 'comentario')
+
+@admin.register(Siniestros)
+class SiniestrosAdmin(admin.ModelAdmin):
+    list_display = ('vehiculo', 'fecha', 'folio')
+    list_filter = ('fecha',)
+    search_fields = ('vehiculo__placa', 'folio')
+
+@admin.register(Kilometraje)
+class KilometrajeAdmin(admin.ModelAdmin):
+    list_display = ('vehiculo', 'fecha', 'odometro', 'tipo')
+    list_filter = ('fecha', 'tipo')
+    search_fields = ('vehiculo__placa',)
+
+@admin.register(Capufe)
+class CapufeAdmin(admin.ModelAdmin):
+    list_display = ('vehiculo', 'fecha_inicio', 'fecha_termino')
+    list_filter = ('fecha_inicio', 'fecha_termino')
+    search_fields = ('vehiculo__placa',)
+
+@admin.register(CombustibleExt)
+class CombustibleExtAdmin(admin.ModelAdmin):
+    list_display = ('vehiculo', 'fecha', 'monto')
+    list_filter = ('fecha',)
+    search_fields = ('vehiculo__placa',)
 
 
 
