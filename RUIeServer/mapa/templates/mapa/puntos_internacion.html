@@ -1,0 +1,306 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}Gestión de Puntos de Internación y Estaciones - RUIE{% endblock title %}
+
+{% block scripts %}
+<script>
+    function openPuntoModal() {
+        const modal = document.getElementById('puntoModal');
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    }
+
+    // Adaptado para cerrar el modal
+    function closePuntoModal() {
+        const modal = document.getElementById('puntoModal');
+        modal.classList.add('hidden');
+        document.body.style.overflow = 'auto';
+    }
+
+    function resetPuntoForm() {
+        const form = document.getElementById('puntoForm');
+        form.reset();
+        
+        // Limpiar ID de edición
+        document.getElementById('punto_id').value = '';
+        document.getElementById('modal-title').innerText = 'Nuevo Punto de Internación/Estación';
+    }
+
+    // --- Edición de Punto ---
+    async function editPunto(id) {
+        try {
+            const response = await fetch(`/mapa/api/get-punto-internacion/${id}`);
+            const result = await response.json();
+            
+            if (result.status === 'success') {
+                resetPuntoForm();
+                
+                const data = result.data;
+                const form = document.getElementById('puntoForm');
+                
+                document.getElementById('punto_id').value = data.id;
+                document.getElementById('modal-title').innerText = 'Editar Punto de Internación/Estación';
+                
+                // Llenar campos simples
+                form.querySelector('[name="nombre"]').value = data.nombre;
+                form.querySelector('[name="estado_id"]').value = data.estado_id;
+                form.querySelector('[name="tipo"]').value = data.tipo;
+                form.querySelector('[name="latitud"]').value = data.latitud;
+                form.querySelector('[name="longitud"]').value = data.longitud;
+                
+                openPuntoModal();
+            } else {
+                alert('Error al obtener datos: ' + result.message);
+            }
+        } catch (err) {
+            alert('Error de red: ' + err.message);
+        }
+    }
+
+    // --- Filtro de Búsqueda Frontend ---
+    function filterTable() {
+        const query = document.getElementById('search-input').value.toLowerCase();
+        const rows = document.querySelectorAll('tbody.puntos-tbody tr:not(.empty-row)');
+        let visibleCount = 0;
+        
+        rows.forEach(row => {
+            const nombre = row.querySelector('.col-nombre').innerText.toLowerCase();
+            const tipo = row.querySelector('.col-tipo').innerText.toLowerCase();
+            const estado = row.querySelector('.col-estado').innerText.toLowerCase();
+            
+            if (nombre.includes(query) || tipo.includes(query) || estado.includes(query)) {
+                row.classList.remove('hidden');
+                visibleCount++;
+            } else {
+                row.classList.add('hidden');
+            }
+        });
+        
+        const emptyRow = document.querySelector('tr.empty-row');
+        if (visibleCount === 0) {
+            if (emptyRow) emptyRow.classList.remove('hidden');
+        } else {
+            if (emptyRow) emptyRow.classList.add('hidden');
+        }
+    }
+</script>
+{% endblock scripts %}
+
+{% block styles %}
+<style>
+    @keyframes slideUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .animate-slide-up {
+        animation: slideUp 0.4s ease-out forwards;
+    }
+    
+    .custom-select {
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236b7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 0.75rem center;
+        background-size: 1.25em 1.25em;
+    }
+    
+    header.header-style {
+        display: none !important;
+    }
+    body > div.flex.justify-center.mt-4.space-x-2 {
+        display: none !important;
+    }
+</style>
+{% endblock styles %}
+
+{% block content %}
+<main class="min-h-screen bg-gray-50/50 p-6 md:p-12">
+    <div class="max-w-7xl mx-auto">
+        <!-- Cabecera -->
+        <div class="mb-12 animate-slide-up">
+            <div class="flex items-center space-x-3 mb-4">
+                <a href="{% url 'carga_datos' %}" class="px-4 py-1.5 bg-gray-100 text-gray-600 text-[10px] font-bold uppercase tracking-[0.2em] rounded-full hover:bg-gray-200 transition-colors">
+                    &larr; Volver
+                </a>
+                <span class="px-4 py-1.5 bg-emerald-50 text-inm-verde-100 text-[10px] font-bold uppercase tracking-[0.2em] rounded-full border border-emerald-100/50">Infraestructura</span>
+            </div>
+            <div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
+                <div>
+                    <h1 class="text-5xl font-black text-gray-900 tracking-tight mb-4 text-balance">Puntos de internacion y estaciones<span class="text-inm-verde-100">.</span></h1>
+                    <p class="text-lg text-gray-500 max-w-2xl font-medium">Gestión física, coordenadas y clasificación de las estaciones y puntos de internación aérea, marítima y terrestre.</p>
+                </div>
+                {% if estados_list %}
+                <button onclick="resetPuntoForm(); openPuntoModal();" class="px-8 py-4 bg-inm-verde-100 text-white rounded-2xl font-bold shadow-xl shadow-stone-900/20 hover:bg-stone-900 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center flex-shrink-0">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
+                    Nuevo Punto
+                </button>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Notificaciones de Django -->
+        {% if messages %}
+        <div class="mb-10 w-full animate-slide-up">
+            {% for message in messages %}
+            <div class="p-4 rounded-2xl mb-3 flex items-center {% if message.tags == 'success' %}bg-emerald-50 text-emerald-800 border border-emerald-100{% else %}bg-rose-50 text-rose-800 border border-rose-100{% endif %} shadow-sm">
+                <div class="flex-shrink-0">
+                    {% if message.tags == 'success' %}
+                    <svg class="h-5 w-5 text-emerald-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
+                    {% else %}
+                    <svg class="h-5 w-5 text-rose-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" /></svg>
+                    {% endif %}
+                </div>
+                <div class="ml-3"><p class="text-sm font-bold">{{ message }}</p></div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Panel de Búsqueda y Tabla -->
+        <div class="bg-white border border-gray-100 rounded-[2.5rem] shadow-sm overflow-hidden mb-12 animate-slide-up" style="animation-delay: 0.1s;">
+            <div class="p-8 border-b border-gray-50 flex flex-col md:flex-row justify-between items-center gap-4">
+                <div>
+                    <h2 class="text-xl font-bold text-gray-900">Puntos de Internación y Estaciones Registrados</h2>
+                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Control logístico del catálogo de aduanas, puertos y estaciones migratorias</p>
+                </div>
+                <div class="flex items-center space-x-3 w-full md:w-auto">
+                    <input type="text" id="search-input" onkeyup="filterTable()" placeholder="Buscar por nombre, tipo o estado..." class="w-full md:w-80 px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl outline-none text-sm font-bold text-gray-700 placeholder-gray-400 focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all">
+                    <div class="flex items-center space-x-2 px-4 py-3 bg-gray-50 rounded-xl flex-shrink-0">
+                        <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                        <span class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{{ puntos_list.count }} Puntos</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="w-full text-left">
+                    <thead>
+                        <tr class="bg-gray-50/50 text-[10px] font-black text-gray-400 uppercase tracking-wider border-b border-gray-100">
+                            <th class="py-5 px-8">Estado</th>
+                            <th class="py-5 px-6">Nombre Punto</th>
+                            <th class="py-5 px-6">Clasificación / Tipo</th>
+                            <th class="py-5 px-6">Coordenadas</th>
+                            <th class="py-5 px-8 text-right">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody class="puntos-tbody divide-y divide-gray-50 text-sm font-bold text-gray-700">
+                        {% for punto in puntos_list %}
+                        <tr class="hover:bg-gray-50/40 transition-colors">
+                            <td class="col-estado py-5 px-8 text-gray-900 font-extrabold">{{ punto.estado.nombre }}</td>
+                            <td class="col-nombre py-5 px-6">{{ punto.nombre }}</td>
+                            <td class="col-tipo py-5 px-6">
+                                {% if punto.tipo == 'AEREO' %}
+                                <span class="px-3 py-1 bg-sky-50 text-sky-700 text-[10px] font-bold uppercase tracking-wider rounded-full border border-sky-100/50">Aéreo</span>
+                                {% elif punto.tipo == 'MARITIMO' %}
+                                <span class="px-3 py-1 bg-blue-50 text-blue-700 text-[10px] font-bold uppercase tracking-wider rounded-full border border-blue-100/50">Marítimo</span>
+                                {% elif punto.tipo == 'TERRESTRE' %}
+                                <span class="px-3 py-1 bg-amber-50 text-amber-700 text-[10px] font-bold uppercase tracking-wider rounded-full border border-amber-100/50">Terrestre</span>
+                                {% elif punto.tipo == 'ESTACION' %}
+                                <span class="px-3 py-1 bg-purple-50 text-purple-700 text-[10px] font-bold uppercase tracking-wider rounded-full border border-purple-100/50">Estación</span>
+                                {% else %}
+                                <span class="px-3 py-1 bg-stone-100 text-stone-700 text-[10px] font-bold uppercase tracking-wider rounded-full">{{ punto.tipo }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-5 px-6 text-gray-500 font-mono text-xs">{{ punto.latitud }}, {{ punto.longitud }}</td>
+                            <td class="py-5 px-8 text-right flex items-center justify-end space-x-2">
+                                <button onclick="editPunto({{ punto.id }})" class="p-2 text-stone-600 hover:text-stone-900 hover:bg-stone-50 rounded-xl transition-all" title="Editar">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                                </button>
+                                <a href="{% url 'eliminar_punto_internacion' punto.id %}" onclick="return confirm('¿Estás seguro de que deseas eliminar este Punto de Internación/Estación?');" class="p-2 text-rose-600 hover:text-rose-900 hover:bg-rose-50 rounded-xl transition-all" title="Eliminar">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr class="empty-row">
+                            <td colspan="5" class="py-12 text-center text-gray-400 italic">No hay Puntos de Internación o Estaciones registrados.</td>
+                        </tr>
+                        {% endfor %}
+                        <tr class="empty-row hidden">
+                            <td colspan="5" class="py-12 text-center text-gray-400 italic">No se encontraron resultados para la búsqueda.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL PRINCIPAL: NUEVO / EDITAR PUNTO -->
+    <div id="puntoModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+        <!-- Backdrop -->
+        <div class="absolute inset-0 bg-stone-900/40 backdrop-blur-sm" onclick="closePuntoModal()"></div>
+        
+        <!-- Contenido Modal -->
+        <div class="relative w-full max-w-xl bg-white rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col" style="max-height: 90vh;">
+            <div class="px-8 pt-8 pb-6 border-b border-gray-50 flex justify-between items-center bg-white">
+                <div>
+                    <h3 id="modal-title" class="text-2xl font-black text-gray-900 leading-tight">Nuevo Punto de Internación/Estación</h3>
+                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Clasificación e información geográfica</p>
+                </div>
+                <button onclick="closePuntoModal()" class="p-2 hover:bg-gray-100 rounded-2xl transition-colors">
+                    <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            
+            <form id="puntoForm" action="{% url 'guardar_punto_internacion' %}" method="POST" class="flex-grow overflow-y-auto p-8 space-y-6">
+                {% csrf_token %}
+                <input type="hidden" id="punto_id" name="punto_id">
+                
+                <!-- Nombre del Punto -->
+                <div class="flex flex-col space-y-2">
+                    <label class="text-xs font-black text-gray-400 uppercase tracking-wider">Nombre del Punto o Estación</label>
+                    <input type="text" name="nombre" required placeholder="Escriba el nombre identificador..." class="px-4 py-3.5 bg-gray-50 border border-gray-100 rounded-xl outline-none text-sm font-bold text-gray-700 placeholder-gray-400 focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all">
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Estado -->
+                    <div class="flex flex-col space-y-2">
+                        <label class="text-xs font-black text-gray-400 uppercase tracking-wider">Estado Adscrito</label>
+                        <select name="estado_id" required class="custom-select px-4 py-3.5 bg-gray-50 border border-gray-100 rounded-xl outline-none text-sm font-bold text-gray-700 focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all">
+                            <option value="">Seleccione Estado...</option>
+                            {% for est in estados_list %}
+                            <option value="{{ est.id }}">{{ est.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Tipo / Clasificación -->
+                    <div class="flex flex-col space-y-2">
+                        <label class="text-xs font-black text-gray-400 uppercase tracking-wider">Clasificación / Tipo</label>
+                        <select name="tipo" required class="custom-select px-4 py-3.5 bg-gray-50 border border-gray-100 rounded-xl outline-none text-sm font-bold text-gray-700 focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all">
+                            <option value="">Seleccione Tipo...</option>
+                            {% for key, val in tipos_list %}
+                            <option value="{{ key }}">{{ val }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Coordenadas Geográficas -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="flex flex-col space-y-2">
+                        <label class="text-xs font-black text-gray-400 uppercase tracking-wider">Latitud</label>
+                        <input type="number" step="any" name="latitud" required placeholder="Ej. 19.43" class="px-4 py-3.5 bg-gray-50 border border-gray-100 rounded-xl outline-none text-sm font-bold text-gray-700 placeholder-gray-400 focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all">
+                    </div>
+                    <div class="flex flex-col space-y-2">
+                        <label class="text-xs font-black text-gray-400 uppercase tracking-wider">Longitud</label>
+                        <input type="number" step="any" name="longitud" required placeholder="Ej. -99.13" class="px-4 py-3.5 bg-gray-50 border border-gray-100 rounded-xl outline-none text-sm font-bold text-gray-700 placeholder-gray-400 focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all">
+                    </div>
+                </div>
+
+                <!-- Botones -->
+                <div class="pt-6 border-t border-gray-50 flex items-center justify-end space-x-4">
+                    <button type="button" onclick="closePuntoModal()" class="px-6 py-3.5 bg-gray-50 text-gray-500 rounded-xl font-bold hover:bg-gray-100 transition-colors">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="px-6 py-3.5 bg-stone-850 text-white rounded-xl font-bold hover:bg-stone-900 transition-colors">
+                        Guardar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</main>
+{% endblock content %}

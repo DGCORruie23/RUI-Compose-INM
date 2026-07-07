@@ -4146,3 +4146,262 @@ def guardar_combustible(request):
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
 
+
+# =====================================================================
+# GESTIÓN DE PRHS (PUNTOS DE RESCATE HUMANO)
+# =====================================================================
+
+def prhs_list(request):
+    """Muestra la lista de PRHs y gestiona sus catálogos."""
+    if not request.user.is_authenticated:
+        return redirect('/log-in/?next=%s' % request.path)
+    user_state = get_user_state(request)
+    
+    from .models import PRHs, TipoPRH, Estado
+    if request.user.is_superuser:
+        prhs_list_qs = PRHs.objects.all().select_related('estado', 'modalidad').order_by('estado__nombre', 'nombre')
+        estados_list = Estado.objects.all().order_by('nombre')
+    elif user_state:
+        prhs_list_qs = PRHs.objects.filter(estado=user_state).select_related('estado', 'modalidad').order_by('nombre')
+        estados_list = [user_state]
+    else:
+        prhs_list_qs = PRHs.objects.none()
+        estados_list = []
+        
+    return render(request, 'mapa/prhs.html', {
+        'prhs_list': prhs_list_qs,
+        'estados_list': estados_list,
+        'modalidades_list': TipoPRH.objects.all().order_by('nombre'),
+    })
+
+
+@transaction.atomic
+def guardar_prh(request):
+    if request.method != 'POST':
+        return redirect('prhs_list')
+        
+    user_state = get_user_state(request)
+    from .models import PRHs
+    
+    try:
+        prh_id = request.POST.get('prh_id')
+        estado_id = request.POST.get('estado_id')
+        
+        # Validación de seguridad: el estado enviado debe coincidir con el del usuario
+        if not request.user.is_superuser:
+            if not user_state or str(user_state.id) != str(estado_id):
+                raise PermissionError("No tienes permisos para registrar PRH en este estado.")
+        
+        # Coordenadas
+        try:
+            lat = float(request.POST.get('latitud') or 0)
+            lng = float(request.POST.get('longitud') or 0)
+        except ValueError:
+            raise ValueError("La latitud y longitud deben ser coordenadas numéricas válidas.")
+
+        activo = request.POST.get('activo') == 'on' or request.POST.get('activo') == 'true'
+
+        defaults = {
+            'estado_id': estado_id,
+            'nombre': normalizar_nombre(request.POST.get('nombre', '')),
+            'modalidad_id': request.POST.get('modalidad_id'),
+            'activo': activo,
+            'coordenadasTexto': f"{lat}, {lng}",
+            'latitud': lat,
+            'longitud': lng,
+        }
+
+        if prh_id:
+            prh = PRHs.objects.get(id=prh_id)
+            if not request.user.is_superuser and prh.estado != user_state:
+                raise PermissionError("No tienes permisos para modificar este PRH.")
+            for key, val in defaults.items():
+                setattr(prh, key, val)
+            prh.save()
+            created = False
+        else:
+            prh = PRHs.objects.create(**defaults)
+            created = True
+
+        messages.success(request, f"Punto de Rescate Humano '{prh.nombre}' {'creado' if created else 'actualizado'} correctamente.")
+    except Exception as e:
+        messages.error(request, f"Error al guardar PRH: {str(e)}")
+        
+    return redirect('prhs_list')
+
+
+@transaction.atomic
+def eliminar_prh(request, prh_id):
+    """Elimina un PRH si tiene permisos por estado."""
+    from .models import PRHs
+    try:
+        user_state = get_user_state(request)
+        prh = PRHs.objects.get(id=prh_id)
+        
+        # Validación de seguridad
+        if not request.user.is_superuser:
+            if not user_state or prh.estado != user_state:
+                messages.error(request, "No tienes permisos para eliminar este registro.")
+                return redirect('prhs_list')
+                
+        nombre = prh.nombre
+        prh.delete()
+        messages.success(request, f"Punto de Rescate Humano '{nombre}' eliminado correctamente.")
+    except Exception as e:
+        messages.error(request, f"Error al eliminar PRH: {str(e)}")
+        
+    return redirect('prhs_list')
+
+
+def api_get_prh(request, prh_id):
+    """Retorna los datos de un PRH en formato JSON."""
+    from .models import PRHs
+    try:
+        user_state = get_user_state(request)
+        prh = PRHs.objects.get(id=prh_id)
+        
+        # Validación de seguridad
+        if not request.user.is_superuser:
+            if not user_state or prh.estado != user_state:
+                return JsonResponse({'status': 'error', 'message': 'Sin permisos'}, status=403)
+                
+        data = {
+            'id': prh.id,
+            'nombre': prh.nombre,
+            'estado_id': prh.estado_id,
+            'modalidad_id': prh.modalidad_id,
+            'activo': prh.activo,
+            'latitud': prh.latitud,
+            'longitud': prh.longitud,
+        }
+        return JsonResponse({'status': 'success', 'data': data})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
+
+# =====================================================================
+# GESTIÓN DE PUNTOS DE INTERNACIÓN Y ESTACIONES
+# =====================================================================
+
+def puntos_internacion_list(request):
+    """Muestra la lista de puntos de internación y estaciones."""
+    if not request.user.is_authenticated:
+        return redirect('/log-in/?next=%s' % request.path)
+    user_state = get_user_state(request)
+    
+    from .models import PuntosInternacionEstacion, Estado
+    if request.user.is_superuser:
+        puntos_list = PuntosInternacionEstacion.objects.all().select_related('estado').order_by('estado__nombre', 'nombre')
+        estados_list = Estado.objects.all().order_by('nombre')
+    elif user_state:
+        puntos_list = PuntosInternacionEstacion.objects.filter(estado=user_state).select_related('estado').order_by('nombre')
+        estados_list = [user_state]
+    else:
+        puntos_list = PuntosInternacionEstacion.objects.none()
+        estados_list = []
+        
+    return render(request, 'mapa/puntos_internacion.html', {
+        'puntos_list': puntos_list,
+        'estados_list': estados_list,
+        'tipos_list': [('AEREO', 'AEREO'), ('MARITIMO', 'MARITIMO'), ('TERRESTRE', 'TERRESTRE'), ('ESTACION', 'ESTACION')],
+    })
+
+
+@transaction.atomic
+def guardar_punto_internacion(request):
+    if request.method != 'POST':
+        return redirect('puntos_internacion_list')
+        
+    user_state = get_user_state(request)
+    from .models import PuntosInternacionEstacion
+    
+    try:
+        punto_id = request.POST.get('punto_id')
+        estado_id = request.POST.get('estado_id')
+        
+        # Validación de seguridad: el estado enviado debe coincidir con el del usuario
+        if not request.user.is_superuser:
+            if not user_state or str(user_state.id) != str(estado_id):
+                raise PermissionError("No tienes permisos para registrar puntos de internación en este estado.")
+        
+        # Coordenadas
+        try:
+            lat = float(request.POST.get('latitud') or 0)
+            lng = float(request.POST.get('longitud') or 0)
+        except ValueError:
+            raise ValueError("La latitud y longitud deben ser coordenadas numéricas válidas.")
+
+        defaults = {
+            'estado_id': estado_id,
+            'nombre': normalizar_nombre(request.POST.get('nombre', '')),
+            'tipo': request.POST.get('tipo'),
+            'latitud': lat,
+            'longitud': lng,
+        }
+
+        if punto_id:
+            punto = PuntosInternacionEstacion.objects.get(id=punto_id)
+            if not request.user.is_superuser and punto.estado != user_state:
+                raise PermissionError("No tienes permisos para modificar este punto de internación.")
+            for key, val in defaults.items():
+                setattr(punto, key, val)
+            punto.save()
+            created = False
+        else:
+            punto = PuntosInternacionEstacion.objects.create(**defaults)
+            created = True
+
+        messages.success(request, f"Punto de Internación/Estación '{punto.nombre}' {'creado' if created else 'actualizado'} correctamente.")
+    except Exception as e:
+        messages.error(request, f"Error al guardar punto de internación: {str(e)}")
+        
+    return redirect('puntos_internacion_list')
+
+
+@transaction.atomic
+def eliminar_punto_internacion(request, punto_id):
+    """Elimina un punto de internación/estación si tiene permisos por estado."""
+    from .models import PuntosInternacionEstacion
+    try:
+        user_state = get_user_state(request)
+        punto = PuntosInternacionEstacion.objects.get(id=punto_id)
+        
+        # Validación de seguridad
+        if not request.user.is_superuser:
+            if not user_state or punto.estado != user_state:
+                messages.error(request, "No tienes permisos para eliminar este registro.")
+                return redirect('puntos_internacion_list')
+                
+        nombre = punto.nombre
+        punto.delete()
+        messages.success(request, f"Punto de Internación/Estación '{nombre}' eliminado correctamente.")
+    except Exception as e:
+        messages.error(request, f"Error al eliminar punto de internación: {str(e)}")
+        
+    return redirect('puntos_internacion_list')
+
+
+def api_get_punto_internacion(request, punto_id):
+    """Retorna los datos de un punto de internación/estación en formato JSON."""
+    from .models import PuntosInternacionEstacion
+    try:
+        user_state = get_user_state(request)
+        punto = PuntosInternacionEstacion.objects.get(id=punto_id)
+        
+        # Validación de seguridad
+        if not request.user.is_superuser:
+            if not user_state or punto.estado != user_state:
+                return JsonResponse({'status': 'error', 'message': 'Sin permisos'}, status=403)
+                
+        data = {
+            'id': punto.id,
+            'nombre': punto.nombre,
+            'estado_id': punto.estado_id,
+            'tipo': punto.tipo,
+            'latitud': punto.latitud,
+            'longitud': punto.longitud,
+        }
+        return JsonResponse({'status': 'success', 'data': data})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+

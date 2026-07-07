@@ -49,4 +49,14 @@ urlpatterns = [
     path('guardar-siniestro', views.guardar_siniestro, name="guardar_siniestro"),
     path('guardar-capufe', views.guardar_capufe, name="guardar_capufe"),
     path('guardar-combustible', views.guardar_combustible, name="guardar_combustible"),
+    
+    path('prhs', views.prhs_list, name="prhs_list"),
+    path('guardar-prh', views.guardar_prh, name="guardar_prh"),
+    path('eliminar-prh/<int:prh_id>', views.eliminar_prh, name="eliminar_prh"),
+    path('api/get-prh/<int:prh_id>', views.api_get_prh, name="api_get_prh"),
+    
+    path('puntos-internacion', views.puntos_internacion_list, name="puntos_internacion_list"),
+    path('guardar-punto-internacion', views.guardar_punto_internacion, name="guardar_punto_internacion"),
+    path('eliminar-punto-internacion/<int:punto_id>', views.eliminar_punto_internacion, name="eliminar_punto_internacion"),
+    path('api/get-punto-internacion/<int:punto_id>', views.api_get_punto_internacion, name="api_get_punto_internacion"),
 ]
