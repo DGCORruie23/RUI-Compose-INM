@@ -2724,12 +2724,20 @@ def mapa_interactivo(request):
             'url': f"{settings.STATIC_URL}mapa/icons/OR_ACTIVO.svg"
         })
 
-    national_data = {
-        'name': LABEL_NACIONAL,
-        'cs': default_vals.copy(),
-        'dt': default_vals.copy(),
-        'pe': default_vals.copy()
-    }
+    if user_state:
+        national_data = {
+            'name': user_state.nombre.upper(),
+            'cs': default_vals.copy(),
+            'dt': default_vals.copy(),
+            'pe': default_vals.copy()
+        }
+    else:
+        national_data = {
+            'name': LABEL_NACIONAL,
+            'cs': default_vals.copy(),
+            'dt': default_vals.copy(),
+            'pe': default_vals.copy()
+        }
     
     context = {
         'geo_data_json': json.dumps(geo_data),
