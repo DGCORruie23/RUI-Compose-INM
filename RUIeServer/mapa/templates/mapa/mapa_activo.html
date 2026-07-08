@@ -681,8 +681,27 @@
     
     if (mainSection.classList.contains('focus-mode')) {
       icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>';
+      
+      // Intentar maximizar la pantalla (Fullscreen API)
+      const elem = document.documentElement;
+      if (elem.requestFullscreen) {
+        elem.requestFullscreen().catch(err => console.log("Error al intentar pantalla completa: ", err));
+      } else if (elem.webkitRequestFullscreen) { /* Safari / iOS / Android */
+        elem.webkitRequestFullscreen();
+      } else if (elem.msRequestFullscreen) { /* IE/Edge */
+        elem.msRequestFullscreen();
+      }
     } else {
       icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>';
+      
+      // Salir de pantalla completa
+      if (document.exitFullscreen) {
+        document.exitFullscreen().catch(err => console.log("Error al intentar salir de pantalla completa: ", err));
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      } else if (document.msExitFullscreen) {
+        document.msExitFullscreen();
+      }
     }
     
     // Forzar a MapLibre a re-dimensionar
@@ -691,6 +710,38 @@
         window.dispatchEvent(new Event('resize'));
     }, 100);
   };
+
+  // Escuchar el evento de cambio de pantalla completa para sincronizar el estado del botón si el usuario usa ESC o controles del navegador
+  const syncFullscreenUI = () => {
+    const isFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
+    const mainSection = document.getElementById('main-section');
+    const icon = document.getElementById('focusIcon');
+    const body = document.body;
+
+    if (mainSection) {
+      if (isFullscreen && !mainSection.classList.contains('focus-mode')) {
+        mainSection.classList.add('focus-mode');
+        body.classList.add('focus-mode');
+        if (icon) {
+          icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>';
+        }
+      } else if (!isFullscreen && mainSection.classList.contains('focus-mode')) {
+        mainSection.classList.remove('focus-mode');
+        body.classList.remove('focus-mode');
+        if (icon) {
+          icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>';
+        }
+      }
+      setTimeout(() => {
+          if (window.map) window.map.resize();
+          window.dispatchEvent(new Event('resize'));
+      }, 100);
+    }
+  };
+
+  document.addEventListener('fullscreenchange', syncFullscreenUI);
+  document.addEventListener('webkitfullscreenchange', syncFullscreenUI);
+  document.addEventListener('msfullscreenchange', syncFullscreenUI);
 
   window.changeMenuState = function(state) {
     // 'general' es alias de 'expandido' en layout de columna fija
