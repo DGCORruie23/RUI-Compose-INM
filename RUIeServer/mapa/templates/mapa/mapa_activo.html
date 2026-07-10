@@ -1670,9 +1670,9 @@
             document.getElementById('inmPersActivos').innerText = data.personal.activos;
             document.getElementById('inmPersInactivos').innerText = data.personal.inactivos;
             
-            document.getElementById('inmVehTotal').innerText = '';
-            document.getElementById('inmVehActivos').innerText = '';
-            document.getElementById('inmVehInactivos').innerText = '';
+            document.getElementById('inmVehTotal').innerText = data.vehiculos.total;
+            document.getElementById('inmVehActivos').innerText = data.vehiculos.activos;
+            document.getElementById('inmVehInactivos').innerText = data.vehiculos.inactivos;
             
             document.getElementById('inmPipcInm').innerText = data.pipc.fecha_inm;
             document.getElementById('inmPipcComodante').innerText = data.pipc.fecha_comodante;
@@ -1849,10 +1849,10 @@
             document.getElementById('estPersActivos').innerText = data.personal.activos;
             document.getElementById('estPersInactivos').innerText = data.personal.inactivos;
             
-            // Vehículos (se dejan en blanco/SD)
-            document.getElementById('estVehTotal').innerText = '';
-            document.getElementById('estVehActivos').innerText = '';
-            document.getElementById('estVehInactivos').innerText = '';
+            // Vehículos
+            document.getElementById('estVehTotal').innerText = data.vehiculos.total;
+            document.getElementById('estVehActivos').innerText = data.vehiculos.activos;
+            document.getElementById('estVehInactivos').innerText = data.vehiculos.inactivos;
             
             // PIPC counts con Tooltips interactivos
             const bindPipcTooltip = (id, count, inmueblesList) => {

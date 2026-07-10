@@ -3112,7 +3112,12 @@ def api_get_inmueble_detalle(request, inmueble_id):
         activos = personal_qs.filter(estatus__estatus__iexact='ACTIVO').count()
         inactivos = personal_qs.filter(estatus__estatus__iexact='VACANTE').count()
         
-        # 3. PIPC (Programa IPC)
+        # 2.5. Vehículos conteo
+        from .models import VehiculosOR
+        veh_qs = VehiculosOR.objects.filter(inmueble=inmueble)
+        total_veh = veh_qs.count()
+        activos_veh = veh_qs.filter(situacion__situacion__iexact='ACTIVO').count()
+        inactivos_veh = total_veh - activos_veh
         pipc = inmueble.pipc.first()
         fecha_inm_str = "sin programa"
         fecha_comodante_str = "sin programa"
@@ -3181,9 +3186,9 @@ def api_get_inmueble_detalle(request, inmueble_id):
                 'inactivos': inactivos
             },
             'vehiculos': {
-                'total': "S/D",
-                'activos': "S/D",
-                'inactivos': "S/D"
+                'total': total_veh,
+                'activos': activos_veh,
+                'inactivos': inactivos_veh
             },
             'pipc': {
                 'fecha_inm': fecha_inm_str,
@@ -3232,10 +3237,17 @@ def api_get_estado_detalle(request, estado_id):
             inmueble_count = inmuebles.count()
             
             # 1. Personal
-            personal_qs = PersonalINM.objects.filter(lugar_asignado_id__in=inmuebles_ids)
+            personal_qs = PersonalINM.objects.all()
             total_personal = personal_qs.count()
             activos = personal_qs.filter(estatus__estatus__iexact='ACTIVO').count()
             inactivos = personal_qs.filter(estatus__estatus__iexact='VACANTE').count()
+            
+            # 1.5. Vehículos
+            from .models import VehiculosOR
+            veh_qs = VehiculosOR.objects.all()
+            total_veh = veh_qs.count()
+            activos_veh = veh_qs.filter(situacion__situacion__iexact='ACTIVO').count()
+            inactivos_veh = total_veh - activos_veh
             
             # 2. PIPC (Programa IPC)
             from .models import ProgramaIPC
@@ -3314,9 +3326,9 @@ def api_get_estado_detalle(request, estado_id):
                     'inactivos': inactivos
                 },
                 'vehiculos': {
-                    'total': "S/D",
-                    'activos': "S/D",
-                    'inactivos': "S/D"
+                    'total': total_veh,
+                    'activos': activos_veh,
+                    'inactivos': inactivos_veh
                 },
                 'pipc': {
                     'inm_pipc_count': count_inm_pipc,
@@ -3353,10 +3365,17 @@ def api_get_estado_detalle(request, estado_id):
         inmueble_count = inmuebles.count()
         
         # 1. Personal
-        personal_qs = PersonalINM.objects.filter(lugar_asignado_id__in=inmuebles_ids)
+        personal_qs = PersonalINM.objects.filter(estado=estado)
         total_personal = personal_qs.count()
         activos = personal_qs.filter(estatus__estatus__iexact='ACTIVO').count()
         inactivos = personal_qs.filter(estatus__estatus__iexact='VACANTE').count()
+        
+        # 1.5. Vehículos
+        from .models import VehiculosOR
+        veh_qs = VehiculosOR.objects.filter(estado=estado)
+        total_veh = veh_qs.count()
+        activos_veh = veh_qs.filter(situacion__situacion__iexact='ACTIVO').count()
+        inactivos_veh = total_veh - activos_veh
         
         # 2. PIPC (Programa IPC) - Cuenta de inmuebles con programas activos y sus listados
         from .models import ProgramaIPC
@@ -3435,9 +3454,9 @@ def api_get_estado_detalle(request, estado_id):
                 'inactivos': inactivos
             },
             'vehiculos': {
-                'total': "S/D",
-                'activos': "S/D",
-                'inactivos': "S/D"
+                'total': total_veh,
+                'activos': activos_veh,
+                'inactivos': inactivos_veh
             },
             'pipc': {
                 'inm_pipc_count': count_inm_pipc,
@@ -3483,25 +3502,25 @@ def api_get_personal_stats(request, estado_id):
         import unicodedata
         today = date.today()
         
-        if estado_id == 0:
-            qs_all = PersonalINM.objects.all().select_related('estatus', 'tipo_plaza')
-            estado_nombre_display = "TOTAL NACIONAL"
-        else:
-            estado = Estado.objects.get(id=estado_id)
-            
-            # Check if filtering by specific inmueble
-            inmueble_id = request.GET.get('inmueble_id')
-            inmueble = None
-            if inmueble_id:
-                try:
-                    inmueble = Inmueble.objects.get(id=inmueble_id)
-                    qs_all = PersonalINM.objects.filter(lugar_asignado=inmueble).select_related('estatus', 'tipo_plaza')
+        inmueble_id = request.GET.get('inmueble_id')
+        inmueble = None
+        if inmueble_id:
+            try:
+                inmueble = Inmueble.objects.get(id=inmueble_id)
+                qs_all = PersonalINM.objects.filter(lugar_asignado=inmueble).select_related('estatus', 'tipo_plaza')
+                if estado_id == 0:
+                    estado_nombre_display = f"TOTAL NACIONAL - {inmueble.nombre_inmueble}"
+                else:
+                    estado = Estado.objects.get(id=estado_id)
                     estado_nombre_display = f"{estado.nombre} - {inmueble.nombre_inmueble}"
-                    if inmueble.estado:
-                        estado = inmueble.estado
-                except Inmueble.DoesNotExist:
-                    return JsonResponse({'status': 'error', 'message': 'El inmueble solicitado no existe.'}, status=404)
+            except Inmueble.DoesNotExist:
+                return JsonResponse({'status': 'error', 'message': 'El inmueble solicitado no existe.'}, status=404)
+        else:
+            if estado_id == 0:
+                qs_all = PersonalINM.objects.all().select_related('estatus', 'tipo_plaza')
+                estado_nombre_display = "TOTAL NACIONAL"
             else:
+                estado = Estado.objects.get(id=estado_id)
                 qs_all = PersonalINM.objects.filter(estado=estado).select_related('estatus', 'tipo_plaza')
                 estado_nombre_display = estado.nombre
             
