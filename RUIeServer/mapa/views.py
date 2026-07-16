@@ -313,6 +313,8 @@ def calc_national(totals_dict):
             if k in state_data: national[k] += state_data[k]
     return national
 
+#retomar la colocaciones de las fechas de actualizacion en el template
+
 def get_global_update_date():
     """Calcula el mínimo de los máximos para determinar la fecha de integridad total."""
     from .models import Repatriados, Recibidos, ExtRescatados, Ingresos, Tramites, Retornados, Inadmitidos
