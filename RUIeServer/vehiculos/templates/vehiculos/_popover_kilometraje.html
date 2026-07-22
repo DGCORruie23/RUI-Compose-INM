@@ -1,0 +1,17 @@
+{% for lectura in lecturas %}
+<a href="{% url 'vehiculos:detalle' lectura.placa %}" data-modal-url="{% url 'vehiculos:detalle_fragmento' lectura.placa %}"
+   class="flex items-center justify-between gap-3 px-3 py-2 rounded-lg hover:bg-guinda-50 transition text-sm">
+  <span class="flex flex-col">
+    <span class="font-semibold text-slate-700">{{ lectura.placa }}</span>
+    <span class="text-xs text-slate-400">{{ lectura.fecha|default:"S/F" }}</span>
+  </span>
+  <span class="text-guinda font-semibold text-xs">{{ lectura.km }}</span>
+</a>
+{% empty %}
+<p class="px-3 py-4 text-xs text-slate-400 text-center">Sin lecturas de kilometraje registradas.</p>
+{% endfor %}
+{% if total > 8 %}
+<p class="text-center text-xs text-slate-400 px-3 py-2 border-t border-slate-100 mt-1">
+  Mostrando las 8 más recientes de {{ total }}
+</p>
+{% endif %}

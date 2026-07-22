@@ -38,7 +38,11 @@ class Migration(migrations.Migration):
             name='curp',
             field=models.CharField(blank=True, max_length=20, null=True),
         ),
-        migrations.AlterField(
+        migrations.RemoveField(
+            model_name='personalinm',
+            name='estatus',
+        ),
+        migrations.AddField(
             model_name='personalinm',
             name='estatus',
             field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to='mapa.estatuspersonal'),
@@ -49,3 +53,4 @@ class Migration(migrations.Migration):
             field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to='mapa.tipoplaza'),
         ),
     ]
+    

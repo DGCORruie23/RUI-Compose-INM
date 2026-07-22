@@ -1,0 +1,161 @@
+{% load static %}
+<style type="text/tailwindcss">
+  .veh-campo-label { @apply block text-xs font-medium text-slate-400 uppercase tracking-wide mb-1; }
+  .veh-campo-valor { @apply text-sm font-medium text-slate-700; }
+  .veh-icono-lateral {
+    @apply flex flex-row lg:flex-col items-center gap-1.5 px-4 py-3 text-xs font-semibold rounded-xl text-slate-400 min-w-[7rem] lg:min-w-0 lg:w-full text-center shrink-0;
+  }
+  .veh-tab-icon {
+    @apply w-6 h-6 inline-block;
+    background-color: currentColor;
+    -webkit-mask-position: center;
+    mask-position: center;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-size: contain;
+    mask-size: contain;
+  }
+  .veh-tabla-historial th { @apply text-left px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wide bg-slate-50; }
+  .veh-tabla-historial td { @apply px-3 py-2 text-sm text-slate-600 border-t border-slate-100; }
+</style>
+
+<div class="max-w-6xl mx-auto flex flex-col lg:flex-row gap-6 items-start">
+
+  <aside class="w-full lg:w-40 shrink-0">
+    <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-3 flex flex-row lg:flex-col gap-2 overflow-x-auto lg:overflow-visible">
+      <div class="veh-icono-lateral">
+        <span class="veh-tab-icon" style="mask-image:url('{% static 'vehiculos/icons/vehiculo.svg' %}');-webkit-mask-image:url('{% static 'vehiculos/icons/vehiculo.svg' %}')"></span>
+        Información<br>de la Unidad
+      </div>
+      <div class="veh-icono-lateral">
+        <span class="veh-tab-icon" style="mask-image:url('{% static 'vehiculos/icons/logistica.svg' %}');-webkit-mask-image:url('{% static 'vehiculos/icons/logistica.svg' %}')"></span>
+        Asignación<br>y Logística
+      </div>
+      <div class="veh-icono-lateral">
+        <span class="veh-tab-icon" style="mask-image:url('{% static 'vehiculos/icons/gasolineria.svg' %}');-webkit-mask-image:url('{% static 'vehiculos/icons/gasolineria.svg' %}')"></span>
+        Combustible
+      </div>
+      <div class="veh-icono-lateral">
+        <span class="veh-tab-icon" style="mask-image:url('{% static 'vehiculos/icons/kilometraje.svg' %}');-webkit-mask-image:url('{% static 'vehiculos/icons/kilometraje.svg' %}')"></span>
+        Kilometraje
+      </div>
+    </div>
+  </aside>
+
+  <div class="flex-1 w-full space-y-5">
+
+    <section class="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+      <h2 class="flex items-center gap-2 text-sm font-semibold text-[#9A0A38] mb-4">
+        <span class="veh-tab-icon w-5 h-5" style="mask-image:url('{% static 'vehiculos/icons/vehiculo.svg' %}');-webkit-mask-image:url('{% static 'vehiculos/icons/vehiculo.svg' %}')"></span>
+        Información de la Unidad
+      </h2>
+      <div class="grid sm:grid-cols-2 gap-5">
+        <div><p class="veh-campo-label">Marca</p><p class="veh-campo-valor">{{ vehiculo.marca|default:"—" }}</p></div>
+        <div><p class="veh-campo-label">Modelo</p><p class="veh-campo-valor">{{ vehiculo.modelo|default:"—" }}</p></div>
+        <div><p class="veh-campo-label">Año</p><p class="veh-campo-valor">{{ vehiculo.anio|default:"—" }}</p></div>
+        <div><p class="veh-campo-label">Placa</p><p class="veh-campo-valor">{{ vehiculo.placa|default:"—" }}</p></div>
+        <div><p class="veh-campo-label">No. de motor</p><p class="veh-campo-valor">{{ vehiculo.no_motor|default:"—" }}</p></div>
+      </div>
+    </section>
+
+    <section class="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+      <h2 class="flex items-center gap-2 text-sm font-semibold text-[#9A0A38] mb-4">
+        <span class="veh-tab-icon w-5 h-5" style="mask-image:url('{% static 'vehiculos/icons/logistica.svg' %}');-webkit-mask-image:url('{% static 'vehiculos/icons/logistica.svg' %}')"></span>
+        Asignación y Logística
+      </h2>
+      <div class="grid sm:grid-cols-2 gap-5 mb-6">
+        <div><p class="veh-campo-label">Tipo de vehículo</p><p class="veh-campo-valor">{{ vehiculo.tipo_vehiculo|default:"—" }}</p></div>
+        <div><p class="veh-campo-label">Tipo de asignación</p><p class="veh-campo-valor">{{ vehiculo.tipo_asignacion|default:"—" }}</p></div>
+        <div><p class="veh-campo-label">Situación</p><p class="veh-campo-valor">{{ vehiculo.situacion|default:"—" }}</p></div>
+        <div><p class="veh-campo-label">Estado</p><p class="veh-campo-valor">{{ vehiculo.estado|default:"—" }}</p></div>
+        <div><p class="veh-campo-label">Inmueble</p><p class="veh-campo-valor">{{ vehiculo.inmueble_destino|default:"—" }}</p></div>
+        <div><p class="veh-campo-label">Tarjeta asignada</p><p class="veh-campo-valor">{{ vehiculo.tarjeta|default:"Sin tarjeta" }}</p></div>
+      </div>
+
+      {% if prestamos %}
+      <p class="veh-campo-label mb-2">Historial de préstamos</p>
+      <div class="border border-slate-100 rounded-xl overflow-hidden mb-2">
+        <table class="w-full veh-tabla-historial">
+          <thead><tr><th>Fecha</th><th>Estado</th><th>Inmueble</th></tr></thead>
+          <tbody>
+            {% for p in prestamos %}
+            <tr><td>{{ p.fecha_prestamo|default:"S/F" }}</td><td>{{ p.estado.nombre }}</td><td>{{ p.inmueble.nombre_inmueble|default:"Sin asignar" }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+
+      {% if siniestros %}
+      <p class="veh-campo-label mb-2 mt-4">Siniestros</p>
+      <div class="border border-slate-100 rounded-xl overflow-hidden mb-2">
+        <table class="w-full veh-tabla-historial">
+          <thead><tr><th>Fecha</th><th>Folio</th></tr></thead>
+          <tbody>
+            {% for s in siniestros %}
+            <tr><td>{{ s.fecha|default:"S/F" }}</td><td>{{ s.folio|default:"S/F" }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+
+      {% if capufe %}
+      <p class="veh-campo-label mb-2 mt-4">Registros Capufe</p>
+      <div class="border border-slate-100 rounded-xl overflow-hidden">
+        <table class="w-full veh-tabla-historial">
+          <thead><tr><th>Inicio</th><th>Término</th></tr></thead>
+          <tbody>
+            {% for c in capufe %}
+            <tr><td>{{ c.fecha_inicio|default:"S/F" }}</td><td>{{ c.fecha_termino|default:"S/F" }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+    </section>
+
+    <section class="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+      <h2 class="flex items-center gap-2 text-sm font-semibold text-[#9A0A38] mb-4">
+        <span class="veh-tab-icon w-5 h-5" style="mask-image:url('{% static 'vehiculos/icons/gasolineria.svg' %}');-webkit-mask-image:url('{% static 'vehiculos/icons/gasolineria.svg' %}')"></span>
+        Combustible externo
+      </h2>
+      {% if combustible %}
+      <div class="border border-slate-100 rounded-xl overflow-hidden">
+        <table class="w-full veh-tabla-historial">
+          <thead><tr><th>Fecha</th><th class="text-right">Monto</th></tr></thead>
+          <tbody>
+            {% for c in combustible %}
+            <tr><td>{{ c.fecha|default:"S/F" }}</td><td class="text-right">${{ c.monto|floatformat:2 }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="text-sm text-slate-400">Sin registros de combustible externo para este vehículo.</p>
+      {% endif %}
+    </section>
+
+    <section class="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+      <h2 class="flex items-center gap-2 text-sm font-semibold text-[#9A0A38] mb-4">
+        <span class="veh-tab-icon w-5 h-5" style="mask-image:url('{% static 'vehiculos/icons/kilometraje.svg' %}');-webkit-mask-image:url('{% static 'vehiculos/icons/kilometraje.svg' %}')"></span>
+        Historial de kilometraje
+      </h2>
+      {% if kilometraje %}
+      <div class="border border-slate-100 rounded-xl overflow-hidden">
+        <table class="w-full veh-tabla-historial">
+          <thead><tr><th>Fecha</th><th>Tipo</th><th class="text-right">Odómetro</th></tr></thead>
+          <tbody>
+            {% for k in kilometraje %}
+            <tr><td>{{ k.fecha|default:"S/F" }}</td><td>{{ k.get_tipo_display }}</td><td class="text-right">{{ k.odometro }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="text-sm text-slate-400">Sin lecturas de kilometraje registradas para este vehículo.</p>
+      {% endif %}
+    </section>
+
+  </div>
+</div>

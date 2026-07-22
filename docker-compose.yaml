@@ -21,6 +21,7 @@ services:
       - ./RUIeServer/mapa:/src/backendRUIe/mapa
       - ./RUIeServer/usuarioL:/src/backendRUIe/usuarioL
       - ./RUIeServer/serverRUI:/src/backendRUIe/serverRUI
+      - ./RUIeServer/vehiculos:/src/backendRUIe/vehiculos
 
   db:
     container_name: dbPGruie

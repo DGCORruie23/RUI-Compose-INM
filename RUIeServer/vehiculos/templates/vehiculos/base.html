@@ -1,0 +1,65 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Gestión de Vehículos{% endblock %}</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            guinda: { DEFAULT: '#9A0A38', 50: '#fbeef2', 100: '#f3d0dc', 600: '#9A0A38', 700: '#7c082e' },
+            institverde: { DEFAULT: '#0E3B1E', 50: '#eaf1ec', 600: '#0E3B1E', 700: '#0a2c16' },
+            bandera: { DEFAULT: '#145B4D', 50: '#e7f1ef', 600: '#145B4D', 700: '#0f453a' },
+          }
+        }
+      }
+    }
+  </script>
+  {% block extra_head %}{% endblock %}
+</head>
+<body class="bg-[#F1F3F2] text-slate-800 antialiased">
+<div class="min-h-screen flex">
+
+  <aside class="w-64 bg-institverde text-white hidden lg:flex lg:flex-col shrink-0">
+    <div class="px-6 py-5 border-b border-white/10 flex items-center justify-center bg-white">
+      <img src="{% static 'vehiculos/img/logo_inm.png' %}" alt="INM · Secretaría de Gobernación" class="h-14 object-contain">
+    </div>
+    <nav class="flex-1 px-3 py-5 space-y-1 text-sm">
+      <a href="{% url 'vehiculos:dashboard' %}"
+         class="flex items-center gap-3 px-3 py-2 rounded-lg transition font-medium
+                {% if request.resolver_match.url_name == 'dashboard' %}bg-white/15 text-white{% else %}text-white/70 hover:bg-white/10 hover:text-white{% endif %}">
+        Vista general
+      </a>
+      <a href="{% url 'vehiculos:listado' %}"
+         class="flex items-center gap-3 px-3 py-2 rounded-lg transition font-medium
+                {% if request.resolver_match.url_name == 'listado' or request.resolver_match.url_name == 'detalle' %}bg-white/15 text-white{% else %}text-white/70 hover:bg-white/10 hover:text-white{% endif %}">
+        Listado de vehículos
+      </a>
+    </nav>
+    <div class="px-6 py-4 text-xs text-white/50 border-t border-white/10">
+      Acceso de solo lectura · Datos en vivo
+    </div>
+    <div class="h-2 bg-bandera"></div>
+  </aside>
+
+  <div class="flex-1 flex flex-col min-w-0">
+    <header class="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+      <h1 class="text-xl font-semibold text-guinda">{% block header %}{% endblock %}</h1>
+      <div class="text-sm text-slate-500">{% block header_actions %}{% endblock %}</div>
+    </header>
+    <main class="flex-1 p-6">
+      {% block content %}{% endblock %}
+    </main>
+    <div class="h-1.5 bg-bandera"></div>
+  </div>
+</div>
+
+<script src="{% static 'vehiculos/js/modal.js' %}"></script>
+{% block extra_scripts %}{% endblock %}
+</body>
+</html>
