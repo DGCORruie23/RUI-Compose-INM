@@ -43,13 +43,13 @@
 
 <div class="flex items-center justify-between mb-3">
   <p id="contadorListado" class="text-sm text-slate-500">Selecciona un filtro o espera a que cargue</p>
-  {# Comentado a propósito: el reporte de descarga se activará más adelante. #}
-  {#
+  {% comment %}
+  Comentado a propósito: el reporte de descarga se activará más adelante.
   <a id="descargarExcel" href="{% url 'vehiculos:exportar_excel' %}"
      class="inline-flex items-center gap-2 bg-institverde hover:bg-institverde-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
     ⬇ Descargar Excel
   </a>
-  #}
+  {% endcomment %}
 </div>
 
 <div class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">

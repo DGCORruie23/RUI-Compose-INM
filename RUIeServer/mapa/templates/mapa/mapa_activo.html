@@ -603,7 +603,7 @@
                     <img src="/static/vehiculos/icons/vehiculo.svg" class="w-4 h-4 object-contain flex-shrink-0" alt="Parque Vehicular">
                     <span class="menu-label-text text-[9px] font-black text-gray-600 uppercase tracking-tight leading-tight">Parque Vehicular</span>
                 </div>
-                <span id="menu_vehiculos" class="text-sm font-extrabold text-[#9A0A38] pl-0.5">32</span>
+                <span id="menu_vehiculos" class="text-sm font-extrabold text-[#9A0A38] pl-0.5">…</span>
             </div>
 
         </div>
@@ -1083,6 +1083,14 @@
   };
 </script>
 
+<script>
+  // Rutas estaticas que modal.js necesita pero no puede resolver el mismo
+  // (es un .js plano, no una plantilla) -- se inyectan aqui, ya resueltas
+  // por Django, para no tener el path escrito a mano dentro del JS.
+  window.VEH_ICONOS = {
+    auto: "{% static 'vehiculos/icons/vehiculo.svg' %}"
+  };
+</script>
 <script src="{% static 'vehiculos/js/modal.js' %}"></script>
 <script src="{% static 'vehiculos/js/hold-menu.js' %}"></script>
 <script>
@@ -2913,7 +2921,7 @@ function mostrarParqueVehicular() {
                     </div>
 
                     <!-- Tarjeta de Vehículos -->
-                    <div class="bg-white/80 backdrop-blur-md p-6 rounded-[2rem] border border-gray-100 shadow-sm relative overflow-hidden flex items-center gap-5 cursor-pointer hover:border-emerald-300 hover:shadow-md transition-all" onclick="event.stopPropagation(); window._vehiculosAlCerrarCallback = function() { if (typeof window.openInmuebleDetailModal === 'function' && window.currentSelectedInmuebleId) { window.openInmuebleDetailModal(window.currentSelectedInmuebleId); } }; if (typeof window.closeInmuebleDetailModal === 'function') { window.closeInmuebleDetailModal(); } window.VehiculosModal.abrir('/vehiculos/fragmento/resumen-estado/?inmueble=' + encodeURIComponent(document.getElementById('inmNombreHeader').innerText))" title="Ver detalle en el módulo de Parque Vehicular">
+                    <div class="bg-white/80 backdrop-blur-md p-6 rounded-[2rem] border border-gray-100 shadow-sm relative overflow-hidden flex items-center gap-5 cursor-pointer hover:border-emerald-300 hover:shadow-md transition-all" onclick="event.stopPropagation(); window._vehiculosAlCerrarCallback = function() { if (typeof window.openInmuebleDetailModal === 'function' && window.currentSelectedInmuebleId) { window.openInmuebleDetailModal(window.currentSelectedInmuebleId); } }; if (typeof window.closeInmuebleDetailModal === 'function') { window.closeInmuebleDetailModal(); } window.VehiculosModal.abrirParaInmueble(document.getElementById('inmNombreHeader').innerText)" title="Ver detalle en el módulo de Parque Vehicular">
                         <div class="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center flex-shrink-0 border border-emerald-100 shadow-inner">
                             <img src="/static/mapa/icons_inmueble/icon_vehiculo.svg" alt="Vehículos" class="w-8 h-8 object-contain">
                         </div>
