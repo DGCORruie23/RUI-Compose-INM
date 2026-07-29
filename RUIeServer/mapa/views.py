@@ -22,8 +22,16 @@ import base64
 import openpyxl
 import requests
 import urllib3
+from collections import Counter
+from urllib.parse import quote
+
+from openpyxl.drawing.image import Image as ExcelImage
+from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.utils import get_column_letter
+from weasyprint import HTML
 
 from django.contrib import messages
+from django.contrib.staticfiles import finders
 from django.shortcuts import render, redirect
 from django.apps import apps
 from django.core.files.base import ContentFile
@@ -32,7 +40,21 @@ from django.db import transaction, models
 from django.db.models import Sum, Count, Max, Q
 from django.db.models.functions import TruncDay, TruncMonth, TruncWeek
 from datetime import date, timedelta
-from django.http import JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
+from django.template.loader import get_template
+from django.views.decorators.http import require_GET
+
+from .models import (
+    Capufe,
+    CombustibleExt,
+    Kilometraje,
+    PrestadoDe,
+    Siniestros,
+    SituacionVeh,
+    TipoAsignacionVeh,
+    TipoVeh,
+    VehiculosOR,
+)
 
 
 def normalizar_nombre(texto):
@@ -4416,12 +4438,12 @@ def api_get_punto_internacion(request, punto_id):
     try:
         user_state = get_user_state(request)
         punto = PuntosInternacionEstacion.objects.get(id=punto_id)
-        
+
         # Validación de seguridad
         if not request.user.is_superuser:
             if not user_state or punto.estado != user_state:
                 return JsonResponse({'status': 'error', 'message': 'Sin permisos'}, status=403)
-                
+
         data = {
             'id': punto.id,
             'nombre': punto.nombre,
@@ -4433,4 +4455,600 @@ def api_get_punto_internacion(request, punto_id):
         return JsonResponse({'status': 'success', 'data': data})
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
+
+# =============================================================================
+# Parque Vehicular -- capa de consulta/visualizacion de solo lectura sobre
+# VehiculosOR (integrada aqui desde la antigua app 'vehiculos'; el alta/edicion
+# real sigue siendo guardar_vehiculo, guardar_kilometraje, etc. mas arriba).
+# =============================================================================
+
+# --- Helpers de conversión (VehiculosOR -> dict amigable para templates) --
+
+def _color_situacion(situacion_nombre):
+    """Color consistente en todo el módulo: verde para Activo, amarillo
+    para Mantenimiento, rojo para cualquier otra cosa (ej. Posible baja,
+    o valores no reconocidos). Centralizado aquí para no repetir la
+    lógica de comparación de texto en cada template por separado.
+
+    La situación es texto libre en la base real (ej. "ACTIVO",
+    "SERVICIO/MANTENIMIENTO", "PARA BAJA" -- no un catálogo cerrado de 3
+    valores), por eso "mantenimiento" se busca como substring y no con
+    igualdad exacta; cualquier otra cosa cae en "baja"."""
+    nombre = (situacion_nombre or "").strip().upper()
+    if nombre == "ACTIVO":
+        return "activo"
+    if "MANTENIMIENTO" in nombre:
+        return "mantenimiento"
+    return "baja"
+
+
+def _vehiculo_a_dict(v):
+    """Convierte una instancia de VehiculosOR a un dict con nombres
+    estables, para no acoplar los templates a los nombres de campo reales
+    (que pueden tener sus propias particularidades, ej. 'tipoVeh')."""
+    situacion_nombre = v.situacion.situacion if v.situacion_id else "Sin especificar"
+    return {
+        "id": v.id,
+        "placa": v.placa,
+        "marca": v.marca,
+        "modelo": v.modelo,
+        "anio": v.anio.year if v.anio else "",
+        "no_motor": v.no_motor,
+        "tipo_vehiculo": v.tipoVeh.tipo_veh if v.tipoVeh else "Sin especificar",
+        "tipo_asignacion": v.asignacion.tipo if v.asignacion_id else "Sin especificar",
+        "situacion": situacion_nombre,
+        "situacion_color": _color_situacion(situacion_nombre),
+        "estado": v.estado.nombre if v.estado_id else "",
+        "inmueble_destino": v.inmueble.nombre_inmueble if v.inmueble_id else "Sin asignar",
+        "tarjeta": v.tarjeta_asig or "",
+    }
+
+
+def _queryset_base():
+    return VehiculosOR.objects.select_related("tipoVeh", "asignacion", "situacion", "estado", "inmueble", "fotografias")
+
+
+def _es_activo(v):
+    return bool(v.situacion_id) and v.situacion.situacion.strip().upper() == "ACTIVO"
+
+
+# --- Filtros compartidos (listado, popover, excel) ----------------------
+
+def _filtrar_por_situacion(qs, situacion):
+    """Filtra por el mismo "bucket" que ya usa _color_situacion() (Activo /
+    Mantenimiento / lo demas), en vez de un iexact contra el texto libre
+    real -- si no, las tarjetas de resumen ("Activos", "Mantenimiento",
+    "Posible baja") llevarian a un listado vacio o equivocado en cuanto
+    la situacion real no coincidiera con el texto exacto del boton
+    (ej. "SERVICIO/MANTENIMIENTO" o "PARA BAJA" en la base real)."""
+    nombre = situacion.strip().upper()
+    if nombre == "ACTIVO":
+        return qs.filter(situacion__situacion__iexact="Activo")
+    if nombre == "MANTENIMIENTO":
+        return qs.filter(situacion__situacion__icontains="Mantenimiento")
+    # "Posible baja" (o cualquier otro valor): todo lo que no cae en los
+    # dos buckets de arriba, igual que el "return baja" de _color_situacion.
+    return qs.exclude(situacion__situacion__iexact="Activo").exclude(
+        situacion__situacion__icontains="Mantenimiento"
+    )
+
+
+def _aplicar_filtros(qs, request):
+    tipo = request.GET.get("tipo", "").strip()
+    situacion = request.GET.get("situacion", "").strip()
+    asignacion = request.GET.get("asignacion", "").strip()
+    estado = request.GET.get("estado", "").strip()
+    placa = request.GET.get("placa", "").strip()
+
+    if tipo:
+        qs = qs.filter(tipoVeh__tipo_veh__iexact=tipo)
+    if situacion:
+        qs = _filtrar_por_situacion(qs, situacion)
+    if asignacion:
+        qs = qs.filter(asignacion__tipo__iexact=asignacion)
+    if estado:
+        qs = qs.filter(estado__nombre__iexact=estado)
+    if placa:
+        qs = qs.filter(placa__icontains=placa)
+    return qs
+
+
+# --- Conteo para la tarjeta "Parque Vehicular" del menu del mapa ---------
+
+@require_GET
+def conteo_total(request):
+    """JSON minimo (solo el total) para la tarjeta del menu del mapa, que
+    antes mostraba un "32" fijo sin actualizar. Acepta '?estado=' opcional
+    por si algun dia se quiere el conteo de un estado en vez del nacional."""
+    estado_nombre = request.GET.get("estado", "").strip()
+    qs = _queryset_base()
+    if estado_nombre:
+        qs = qs.filter(estado__nombre__iexact=estado_nombre)
+    return JsonResponse({"total": qs.count()})
+
+
+# --- Vista general (dashboard) -------------------------------------------
+
+def vehiculos_dashboard(request):
+    filas = list(_queryset_base())
+    total = len(filas)
+    activos = sum(1 for v in filas if _es_activo(v))
+    mantenimiento = sum(1 for v in filas if _color_situacion(v.situacion.situacion if v.situacion_id else "") == "mantenimiento")
+    posible_baja = total - activos - mantenimiento
+
+    # SituacionVeh es texto libre en la base real (sin catálogo fijo de 3
+    # valores) — se cuenta todo lo que NO sea "Activo" como un solo grupo,
+    # y se muestra el desglose real de esas otras situaciones aparte.
+    otras_situaciones = {}
+    for v in filas:
+        if not _es_activo(v):
+            nombre = v.situacion.situacion if v.situacion_id else "Sin especificar"
+            otras_situaciones[nombre] = otras_situaciones.get(nombre, 0) + 1
+
+    tarjetas_asignadas = sum(1 for v in filas if v.tarjeta_asig)
+
+    monto_combustible = sum((c.monto for c in CombustibleExt.objects.only("monto")), start=0)
+
+    # "Total kilómetros" = suma de la lectura MÁS RECIENTE de cada
+    # vehículo (no la suma de todo el historial, que sobrecontaría).
+    ultima_lectura_por_vehiculo = {}
+    for k in Kilometraje.objects.order_by("vehiculo_id", "-fecha").only("vehiculo_id", "odometro"):
+        if k.vehiculo_id not in ultima_lectura_por_vehiculo:
+            ultima_lectura_por_vehiculo[k.vehiculo_id] = k.odometro
+    total_km = sum(ultima_lectura_por_vehiculo.values(), start=0)
+
+    conteo_tipos = Counter(v.tipoVeh.tipo_veh for v in filas if v.tipoVeh_id)
+    tipos_catalogo = TipoVeh.objects.all().order_by("tipo_veh")
+    tipos_vehiculo = [
+        {"nombre": t.tipo_veh, "cantidad": conteo_tipos.get(t.tipo_veh, 0)} for t in tipos_catalogo
+    ]
+
+    # Igual que con situación: TipoAsignacionVeh es texto libre en la base
+    # real, así que no asumimos que solo existen "Propio"/"Arrendado".
+    asignacion_conteo = {}
+    for v in filas:
+        if v.asignacion_id:
+            nombre = v.asignacion.tipo
+            asignacion_conteo[nombre] = asignacion_conteo.get(nombre, 0) + 1
+
+    context = {
+        "resumen_estado": {
+            "activos": activos,
+            "mantenimiento": mantenimiento,
+            "posible_baja": posible_baja,
+            "total": total,
+            "otras_situaciones": otras_situaciones,
+        },
+        # Categorias (tipo_vehiculo) en vez de "modelos distintos": el
+        # campo "modelo" es texto libre y se infla por errores de captura
+        # (typos, mayusculas, marca repetida con otro nombre); tipo_vehiculo
+        # es un catalogo cerrado, asi que el conteo es confiable.
+        "categorias_distintas": len(conteo_tipos),
+        "asignacion_conteo": asignacion_conteo,
+        "tarjetas_asignadas": tarjetas_asignadas,
+        "monto_combustible": monto_combustible,
+        "total_kilometros": total_km,
+        "tipos_vehiculo": tipos_vehiculo,
+        "situacion_opciones": sorted({v.situacion.situacion for v in filas if v.situacion_id}),
+        "asignacion_opciones": sorted(asignacion_conteo.keys()),
+        "estado_opciones": sorted({v.estado.nombre for v in filas if v.estado_id}),
+    }
+    return render(request, "vehiculos/dashboard.html", context)
+
+
+@require_GET
+def filtrar_dashboard(request):
+    qs = _aplicar_filtros(_queryset_base(), request)
+    conteo_tipos = Counter(v.tipoVeh.tipo_veh for v in qs if v.tipoVeh_id)
+    tipos_catalogo = TipoVeh.objects.all().order_by("tipo_veh")
+    tipos_vehiculo = [
+        {"nombre": t.tipo_veh, "cantidad": conteo_tipos.get(t.tipo_veh, 0)} for t in tipos_catalogo
+    ]
+    if request.GET.get("solo_con_unidades") == "1":
+        tipos_vehiculo = [t for t in tipos_vehiculo if t["cantidad"] > 0]
+    return render(request, "vehiculos/_tipos_grid.html", {"tipos_vehiculo": tipos_vehiculo})
+
+
+# --- Listado filtrable -----------------------------------------------------
+
+def vehiculos_listado(request):
+    context = {
+        "vehiculos": [],  # se llena vía AJAX al cargar, igual que el resto
+        "tipos_opciones": TipoVeh.objects.all().order_by("tipo_veh").values_list("tipo_veh", flat=True),
+        "situacion_opciones": SituacionVeh.objects.all().order_by("situacion").values_list("situacion", flat=True),
+        "asignacion_opciones": TipoAsignacionVeh.objects.all().order_by("tipo").values_list("tipo", flat=True),
+        "estado_opciones": Estado.objects.all().order_by("nombre").values_list("nombre", flat=True),
+    }
+    return render(request, "vehiculos/listado.html", context)
+
+
+@require_GET
+def filtrar_listado(request):
+    qs = _aplicar_filtros(_queryset_base(), request).order_by("estado__nombre", "marca", "modelo")
+    vehiculos = [_vehiculo_a_dict(v) for v in qs]
+    return render(request, "vehiculos/_listado_filas.html", {"vehiculos": vehiculos})
+
+
+@require_GET
+def listado_fragmento(request):
+    """Listado completo, pero como fragmento para abrir DENTRO del mismo
+    popup del mapa (VehiculosModal), no como página aparte. Se puede
+    llegar con '?estado=<nombre>' para llegar ya filtrado a ese estado
+    (por ejemplo, viniendo del botón 'Ver listado completo' del resumen)."""
+    estado_inicial = request.GET.get("estado", "").strip()
+    qs = _aplicar_filtros(_queryset_base(), request).order_by("estado__nombre", "marca", "modelo")
+    vehiculos = [_vehiculo_a_dict(v) for v in qs]
+
+    context = {
+        "vehiculos": vehiculos,
+        "estado_inicial": estado_inicial,
+        "tipos_opciones": TipoVeh.objects.all().order_by("tipo_veh").values_list("tipo_veh", flat=True),
+        "situacion_opciones": SituacionVeh.objects.all().order_by("situacion").values_list("situacion", flat=True),
+        "asignacion_opciones": TipoAsignacionVeh.objects.all().order_by("tipo").values_list("tipo", flat=True),
+        "estado_opciones": Estado.objects.all().order_by("nombre").values_list("nombre", flat=True),
+    }
+    return render(request, "vehiculos/_listado_modal.html", context)
+
+
+# --- Ficha de detalle (solo lectura) -------------------------------------
+
+def _historial_vehiculo(vehiculo_obj, fecha_inicio=None, fecha_fin=None):
+    # kilometraje/combustible se materializan en listas (no queryset lazy)
+    # porque _resumen_km_monto() indexa [0]/[-1] sobre ellas; así se
+    # reutiliza la misma consulta en vez de disparar una segunda.
+    # El filtro de fecha solo aplica a estas dos -- es lo único que pidió
+    # el calendario de la ficha (siniestros/capufe/préstamos quedan igual).
+    km_qs = Kilometraje.objects.filter(vehiculo=vehiculo_obj)
+    combustible_qs = CombustibleExt.objects.filter(vehiculo=vehiculo_obj)
+    if fecha_inicio:
+        km_qs = km_qs.filter(fecha__gte=fecha_inicio)
+        combustible_qs = combustible_qs.filter(fecha__gte=fecha_inicio)
+    if fecha_fin:
+        km_qs = km_qs.filter(fecha__lte=fecha_fin)
+        combustible_qs = combustible_qs.filter(fecha__lte=fecha_fin)
+
+    return {
+        "kilometraje": list(km_qs.order_by("-fecha")),
+        "combustible": list(combustible_qs.order_by("-fecha")),
+        "siniestros": Siniestros.objects.filter(vehiculo=vehiculo_obj).order_by("-fecha"),
+        "capufe": Capufe.objects.filter(vehiculo=vehiculo_obj).order_by("-fecha_inicio"),
+        "prestamos": PrestadoDe.objects.filter(vehiculo=vehiculo_obj).select_related("estado", "inmueble").order_by("-fecha_prestamo"),
+    }
+
+
+def _resumen_km_monto(historial):
+    """Resumen para la ficha: el kilometraje son lecturas de odómetro
+    (no tiene sentido sumarlas), así que se muestra el actual contra el
+    inicial. El combustible externo son montos independientes por
+    dispersión, así que ahí sí aplica la sumatoria total."""
+    km_lecturas = historial["kilometraje"]  # ya viene ordenado -fecha
+    km_inicial = km_lecturas[-1].odometro if km_lecturas else None
+    km_actual = km_lecturas[0].odometro if km_lecturas else None
+    km_recorridos = (
+        km_actual - km_inicial if km_inicial is not None and km_actual is not None else None
+    )
+
+    combustible_registros = historial["combustible"]
+    monto_total = sum((c.monto for c in combustible_registros), start=0) if combustible_registros else None
+
+    return {
+        "km_inicial": km_inicial,
+        "km_actual": km_actual,
+        "km_recorridos": km_recorridos,
+        "monto_total": monto_total,
+    }
+
+
+def _fotos_vehiculo(vehiculo_obj):
+    """Solo se usa en la ficha de detalle -- por eso no se agrega a
+    _vehiculo_a_dict() (que tambien alimenta listado/popover/excel, donde
+    no hace falta cargar fotos por cada fila)."""
+    fotos = vehiculo_obj.fotografias
+    if not fotos:
+        return {"foto_frente": None, "foto_lateral": None, "foto_trasera": None}
+    return {
+        "foto_frente": fotos.frente.url if fotos.frente else None,
+        "foto_lateral": fotos.lateral.url if fotos.lateral else None,
+        "foto_trasera": fotos.trasera.url if fotos.trasera else None,
+    }
+
+
+def _evidencia_km_actual(historial):
+    """Foto de evidencia (si la tiene) de la lectura de kilometraje mas
+    reciente -- historial["kilometraje"] ya viene ordenado -fecha."""
+    lecturas = historial["kilometraje"]
+    if lecturas and lecturas[0].evidencia:
+        return lecturas[0].evidencia.url
+    return None
+
+
+def _obtener_vehiculo_o_404(placa):
+    vehiculo_obj = _queryset_base().filter(placa__iexact=placa).first()
+    if vehiculo_obj is None:
+        raise Http404("No se encontró un vehículo con esa placa.")
+    return vehiculo_obj
+
+
+def _contexto_ficha(request, vehiculo_obj):
+    fecha_inicio = request.GET.get("fecha_inicio", "").strip()
+    fecha_fin = request.GET.get("fecha_fin", "").strip()
+    historial = _historial_vehiculo(vehiculo_obj, fecha_inicio or None, fecha_fin or None)
+    return {
+        "vehiculo": _vehiculo_a_dict(vehiculo_obj),
+        **historial,
+        **_resumen_km_monto(historial),
+        **_fotos_vehiculo(vehiculo_obj),
+        "km_evidencia": _evidencia_km_actual(historial),
+        "fecha_inicio_filtro": fecha_inicio,
+        "fecha_fin_filtro": fecha_fin,
+    }
+
+
+def detalle_vehiculo(request, placa):
+    vehiculo_obj = _obtener_vehiculo_o_404(placa)
+    return render(request, "vehiculos/detalle.html", _contexto_ficha(request, vehiculo_obj))
+
+
+def detalle_fragmento(request, placa):
+    vehiculo_obj = _obtener_vehiculo_o_404(placa)
+    return render(request, "vehiculos/_detalle_contenido.html", _contexto_ficha(request, vehiculo_obj))
+
+
+# --- Popovers (hold-menu / mapa) -----------------------------------------
+
+@require_GET
+def popover_vehiculos(request):
+    qs = _aplicar_filtros(_queryset_base(), request)
+    total = qs.count()
+    vehiculos = [_vehiculo_a_dict(v) for v in qs[:8]]
+    return render(request, "vehiculos/_popover_lista.html", {
+        "vehiculos": vehiculos,
+        "total": total,
+        "query": request.META.get("QUERY_STRING", ""),
+    })
+
+
+@require_GET
+def popover_kilometraje(request):
+    lecturas_qs = Kilometraje.objects.select_related("vehiculo").order_by("-fecha")[:8]
+    total = Kilometraje.objects.count()
+    lecturas = [
+        {"placa": k.vehiculo.placa, "fecha": k.fecha, "km": k.odometro}
+        for k in lecturas_qs
+    ]
+    return render(request, "vehiculos/_popover_kilometraje.html", {"lecturas": lecturas, "total": total})
+
+
+@require_GET
+def resumen_estado_fragmento(request):
+    """Fragmento para el botón 'Parque Vehicular' del mapa orgánico.
+    Sin parámetros -> resumen nacional, todos los vehículos.
+    Con 'estado=<nombre>' -> solo los de ese estado.
+    Con 'inmueble=<nombre>' -> solo los de ese inmueble específico
+    (tiene prioridad sobre 'estado' si ambos llegaran a mandarse).
+    Se abre dentro del mismo popup (#infoModal / VehiculosModal) que ya
+    usa el resto del mapa, así que no hace falta un modal aparte."""
+    estado_nombre = request.GET.get("estado", "").strip()
+    inmueble_nombre = request.GET.get("inmueble", "").strip()
+
+    # "Total Nacional" (o variantes) no es el nombre real de ningún estado
+    # en la base — es la etiqueta que usa el mapa para "sin filtro". Si
+    # llega tal cual, se trata como si no hubiera parámetro de estado.
+    if estado_nombre.upper() in ("TOTAL NACIONAL", "NACIONAL", "TOTAL_NACIONAL"):
+        estado_nombre = ""
+
+    qs = _queryset_base()
+    if inmueble_nombre:
+        qs = qs.filter(inmueble__nombre_inmueble__iexact=inmueble_nombre)
+        titulo = inmueble_nombre
+        filtro_extra = "inmueble=" + quote(inmueble_nombre)
+    elif estado_nombre:
+        qs = qs.filter(estado__nombre__iexact=estado_nombre)
+        titulo = estado_nombre
+        filtro_extra = "estado=" + quote(estado_nombre)
+    else:
+        titulo = "Total Nacional"
+        filtro_extra = "estado="
+
+    filas = list(qs)
+    total = len(filas)
+    activos = sum(1 for v in filas if _es_activo(v))
+    mantenimiento = sum(1 for v in filas if _color_situacion(v.situacion.situacion if v.situacion_id else "") == "mantenimiento")
+    posible_baja = total - activos - mantenimiento
+
+    # Desglose por situación individual (igual que el dashboard general),
+    # no solo un bulto de "otras situaciones" — así cada categoría real
+    # (Mantenimiento, Posible baja, etc.) tiene su propio botón filtrable.
+    otras_situaciones = {}
+    for v in filas:
+        if not _es_activo(v):
+            nombre = v.situacion.situacion if v.situacion_id else "Sin especificar"
+            otras_situaciones[nombre] = otras_situaciones.get(nombre, 0) + 1
+
+    # --- Mismas tarjetas que el dashboard general, pero filtradas ---
+    conteo_tipos = Counter(v.tipoVeh.tipo_veh for v in filas if v.tipoVeh_id)
+    tipos_catalogo = TipoVeh.objects.all().order_by("tipo_veh")
+    tipos_vehiculo = [
+        {"nombre": t.tipo_veh, "cantidad": conteo_tipos.get(t.tipo_veh, 0)} for t in tipos_catalogo
+    ]
+    tipos_vehiculo = [t for t in tipos_vehiculo if t["cantidad"] > 0]
+
+    # Categorias (tipo_vehiculo) en vez de "modelos distintos" -- mismo
+    # criterio que el dashboard: "modelo" es texto libre e infla el conteo
+    # por errores de captura, tipo_vehiculo es un catalogo cerrado.
+    categorias_distintas = len(conteo_tipos)
+    tarjetas_asignadas = sum(1 for v in filas if v.tarjeta_asig)
+
+    combustible_qs = CombustibleExt.objects.filter(vehiculo__in=filas)
+    monto_combustible = sum((c.monto for c in combustible_qs.only("monto")), start=0)
+
+    ultima_lectura_por_vehiculo = {}
+    km_qs = Kilometraje.objects.filter(vehiculo__in=filas).order_by("vehiculo_id", "-fecha")
+    for k in km_qs.only("vehiculo_id", "odometro"):
+        if k.vehiculo_id not in ultima_lectura_por_vehiculo:
+            ultima_lectura_por_vehiculo[k.vehiculo_id] = k.odometro
+    total_km = sum(ultima_lectura_por_vehiculo.values(), start=0)
+
+    vehiculos = [_vehiculo_a_dict(v) for v in qs.order_by("marca", "modelo")[:15]]
+
+    return render(request, "vehiculos/_resumen_estado.html", {
+        "estado_nombre": titulo,
+        "filtro_extra": filtro_extra,  # ej. "estado=Jalisco" o "inmueble=Oficina%20X", ya codificado
+        "total": total,
+        "activos": activos,
+        "mantenimiento": mantenimiento,
+        "posible_baja": posible_baja,
+        "inactivos": total - activos,
+        "otras_situaciones": otras_situaciones,
+        "categorias_distintas": categorias_distintas,
+        "tipos_vehiculo": tipos_vehiculo,
+        "tarjetas_asignadas": tarjetas_asignadas,
+        "monto_combustible": monto_combustible,
+        "total_kilometros": total_km,
+        "vehiculos": vehiculos,
+        "hay_mas": total > 15,
+    })
+
+
+# --- Exportación a Excel ---------------------------------------------------
+
+ENCABEZADOS_EXCEL_VEHICULOS = [
+    "Placa", "Marca", "Modelo", "Año", "No. Motor", "Tipo de vehículo",
+    "Tipo de asignación", "Situación", "Estado", "Inmueble", "Tarjeta",
+]
+CAMPOS_EXCEL_VEHICULOS = [
+    "placa", "marca", "modelo", "anio", "no_motor", "tipo_vehiculo",
+    "tipo_asignacion", "situacion", "estado", "inmueble_destino", "tarjeta",
+]
+
+
+@require_GET
+def exportar_excel_vehiculos(request):
+    qs = _aplicar_filtros(_queryset_base(), request).order_by("estado__nombre", "marca")
+    filas = [_vehiculo_a_dict(v) for v in qs]
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Vehículos"
+
+    # Encabezado institucional (logo + título), mismo criterio que el PDF
+    # de la ficha, para que el reporte se identifique como oficial del
+    # INM/Gobernación. Todo vía append() (no escritura directa de celdas)
+    # para que el contador interno de filas de openpyxl no se desincronice
+    # con las filas de datos que se agregan más abajo.
+    ws.append([""])
+    ws.append(["Secretaría de Gobernación · Instituto Nacional de Migración · Parque Vehicular"])
+    ws.append([])
+    ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=len(ENCABEZADOS_EXCEL_VEHICULOS))
+    ws["A2"].font = Font(bold=True, color="9A0A38", size=11)
+    ws["A2"].alignment = Alignment(horizontal="left", vertical="center")
+    ws.row_dimensions[1].height = 32
+
+    ruta_logo = finders.find("mapa/fondos/logo_gob.png")
+    if ruta_logo:
+        logo = ExcelImage(ruta_logo)
+        logo.height = 40
+        logo.width = 160
+        ws.add_image(logo, "A1")
+
+    fila_encabezados = ws.max_row + 1
+    ws.append(ENCABEZADOS_EXCEL_VEHICULOS)
+    relleno_encabezado = PatternFill("solid", fgColor="9A0A38")
+    for celda in ws[fila_encabezados]:
+        celda.font = Font(bold=True, color="FFFFFF")
+        celda.fill = relleno_encabezado
+        celda.alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[fila_encabezados].height = 20
+    ws.freeze_panes = f"A{fila_encabezados + 1}"
+
+    for fila in filas:
+        ws.append([fila.get(campo, "") for campo in CAMPOS_EXCEL_VEHICULOS])
+
+    for indice, encabezado in enumerate(ENCABEZADOS_EXCEL_VEHICULOS, start=1):
+        letra = get_column_letter(indice)
+        ws.column_dimensions[letra].width = max(len(encabezado), 12) + 2
+
+    partes_nombre = ["vehiculos"]
+    for etiqueta in ("tipo", "situacion", "asignacion", "estado"):
+        valor = request.GET.get(etiqueta, "")
+        if valor:
+            partes_nombre.append(valor.replace(" ", "_"))
+    nombre_archivo = "_".join(partes_nombre) + ".xlsx"
+
+    response = HttpResponse(
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response["Content-Disposition"] = f'attachment; filename="{nombre_archivo}"'
+    wb.save(response)
+    return response
+
+
+# --- Descarga de la ficha en PDF -------------------------------------------
+
+@require_GET
+def descargar_pdf_ficha(request, placa):
+    """Mismo contexto que la ficha en pantalla (_contexto_ficha), pero
+    renderizado a un template plano (sin Tailwind/JS, WeasyPrint no los
+    procesa) y convertido a PDF -- mismo patron que ya usa 'estadistica'
+    para sus reportes."""
+    vehiculo_obj = _obtener_vehiculo_o_404(placa)
+    context = _contexto_ficha(request, vehiculo_obj)
+
+    template = get_template("vehiculos/_pdf_ficha.html")
+    html_string = template.render(context)
+    pdf_file = HTML(string=html_string, base_url=request.build_absolute_uri()).write_pdf()
+
+    response = HttpResponse(pdf_file, content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="ficha_{vehiculo_obj.placa}.pdf"'
+    return response
+
+
+# --- Ubicaciones para el mapa (íconos por inmueble) -----------------------
+
+@require_GET
+def mapa_ubicaciones_geojson(request):
+    """GeoJSON con un punto por cada inmueble que tenga vehículos asignados
+    y coordenadas capturadas, con el conteo de vehículos en cada uno — para
+    pintar íconos en el mapa (MapLibre). Los vehículos sin inmueble
+    asignado, o cuyo inmueble no tenga latitud/longitud, no aparecen aquí
+    (a propósito: no hay dónde ubicarlos con precisión)."""
+    qs = _queryset_base().filter(
+        inmueble__isnull=False,
+        inmueble__latitud__isnull=False,
+        inmueble__longitud__isnull=False,
+    )
+
+    conteo_por_inmueble = {}
+    for v in qs:
+        inmueble = v.inmueble
+        clave = inmueble.id
+        if clave not in conteo_por_inmueble:
+            conteo_por_inmueble[clave] = {
+                "nombre": inmueble.nombre_inmueble,
+                "lat": float(inmueble.latitud),
+                "lng": float(inmueble.longitud),
+                "total": 0,
+                "placa_unica": v.placa,  # se usa solo si total termina en 1
+            }
+        else:
+            conteo_por_inmueble[clave]["placa_unica"] = None  # ya hay más de uno
+        conteo_por_inmueble[clave]["total"] += 1
+
+    features = [
+        {
+            "type": "Feature",
+            "geometry": {"type": "Point", "coordinates": [datos["lng"], datos["lat"]]},
+            "properties": {
+                "nombre": datos["nombre"],
+                "total": datos["total"],
+                # Si el inmueble tiene un único vehículo, se manda su placa
+                # para poder ir directo a la ficha sin pasar por la lista.
+                "placa_unica": datos["placa_unica"] if datos["total"] == 1 else None,
+            },
+        }
+        for datos in conteo_por_inmueble.values()
+    ]
+
+    return JsonResponse({"type": "FeatureCollection", "features": features})
 

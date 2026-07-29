@@ -45,7 +45,7 @@ urlpatterns = [
     path('estadistica/', include('estadistica.urls')),
     # path('info/pruebas/edoFuerza/editarEdoFuerza/<int:id_edo_fuerza>', viewsDash.editar_estado_fuerza, name='editar_estado_fuerza'),
     # path('info/pruebas/usuarios/eliminarUsuario/<int:id_usuario>', viewsDash.eliminarUsuario, name='eliminar_usuario'),
-    path('vehiculos/', include('vehiculos.urls')),
+    path('vehiculos/', include('mapa.urls_vehiculos')),
 
 ]
 
