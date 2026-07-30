@@ -1,13 +1,14 @@
 {% for lectura in lecturas %}
-{% if '/' in lectura.placa %}
-{% comment %}Placas tipo "S/P" (sin placa) traen "/" y rompen la URL de detalle (el <str:placa> de Django no admite "/"); se muestran sin liga.{% endcomment %}
-<div class="flex items-center justify-between gap-3 px-3 py-2 rounded-lg text-sm opacity-70">
+{% if lectura.placa_ambigua %}
+{% comment %}Placas de relleno ("S/P", "SIN NUMERO DE PLACA", etc.) no son unicas ni todas validas como segmento de URL -- se enlaza por id.{% endcomment %}
+<a href="{% url 'vehiculos:detalle_id' lectura.vehiculo_id %}" data-modal-url="{% url 'vehiculos:detalle_fragmento_id' lectura.vehiculo_id %}"
+   class="flex items-center justify-between gap-3 px-3 py-2 rounded-lg hover:bg-guinda-50 transition text-sm">
   <span class="flex flex-col">
     <span class="font-semibold text-slate-700">{{ lectura.placa }} (sin placa)</span>
     <span class="text-xs text-slate-400">{{ lectura.fecha|default:"S/F" }}</span>
   </span>
   <span class="text-guinda font-semibold text-xs">{{ lectura.km }}</span>
-</div>
+</a>
 {% else %}
 <a href="{% url 'vehiculos:detalle' lectura.placa %}" data-modal-url="{% url 'vehiculos:detalle_fragmento' lectura.placa %}"
    class="flex items-center justify-between gap-3 px-3 py-2 rounded-lg hover:bg-guinda-50 transition text-sm">

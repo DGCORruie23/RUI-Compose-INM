@@ -14,9 +14,12 @@
   <td class="px-4 py-3 text-slate-600">{{ v.tipo_asignacion }}</td>
   <td class="px-4 py-3 text-slate-600">{{ v.estado }}</td>
   <td class="px-4 py-3 text-right">
-    {% if '/' in v.placa %}
-    {% comment %}Placas tipo "S/P" (sin placa) traen "/" y rompen la URL de detalle (el <str:placa> de Django no admite "/"); se muestran sin liga.{% endcomment %}
-    <span class="text-slate-400 text-xs">Sin placa</span>
+    {% if v.placa_ambigua %}
+    {% comment %}Placas de relleno ("S/P", "SIN NUMERO DE PLACA", etc.) no son unicas ni todas validas como segmento de URL -- se enlaza por id.{% endcomment %}
+    <a href="{% url 'vehiculos:detalle_id' v.id %}" data-modal-url="{% url 'vehiculos:detalle_fragmento_id' v.id %}"
+       class="text-emerald-600 hover:text-emerald-700 hover:underline font-medium whitespace-nowrap">
+      Ver detalle →
+    </a>
     {% else %}
     <a href="{% url 'vehiculos:detalle' v.placa %}" data-modal-url="{% url 'vehiculos:detalle_fragmento' v.placa %}"
        class="text-emerald-600 hover:text-emerald-700 hover:underline font-medium whitespace-nowrap">

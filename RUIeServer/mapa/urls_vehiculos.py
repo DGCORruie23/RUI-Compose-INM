@@ -26,6 +26,11 @@ urlpatterns = [
     path("fragmento/resumen-estado/", views.resumen_estado_fragmento, name="resumen_estado_fragmento"),
     path("fragmento/<str:placa>/", views.detalle_fragmento, name="detalle_fragmento"),
     path("descargar-pdf/<str:placa>/", views.descargar_pdf_ficha, name="descargar_pdf_ficha"),
+    # Alternativas por id para vehiculos sin placa real (placa de relleno
+    # tipo "S/P", "SIN NUMERO DE PLACA", etc: ni son unicas ni todas son
+    # validas como segmento de URL). Ver mapa/views.py _placa_ambigua().
+    path("fragmento/id/<int:vehiculo_id>/", views.detalle_fragmento_por_id, name="detalle_fragmento_id"),
+    path("id/<int:vehiculo_id>/", views.detalle_vehiculo_por_id, name="detalle_id"),
     # Debe ir al final: "placa" es un segmento genérico y atraparía
     # cualquier ruta de un solo nivel si se declara antes que las de arriba.
     path("<str:placa>/", views.detalle_vehiculo, name="detalle"),

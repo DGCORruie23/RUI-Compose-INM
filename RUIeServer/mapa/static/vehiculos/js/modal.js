@@ -212,7 +212,10 @@
   // del mapa (VehiculosModal.abrir), y los navegadores NO ejecutan
   // <script> insertados por innerHTML -- solo funcionaria en la pagina
   // completa /vehiculos/<placa>/, no dentro del modal.
-  window.vehFiltrarHistorial = function (placa, limpiar) {
+  // 'esId' distingue vehiculos con placa de relleno ("S/P", "SIN NUMERO DE
+  // PLACA", etc.): esos no son identificador valido/unico, así que se
+  // re-consulta por id en vez de por placa (ver _placa_ambigua en views.py).
+  window.vehFiltrarHistorial = function (identificador, limpiar, esId) {
     const inicio = document.getElementById('vehFiltroFechaInicio');
     const fin = document.getElementById('vehFiltroFechaFin');
     const params = new URLSearchParams();
@@ -220,7 +223,10 @@
       if (inicio && inicio.value) params.set('fecha_inicio', inicio.value);
       if (fin && fin.value) params.set('fecha_fin', fin.value);
     }
-    fetch(`/vehiculos/fragmento/${encodeURIComponent(placa)}/?${params.toString()}`, {
+    const base = esId
+      ? `/vehiculos/fragmento/id/${identificador}/`
+      : `/vehiculos/fragmento/${encodeURIComponent(identificador)}/`;
+    fetch(`${base}?${params.toString()}`, {
       headers: { 'X-Requested-With': 'XMLHttpRequest' },
     })
       .then((resp) => resp.text())

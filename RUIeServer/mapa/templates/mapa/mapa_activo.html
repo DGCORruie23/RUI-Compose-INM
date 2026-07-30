@@ -741,7 +741,7 @@
         }
       }
       setTimeout(() => {
-          if (window.map) window.map.resize();
+          if (map) map.resize();
           window.dispatchEvent(new Event('resize'));
       }, 100);
     }
@@ -791,7 +791,7 @@
         if (btnCollapse) btnCollapse.classList.remove('hidden');
         if (btnReturn) btnReturn.classList.add('hidden');
         // Trigger resize para que el mapa se ajuste
-        setTimeout(() => { if (window.map) window.map.resize(); }, 310);
+        setTimeout(() => { if (map) map.resize(); }, 310);
     }
   };
 

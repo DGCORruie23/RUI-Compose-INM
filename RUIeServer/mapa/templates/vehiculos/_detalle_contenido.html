@@ -183,12 +183,13 @@
           <input type="date" id="vehFiltroFechaFin" value="{{ fecha_fin_filtro|default:'' }}"
                  class="border border-slate-200 rounded-lg px-3 py-1.5 text-sm text-slate-700">
         </div>
-        <button type="button" onclick="vehFiltrarHistorial('{{ vehiculo.placa }}')"
+        {% comment %}Siempre por id: es el único identificador que nunca es ambiguo, sin importar si la placa se repite o no.{% endcomment %}
+        <button type="button" onclick="vehFiltrarHistorial('{{ vehiculo.id }}', false, true)"
                 class="bg-[#9A0A38] hover:bg-[#7d0830] text-white text-xs font-semibold px-4 py-2 rounded-lg transition">
           Filtrar
         </button>
         {% if fecha_inicio_filtro or fecha_fin_filtro %}
-        <button type="button" onclick="vehFiltrarHistorial('{{ vehiculo.placa }}', true)"
+        <button type="button" onclick="vehFiltrarHistorial('{{ vehiculo.id }}', true, true)"
                 class="text-xs font-semibold text-slate-500 hover:text-[#9A0A38] transition">
           ✕ Limpiar
         </button>

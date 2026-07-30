@@ -38,7 +38,7 @@ from django.core.files.base import ContentFile
 from django.conf import settings
 from django.db import transaction, models
 from django.db.models import Sum, Count, Max, Q
-from django.db.models.functions import TruncDay, TruncMonth, TruncWeek
+from django.db.models.functions import TruncDay, TruncMonth, TruncWeek, Upper
 from datetime import date, timedelta
 from django.http import Http404, HttpResponse, JsonResponse
 from django.template.loader import get_template
@@ -4483,14 +4483,54 @@ def _color_situacion(situacion_nombre):
     return "baja"
 
 
-def _vehiculo_a_dict(v):
+# Valores de relleno que captura usa cuando el vehículo no tiene placa real
+# (texto libre, sin catálogo cerrado -- de ahí la variedad). Ninguno sirve
+# como identificador: además de que "S/P" y "S/N" traen "/" y rompen la URL
+# <str:placa>, varios vehículos distintos comparten el mismo texto (ej. 15
+# con "SIN NUMERO DE PLACA"), así que buscar por placa devolvería siempre
+# el mismo vehículo del grupo sin importar cuál se haya clickeado. Estos
+# casos deben enlazarse por id, no por placa.
+_PLACAS_SIN_ASIGNAR = {"S/P", "S/N", "SIN PLACAS", "SIN NUMERO DE PLACA", "NO APLICA"}
+
+
+def _placas_duplicadas():
+    """Placas (normalizadas) que le pertenecen a mas de un vehiculo en toda
+    la tabla -- no solo relleno compartido a propósito (_PLACAS_SIN_ASIGNAR),
+    también coincidencias reales de captura (dos vehículos distintos con la
+    misma placa, ej. mismo folio de flotilla reusado). _obtener_vehiculo_o_404
+    busca sobre TODA la tabla sin filtro, así que la ambigüedad es global:
+    no basta con revisar duplicados dentro de un listado ya filtrado."""
+    conteo = (
+        VehiculosOR.objects.exclude(placa="")
+        .annotate(placa_norm=Upper("placa"))
+        .values("placa_norm")
+        .annotate(n=Count("id"))
+        .filter(n__gt=1)
+        .values_list("placa_norm", flat=True)
+    )
+    return set(conteo)
+
+
+def _placa_ambigua(placa, duplicadas=None):
+    if not placa or "/" in placa:
+        return True
+    normalizada = placa.strip().upper()
+    if normalizada in _PLACAS_SIN_ASIGNAR:
+        return True
+    return bool(duplicadas) and normalizada in duplicadas
+
+
+def _vehiculo_a_dict(v, duplicadas=None):
     """Convierte una instancia de VehiculosOR a un dict con nombres
     estables, para no acoplar los templates a los nombres de campo reales
-    (que pueden tener sus propias particularidades, ej. 'tipoVeh')."""
+    (que pueden tener sus propias particularidades, ej. 'tipoVeh').
+    'duplicadas' (ver _placas_duplicadas) se calcula una sola vez por vista
+    y se pasa aquí -- no tiene caso reconsultarlo por cada fila."""
     situacion_nombre = v.situacion.situacion if v.situacion_id else "Sin especificar"
     return {
         "id": v.id,
         "placa": v.placa,
+        "placa_ambigua": _placa_ambigua(v.placa, duplicadas),
         "marca": v.marca,
         "modelo": v.modelo,
         "anio": v.anio.year if v.anio else "",
@@ -4548,7 +4588,7 @@ def _aplicar_filtros(qs, request):
     if asignacion:
         qs = qs.filter(asignacion__tipo__iexact=asignacion)
     if estado:
-        qs = qs.filter(estado__nombre__iexact=estado)
+        qs = qs.filter(estado__nombre__iexact=normalizar_nombre(estado))
     if placa:
         qs = qs.filter(placa__icontains=placa)
     return qs
@@ -4564,7 +4604,7 @@ def conteo_total(request):
     estado_nombre = request.GET.get("estado", "").strip()
     qs = _queryset_base()
     if estado_nombre:
-        qs = qs.filter(estado__nombre__iexact=estado_nombre)
+        qs = qs.filter(estado__nombre__iexact=normalizar_nombre(estado_nombre))
     return JsonResponse({"total": qs.count()})
 
 
@@ -4666,7 +4706,8 @@ def vehiculos_listado(request):
 @require_GET
 def filtrar_listado(request):
     qs = _aplicar_filtros(_queryset_base(), request).order_by("estado__nombre", "marca", "modelo")
-    vehiculos = [_vehiculo_a_dict(v) for v in qs]
+    duplicadas = _placas_duplicadas()
+    vehiculos = [_vehiculo_a_dict(v, duplicadas) for v in qs]
     return render(request, "vehiculos/_listado_filas.html", {"vehiculos": vehiculos})
 
 
@@ -4678,7 +4719,8 @@ def listado_fragmento(request):
     (por ejemplo, viniendo del botón 'Ver listado completo' del resumen)."""
     estado_inicial = request.GET.get("estado", "").strip()
     qs = _aplicar_filtros(_queryset_base(), request).order_by("estado__nombre", "marca", "modelo")
-    vehiculos = [_vehiculo_a_dict(v) for v in qs]
+    duplicadas = _placas_duplicadas()
+    vehiculos = [_vehiculo_a_dict(v, duplicadas) for v in qs]
 
     context = {
         "vehiculos": vehiculos,
@@ -4770,6 +4812,13 @@ def _obtener_vehiculo_o_404(placa):
     return vehiculo_obj
 
 
+def _obtener_vehiculo_por_id_o_404(vehiculo_id):
+    vehiculo_obj = _queryset_base().filter(pk=vehiculo_id).first()
+    if vehiculo_obj is None:
+        raise Http404("No se encontró un vehículo con ese id.")
+    return vehiculo_obj
+
+
 def _contexto_ficha(request, vehiculo_obj):
     fecha_inicio = request.GET.get("fecha_inicio", "").strip()
     fecha_fin = request.GET.get("fecha_fin", "").strip()
@@ -4795,13 +4844,27 @@ def detalle_fragmento(request, placa):
     return render(request, "vehiculos/_detalle_contenido.html", _contexto_ficha(request, vehiculo_obj))
 
 
+def detalle_vehiculo_por_id(request, vehiculo_id):
+    """Misma ficha que detalle_vehiculo, pero por id en vez de placa -- para
+    vehículos con placa de relleno (ver _placa_ambigua) donde buscar por
+    placa sería ambiguo o rompería la URL."""
+    vehiculo_obj = _obtener_vehiculo_por_id_o_404(vehiculo_id)
+    return render(request, "vehiculos/detalle.html", _contexto_ficha(request, vehiculo_obj))
+
+
+def detalle_fragmento_por_id(request, vehiculo_id):
+    vehiculo_obj = _obtener_vehiculo_por_id_o_404(vehiculo_id)
+    return render(request, "vehiculos/_detalle_contenido.html", _contexto_ficha(request, vehiculo_obj))
+
+
 # --- Popovers (hold-menu / mapa) -----------------------------------------
 
 @require_GET
 def popover_vehiculos(request):
     qs = _aplicar_filtros(_queryset_base(), request)
     total = qs.count()
-    vehiculos = [_vehiculo_a_dict(v) for v in qs[:8]]
+    duplicadas = _placas_duplicadas()
+    vehiculos = [_vehiculo_a_dict(v, duplicadas) for v in qs[:8]]
     return render(request, "vehiculos/_popover_lista.html", {
         "vehiculos": vehiculos,
         "total": total,
@@ -4813,8 +4876,15 @@ def popover_vehiculos(request):
 def popover_kilometraje(request):
     lecturas_qs = Kilometraje.objects.select_related("vehiculo").order_by("-fecha")[:8]
     total = Kilometraje.objects.count()
+    duplicadas = _placas_duplicadas()
     lecturas = [
-        {"placa": k.vehiculo.placa, "fecha": k.fecha, "km": k.odometro}
+        {
+            "placa": k.vehiculo.placa,
+            "placa_ambigua": _placa_ambigua(k.vehiculo.placa, duplicadas),
+            "vehiculo_id": k.vehiculo_id,
+            "fecha": k.fecha,
+            "km": k.odometro,
+        }
         for k in lecturas_qs
     ]
     return render(request, "vehiculos/_popover_kilometraje.html", {"lecturas": lecturas, "total": total})
@@ -4844,7 +4914,7 @@ def resumen_estado_fragmento(request):
         titulo = inmueble_nombre
         filtro_extra = "inmueble=" + quote(inmueble_nombre)
     elif estado_nombre:
-        qs = qs.filter(estado__nombre__iexact=estado_nombre)
+        qs = qs.filter(estado__nombre__iexact=normalizar_nombre(estado_nombre))
         titulo = estado_nombre
         filtro_extra = "estado=" + quote(estado_nombre)
     else:
@@ -4890,7 +4960,8 @@ def resumen_estado_fragmento(request):
             ultima_lectura_por_vehiculo[k.vehiculo_id] = k.odometro
     total_km = sum(ultima_lectura_por_vehiculo.values(), start=0)
 
-    vehiculos = [_vehiculo_a_dict(v) for v in qs.order_by("marca", "modelo")[:15]]
+    duplicadas = _placas_duplicadas()
+    vehiculos = [_vehiculo_a_dict(v, duplicadas) for v in qs.order_by("marca", "modelo")[:15]]
 
     return render(request, "vehiculos/_resumen_estado.html", {
         "estado_nombre": titulo,
