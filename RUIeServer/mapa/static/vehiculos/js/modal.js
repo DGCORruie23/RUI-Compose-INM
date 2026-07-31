@@ -215,7 +215,7 @@
   // 'esId' distingue vehiculos con placa de relleno ("S/P", "SIN NUMERO DE
   // PLACA", etc.): esos no son identificador valido/unico, así que se
   // re-consulta por id en vez de por placa (ver _placa_ambigua en views.py).
-  window.vehFiltrarHistorial = function (identificador, limpiar, esId) {
+  window.vehFiltrarHistorial = function (placa, limpiar, esId) {
     const inicio = document.getElementById('vehFiltroFechaInicio');
     const fin = document.getElementById('vehFiltroFechaFin');
     const params = new URLSearchParams();
@@ -224,8 +224,8 @@
       if (fin && fin.value) params.set('fecha_fin', fin.value);
     }
     const base = esId
-      ? `/vehiculos/fragmento/id/${identificador}/`
-      : `/vehiculos/fragmento/${encodeURIComponent(identificador)}/`;
+      ? `/vehiculos/fragmento/id/${placa}/`
+      : `/vehiculos/fragmento/${encodeURIComponent(placa)}/`;
     fetch(`${base}?${params.toString()}`, {
       headers: { 'X-Requested-With': 'XMLHttpRequest' },
     })

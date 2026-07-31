@@ -33,6 +33,7 @@ from weasyprint import HTML
 from django.contrib import messages
 from django.contrib.staticfiles import finders
 from django.shortcuts import render, redirect
+from django.urls import reverse
 from django.apps import apps
 from django.core.files.base import ContentFile
 from django.conf import settings
@@ -4485,12 +4486,12 @@ def _color_situacion(situacion_nombre):
 
 # Valores de relleno que captura usa cuando el vehículo no tiene placa real
 # (texto libre, sin catálogo cerrado -- de ahí la variedad). Ninguno sirve
-# como identificador: además de que "S/P" y "S/N" traen "/" y rompen la URL
-# <str:placa>, varios vehículos distintos comparten el mismo texto (ej. 15
-# con "SIN NUMERO DE PLACA"), así que buscar por placa devolvería siempre
-# el mismo vehículo del grupo sin importar cuál se haya clickeado. Estos
-# casos deben enlazarse por id, no por placa.
-_PLACAS_SIN_ASIGNAR = {"S/P", "S/N", "SIN PLACAS", "SIN NUMERO DE PLACA", "NO APLICA"}
+# como identificador: varios vehículos distintos comparten el mismo texto
+# (ej. 15 con "SIN NUMERO DE PLACA"), así que buscar por placa devolvería
+# siempre el mismo vehículo del grupo sin importar cuál se haya clickeado.
+# Estos casos deben enlazarse por id, no por placa. ("S/P" y "S/N" no están
+# aquí porque ya los captura el chequeo de "/" en _placa_ambigua().)
+_PLACAS_SIN_ASIGNAR = {"SIN PLACAS", "SIN NUMERO DE PLACA", "NO APLICA"}
 
 
 def _placas_duplicadas():
@@ -4520,6 +4521,22 @@ def _placa_ambigua(placa, duplicadas=None):
     return bool(duplicadas) and normalizada in duplicadas
 
 
+def _urls_detalle_vehiculo(vehiculo_id, placa, ambigua):
+    """URLs de 'Ver detalle'/'Ver ficha': por id si la placa es ambigua, por
+    placa si no. Centralizado aquí para no repetir el mismo {% if
+    placa_ambigua %}...{% else %}...{% endif %} con el mismo <a> en cada
+    template que lista vehículos (listado, resumen por estado, popovers)."""
+    if ambigua:
+        return (
+            reverse("vehiculos:detalle_id", args=[vehiculo_id]),
+            reverse("vehiculos:detalle_fragmento_id", args=[vehiculo_id]),
+        )
+    return (
+        reverse("vehiculos:detalle", args=[placa]),
+        reverse("vehiculos:detalle_fragmento", args=[placa]),
+    )
+
+
 def _vehiculo_a_dict(v, duplicadas=None):
     """Convierte una instancia de VehiculosOR a un dict con nombres
     estables, para no acoplar los templates a los nombres de campo reales
@@ -4527,10 +4544,14 @@ def _vehiculo_a_dict(v, duplicadas=None):
     'duplicadas' (ver _placas_duplicadas) se calcula una sola vez por vista
     y se pasa aquí -- no tiene caso reconsultarlo por cada fila."""
     situacion_nombre = v.situacion.situacion if v.situacion_id else "Sin especificar"
+    ambigua = _placa_ambigua(v.placa, duplicadas)
+    detalle_url, detalle_fragmento_url = _urls_detalle_vehiculo(v.id, v.placa, ambigua)
     return {
         "id": v.id,
         "placa": v.placa,
-        "placa_ambigua": _placa_ambigua(v.placa, duplicadas),
+        "placa_ambigua": ambigua,
+        "detalle_url": detalle_url,
+        "detalle_fragmento_url": detalle_fragmento_url,
         "marca": v.marca,
         "modelo": v.modelo,
         "anio": v.anio.year if v.anio else "",
@@ -4877,16 +4898,18 @@ def popover_kilometraje(request):
     lecturas_qs = Kilometraje.objects.select_related("vehiculo").order_by("-fecha")[:8]
     total = Kilometraje.objects.count()
     duplicadas = _placas_duplicadas()
-    lecturas = [
-        {
+    lecturas = []
+    for k in lecturas_qs:
+        ambigua = _placa_ambigua(k.vehiculo.placa, duplicadas)
+        detalle_url, detalle_fragmento_url = _urls_detalle_vehiculo(k.vehiculo_id, k.vehiculo.placa, ambigua)
+        lecturas.append({
             "placa": k.vehiculo.placa,
-            "placa_ambigua": _placa_ambigua(k.vehiculo.placa, duplicadas),
-            "vehiculo_id": k.vehiculo_id,
+            "placa_ambigua": ambigua,
+            "detalle_url": detalle_url,
+            "detalle_fragmento_url": detalle_fragmento_url,
             "fecha": k.fecha,
             "km": k.odometro,
-        }
-        for k in lecturas_qs
-    ]
+        })
     return render(request, "vehiculos/_popover_kilometraje.html", {"lecturas": lecturas, "total": total})
 
 

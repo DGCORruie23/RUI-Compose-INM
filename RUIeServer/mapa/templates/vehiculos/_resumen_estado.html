@@ -108,18 +108,11 @@
             </span>
           </td>
           <td class="px-3 py-2 text-right">
-            {% if v.placa_ambigua %}
-            {% comment %}Placas de relleno ("S/P", "SIN NUMERO DE PLACA", etc.) no son unicas ni todas validas como segmento de URL -- se enlaza por id.{% endcomment %}
-            <a href="#" data-modal-url="{% url 'vehiculos:detalle_fragmento_id' v.id %}"
+            {% comment %}v.detalle_fragmento_url ya resuelve por id o por placa segun corresponda (placas de relleno tipo "S/P", "SIN NUMERO DE PLACA", etc. no son unicas -- ver _urls_detalle_vehiculo en views.py).{% endcomment %}
+            <a href="#" data-modal-url="{{ v.detalle_fragmento_url }}"
                class="text-emerald-600 hover:text-emerald-700 hover:underline font-medium text-xs whitespace-nowrap">
               Ver ficha →
             </a>
-            {% else %}
-            <a href="#" data-modal-url="{% url 'vehiculos:detalle_fragmento' v.placa %}"
-               class="text-emerald-600 hover:text-emerald-700 hover:underline font-medium text-xs whitespace-nowrap">
-              Ver ficha →
-            </a>
-            {% endif %}
           </td>
         </tr>
         {% endfor %}
