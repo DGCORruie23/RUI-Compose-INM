@@ -1116,7 +1116,7 @@
               'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}'
             ],
             'tileSize': 256,
-            'attribution': 'INEGI &copy; Esri'
+            'attribution': '<span id="live-clock">--:--:-- CST</span> <span>·</span> <span id="live-date">--/--/----</span>'
           }
         },
         'layers': [
@@ -2677,6 +2677,30 @@
       const modal = document.getElementById('personalStatsActivosModal');
       if (modal) modal.classList.add('hidden');
   };
+
+  function updateClock() {
+    const a = new Date(),
+      A = a.toLocaleTimeString("es-MX", {
+        timeZone: "America/Mexico_City",
+        hour12: false,
+      }),
+      i = a.toLocaleDateString("es-MX", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      }),
+      o = document.getElementById("live-clock"),
+      e = document.getElementById("live-date");
+    if (o) o.textContent = A + " CST";
+    if (e) e.textContent = i;
+  }
+  setInterval(updateClock, 1000);
+  updateClock();
+
+  // Recargar la página automáticamente cada hora (3,600,000 ms)
+  setTimeout(() => {
+    location.reload();
+  }, 3600000);
 </script>
 
     <!-- Modal Curriculum Titular -->
