@@ -5106,12 +5106,18 @@ def mapa_ubicaciones_geojson(request):
     y coordenadas capturadas, con el conteo de vehículos en cada uno — para
     pintar íconos en el mapa (MapLibre). Los vehículos sin inmueble
     asignado, o cuyo inmueble no tenga latitud/longitud, no aparecen aquí
-    (a propósito: no hay dónde ubicarlos con precisión)."""
+    (a propósito: no hay dónde ubicarlos con precisión).
+    Con 'estado=<nombre>' -> solo los de ese estado (igual que
+    resumen_estado_fragmento); sin parámetro -> todo el país."""
     qs = _queryset_base().filter(
         inmueble__isnull=False,
         inmueble__latitud__isnull=False,
         inmueble__longitud__isnull=False,
     )
+
+    estado_nombre = request.GET.get("estado", "").strip()
+    if estado_nombre.upper() not in ("", "TOTAL NACIONAL", "NACIONAL", "TOTAL_NACIONAL"):
+        qs = qs.filter(estado__nombre__iexact=normalizar_nombre(estado_nombre))
 
     conteo_por_inmueble = {}
     for v in qs:

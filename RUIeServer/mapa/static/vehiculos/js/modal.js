@@ -20,6 +20,10 @@
   // pedir nada nuevo al backend, si el inmueble tiene un solo vehiculo
   // (y por lo tanto puede ir directo a su ficha) o varios.
   const ubicacionesVehiculosPorInmueble = {};
+  // Referencia al handler de reposicionamiento actualmente enganchado a
+  // los eventos del mapa (move/zoom/resize), para poder quitarlo antes de
+  // reconstruir la capa cuando cambia el estado seleccionado.
+  let reposicionarHandlerActual = null;
 
   function asegurarTailwind() {
     if (window.tailwind) return Promise.resolve();
@@ -415,23 +419,6 @@
     if (e.key === 'ArrowRight') vehCambiarFotoGaleria(1);
   });
 
-  // --- Hover para la tarjeta "Parque Vehicular" del mapa orgánico ---
-  // Esa tarjeta (en mapa_activo.html) solo tenía onclick; esto le agrega
-  // "mantener el cursor encima abre solo", igual que en /vehiculos/,
-  // sin tener que volver a editar mapa_activo.html a mano.
-  document.addEventListener('DOMContentLoaded', () => {
-    const tarjeta = document.getElementById('card_vehiculos');
-    if (!tarjeta || typeof window.mostrarParqueVehicular !== 'function') return;
-
-    let temporizador = null;
-    tarjeta.addEventListener('mouseenter', () => {
-      temporizador = setTimeout(() => window.mostrarParqueVehicular(), 400);
-    });
-    tarjeta.addEventListener('mouseleave', () => {
-      clearTimeout(temporizador);
-    });
-  });
-
   // --- Íconos de vehículos por inmueble en el mapa ---
   // Un marcador con el ícono de auto por inmueble con vehículos
   // (coordenadas reales), con una insignia mostrando el conteo; clic
@@ -455,13 +442,39 @@
   function agregarMarcadoresVehiculos() {
     console.log('[vehiculos-mapa] agregando marcadores ahora');
 
-    fetch('/vehiculos/api/mapa-ubicaciones/')
+    // Mismo criterio que mostrarParqueVehicular(): si hay un estado
+    // seleccionado (y no es "Total Nacional"), se manda para que el
+    // backend solo regrese las ubicaciones de ese estado.
+    var nombreEstado = window.selectedStateData ? window.selectedStateData.name : '';
+    var esNacional = !nombreEstado || nombreEstado === 'Total Nacional' || nombreEstado === 'NACIONAL';
+    if (typeof LABEL_NACIONAL !== 'undefined' && nombreEstado === LABEL_NACIONAL) { esNacional = true; }
+    var urlUbicaciones = '/vehiculos/api/mapa-ubicaciones/' + (esNacional ? '' : ('?estado=' + encodeURIComponent(nombreEstado)));
+
+    fetch(urlUbicaciones)
       .then((resp) => resp.json())
       .then((geojson) => {
         console.log('[vehiculos-mapa] geojson recibido, features =', geojson.features ? geojson.features.length : 'N/A');
         (geojson.features || []).forEach((feature) => {
           ubicacionesVehiculosPorInmueble[feature.properties.nombre] = feature.properties;
         });
+
+        // Limpia la capa anterior (si existia) y sus listeners antes de
+        // reconstruir -- evita duplicar iconos o acumular handlers de
+        // mapa cada vez que se refresca por un cambio de estado.
+        const capaAnterior = document.getElementById('vehiculos-capa-iconos');
+        let visibleAntes = true;
+        if (capaAnterior) {
+          visibleAntes = capaAnterior.style.display !== 'none';
+          capaAnterior.remove();
+        }
+        if (reposicionarHandlerActual) {
+          map.off('move', reposicionarHandlerActual);
+          map.off('zoom', reposicionarHandlerActual);
+          map.off('resize', reposicionarHandlerActual);
+          window.removeEventListener('resize', reposicionarHandlerActual);
+          reposicionarHandlerActual = null;
+        }
+
         if (!geojson.features || !geojson.features.length) return;
 
         // Contenedor propio superpuesto al mapa — no usamos
@@ -535,10 +548,35 @@
         map.on('zoom', reposicionarTodos);
         map.on('resize', reposicionarTodos);
         window.addEventListener('resize', reposicionarTodos);
+        reposicionarHandlerActual = reposicionarTodos;
+        capa.style.display = visibleAntes ? 'block' : 'none';
 
         console.log('[vehiculos-mapa] marcadores agregados con exito (posicionamiento manual)');
       })
       .catch((err) => console.error('[vehiculos-mapa] No se pudo cargar la capa de vehículos en el mapa:', err));
+  }
+
+  // Se llama desde mapa_activo.html cada vez que cambia el estado
+  // seleccionado, para que la capa de iconos (si el usuario ya la habia
+  // activado antes) se reconstruya con el filtro nuevo. Si nunca se dio
+  // clic en "Parque Vehicular", no hay nada que refrescar y no hace nada.
+  window.refrescarCapaVehiculos = function () {
+    if (!document.getElementById('vehiculos-capa-iconos')) return;
+    agregarMarcadoresVehiculos();
+  };
+
+  // Alterna (toggle) la capa de iconos azules en cada clic: si ya existe,
+  // solo cambia su visibilidad (no la vuelve a crear ni pide el geojson de
+  // nuevo); si es la primera vez, la crea vía intentarAgregarCapaVehiculos.
+  function toggleCapaVehiculos() {
+    const capa = document.getElementById('vehiculos-capa-iconos');
+    if (capa) {
+      const visible = capa.style.display !== 'none';
+      capa.style.display = visible ? 'none' : 'block';
+      console.log('[vehiculos-mapa] capa existente, visibilidad ahora:', capa.style.display);
+      return;
+    }
+    intentarAgregarCapaVehiculos();
   }
 
   document.addEventListener('DOMContentLoaded', () => {
@@ -547,13 +585,12 @@
       console.log('[vehiculos-mapa] card_vehiculos NO encontrado en esta página');
       return;
     }
-    // Los iconos de auto ya NO se agregan solos al cargar la pagina --
-    // solo se activan la primera vez que el usuario da clic en la tarjeta
-    // "Parque Vehicular" (intentarAgregarCapaVehiculos ya se protege con
-    // window._vehiculosMarcadoresAgregados para no duplicarlos despues).
+    // Cada clic en "Parque Vehicular" alterna la capa de iconos: aparece,
+    // desaparece, aparece... (toggleCapaVehiculos maneja tanto la primera
+    // creacion como las veces siguientes).
     tarjetaVehiculos.addEventListener('click', () => {
-      console.log('[vehiculos-mapa] tarjeta Parque Vehicular clicada, activando iconos del mapa...');
-      intentarAgregarCapaVehiculos();
+      console.log('[vehiculos-mapa] tarjeta Parque Vehicular clicada, alternando iconos del mapa...');
+      toggleCapaVehiculos();
     });
   });
 

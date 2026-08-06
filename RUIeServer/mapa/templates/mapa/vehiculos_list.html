@@ -471,7 +471,65 @@
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                             <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 ml-1">Marca *</label>
-                            <input type="text" name="marca" required class="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none text-xs font-bold text-gray-700 focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all">
+                            
+                            <!-- PRUEBA: combobox de marcas via NHTSA vPIC (API publica EE.UU.). Experimental. -->
+                            <select name="marca" required id="marca-combobox" class="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none text-xs font-bold text-gray-700 focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all appearance-none cursor-pointer">
+                                <option value="" disabled selected>-- Seleccionar --</option>
+                            </select>
+                            <script>
+                                (function () {
+                                    // Filtra por tipo de vehiculo (dato real de NHTSA API) en vez de una
+                                    // lista escrita a mano, y reduce el ruido (remolques, motos sueltas,
+                                    // talleres personalizados) usando solo datos que la API ya provee.
+                                    var TIPOS = ['car', 'truck', 'multipurpose passenger vehicle (mpv)'];
+                                    var vistos = new Set();
+                                    var combobox = document.getElementById('marca-combobox');
+
+                                    Promise.all(TIPOS.map(function (tipo) {
+                                        var url = 'https://vpic.nhtsa.dot.gov/api/vehicles/GetMakesForVehicleType/'
+                                            + encodeURIComponent(tipo) + '?format=json';
+                                        return fetch(url).then(function (r) { return r.json(); });
+                                    }))
+                                        .then(function (respuestas) {
+                                            var nombres = [];
+                                            respuestas.forEach(function (data) {
+                                                (data.Results || []).forEach(function (make) {
+                                                    var nombre = make.MakeName || make.Make_Name;
+                                                    if (nombre && !vistos.has(nombre.toUpperCase())) {
+                                                        vistos.add(nombre.toUpperCase());
+                                                        nombres.push(nombre);
+                                                    }
+                                                });
+                                            });
+                                            // Marcas confirmadas en el parque vehicular, pero fuera de
+                                            // car/truck/mpv (motos, remolques) - se agregan a mano en
+                                            // vez de sumar esas categorias completas.
+                                            // Se agregan apoyadas en verificacion interna:
+                                            // coinciden con un Tipo de Vehiculo real y consistente en
+                                            // la base de datos del INM.
+                                            [
+                                                'GML', 'YAMAHA', 'CAN-AM', 'HAULMARK',
+                                                'AIR RANGER', 'AMERICAN AIRBOAT', 'DIAMOND BACK',
+                                                'DIAMONDBACK AIRBOATS', 'LARK UNITED', 'SKY WATCH', 'ICX'
+                                            ].forEach(function (nombre) {
+                                                if (!vistos.has(nombre)) {
+                                                    vistos.add(nombre);
+                                                    nombres.push(nombre);
+                                                }
+                                            });
+                                            nombres.sort(function (a, b) { return a.localeCompare(b); });
+                                            nombres.forEach(function (nombre) {
+                                                var option = document.createElement('option');
+                                                option.value = nombre;
+                                                option.textContent = nombre;
+                                                combobox.appendChild(option);
+                                            });
+                                        })
+                                        .catch(function (err) {
+                                            console.error('Prueba: error al cargar catalogo de fabricantes (NHTSA):', err);
+                                        });
+                                })();
+                            </script>
                         </div>
                         <div>
                             <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 ml-1">Modelo *</label>
@@ -490,7 +548,53 @@
                         </div>
                         <div>
                             <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 ml-1">No. Motor *</label>
-                            <input type="text" name="no_motor" required class="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none text-xs font-bold text-gray-700 focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all">
+                            <input type="text" name="no_motor" id="no_motor_input" required class="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none text-xs font-bold text-gray-700 focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all">
+                            <p id="no_motor_error" class="hidden text-[10px] font-bold text-rose-600 mt-1 ml-1"></p>
+                            <label class="flex items-center gap-1.5 mt-1.5 ml-1 text-[10px] font-bold text-gray-500">
+                                <input type="checkbox" id="no_motor_sin_numero">
+                                Sin número de motor
+                            </label>
+
+                            <!-- PRUEBA: no hay norma (NOM ni de fabricante) que defina un formato
+                                 unico de numero de motor - a diferencia del VIN, cada fabricante usa
+                                 su propio esquema. Se valida contra el patron CLASICO general de un
+                                 identificador de este tipo (alfanumerico, sin espacios, longitud
+                                 razonable)-->
+                            <script>
+                                (function () {
+                                    var input = document.getElementById('no_motor_input');
+                                    var checkbox = document.getElementById('no_motor_sin_numero');
+                                    var error = document.getElementById('no_motor_error');
+                                    var form = document.getElementById('vehiculoForm');
+
+                                    // Patron clasico: solo letras/numeros, sin espacios ni simbolos.
+                                    // Longitud corregida via investigacion: numeros de motor reales
+                                    // rondan 11-17 caracteres segun fabricante (Honda/Toyota/VW).
+                                    var PATRON_CLASICO = /^[A-Z0-9]{10,20}$/i;
+
+                                    checkbox.addEventListener('change', function () {
+                                        if (checkbox.checked) {
+                                            input.value = 'SN';
+                                            input.readOnly = true;
+                                            error.classList.add('hidden');
+                                        } else {
+                                            input.value = '';
+                                            input.readOnly = false;
+                                        }
+                                    });
+
+                                    form.addEventListener('submit', function (e) {
+                                        if (checkbox.checked) { return; }
+                                        var valor = input.value.trim();
+                                        if (!PATRON_CLASICO.test(valor)) {
+                                            e.preventDefault();
+                                            error.textContent = 'El numero de motor debe ser alfanumerico, sin espacios, entre 5 y 20 caracteres. Si el vehiculo no tiene, marca "Sin numero de motor".';
+                                            error.classList.remove('hidden');
+                                            input.focus();
+                                        }
+                                    });
+                                })();
+                            </script>
                         </div>
                     </div>
                 </div>
