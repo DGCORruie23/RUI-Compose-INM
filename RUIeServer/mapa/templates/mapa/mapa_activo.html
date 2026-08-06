@@ -993,8 +993,11 @@
       window.currentInfraFilter = null; // Resetear filtros de iconos
       
       updateInformationPanel();
-      animateToNationalView(); 
+      animateToNationalView();
       updateStateOpacity();
+      if (window.refrescarCapaVehiculos) {
+          window.refrescarCapaVehiculos();
+      }
   };
 
   window.animateToSelectedState = function(stateName) {
@@ -1091,8 +1094,8 @@
     auto: "{% static 'vehiculos/icons/vehiculo.svg' %}"
   };
 </script>
-<script src="{% static 'vehiculos/js/modal.js' %}"></script>
-<script src="{% static 'vehiculos/js/hold-menu.js' %}"></script>
+<script src="{% static 'vehiculos/js/modal.js' %}?v=2.3"></script>
+<script src="{% static 'vehiculos/js/hold-menu.js' %}?v=2.2"></script>
 <script>
 function mostrarParqueVehicular() {
     if (!window.selectedStateData) { return; }
@@ -1279,7 +1282,7 @@ function mostrarParqueVehicular() {
           };
           
           window.selectedStateData = newStateData;
-          
+
           if (window.animateToSelectedState) {
               window.animateToSelectedState(newStateData.name);
           }
@@ -1288,6 +1291,9 @@ function mostrarParqueVehicular() {
           }
           if (window.updateStateOpacity) {
               window.updateStateOpacity();
+          }
+          if (window.refrescarCapaVehiculos) {
+              window.refrescarCapaVehiculos();
           }
         }
       });
@@ -1309,6 +1315,9 @@ function mostrarParqueVehicular() {
             }
             if (window.updateStateOpacity) {
                 window.updateStateOpacity();
+            }
+            if (window.refrescarCapaVehiculos) {
+                window.refrescarCapaVehiculos();
             }
         }
       });
@@ -3173,7 +3182,7 @@ function mostrarParqueVehicular() {
                     </div>
 
                     <!-- Tarjeta de Vehículos -->
-                    <div class="bg-white/80 backdrop-blur-md p-6 rounded-[2rem] border border-gray-100 shadow-sm relative overflow-hidden flex items-center gap-5 cursor-pointer hover:border-emerald-300 hover:shadow-md transition-all" onclick="event.stopPropagation(); window._vehiculosAlCerrarCallback = function() { if (typeof window.openStateDetailModal === 'function') { window.openStateDetailModal(); } }; if (typeof window.closeStateDetailModal === 'function') { window.closeStateDetailModal(); } window.VehiculosModal.abrir('/vehiculos/fragmento/resumen-estado/?estado=' + encodeURIComponent(document.getElementById('estNombreHeader').innerText))" title="Ver detalle en el modulo de Parque Vehicular">
+                    <div class="bg-white/80 backdrop-blur-md p-6 rounded-[2rem] border border-gray-100 shadow-sm relative overflow-hidden flex items-center gap-5 cursor-pointer hover:border-emerald-300 hover:shadow-md transition-all" onclick="event.stopPropagation(); (function(idActual) { window._vehiculosAlCerrarCallback = function() { if (typeof window.openStateDetailModal === 'function') { window.openStateDetailModal(idActual); } }; })(window.currentSelectedEstadoId); if (typeof window.closeStateDetailModal === 'function') { window.closeStateDetailModal(); } window.VehiculosModal.abrir('/vehiculos/fragmento/resumen-estado/?estado=' + encodeURIComponent(document.getElementById('estNombreHeader').innerText))" title="Ver detalle en el modulo de Parque Vehicular">
                         <div class="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center flex-shrink-0 border border-emerald-100 shadow-inner">
                             <img src="/static/mapa/icons_inmueble/icon_vehiculo.svg" alt="Vehículos" class="w-8 h-8 object-contain">
                         </div>
