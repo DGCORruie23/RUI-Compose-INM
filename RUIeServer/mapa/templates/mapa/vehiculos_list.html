@@ -588,7 +588,7 @@
                                         var valor = input.value.trim();
                                         if (!PATRON_CLASICO.test(valor)) {
                                             e.preventDefault();
-                                            error.textContent = 'El numero de motor debe ser alfanumerico, sin espacios, entre 5 y 20 caracteres. Si el vehiculo no tiene, marca "Sin numero de motor".';
+                                            error.textContent = 'El numero de motor debe ser alfanumerico, sin espacios, entre 10 y 20 caracteres. Si el vehiculo no tiene, marca "Sin numero de motor".';
                                             error.classList.remove('hidden');
                                             input.focus();
                                         }
