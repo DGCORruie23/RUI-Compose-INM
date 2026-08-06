@@ -69,13 +69,16 @@ choice_embarazo = (
 
 types_paises = []
 
-## Segunda parte para comentar
+try:
+    for paises_I in Paises.objects.all():
+         nomPS = str(paises_I.nombre_pais)
+         types_paises.append((nomPS, nomPS))
+except Exception:
+#     # La tabla usuario_paises puede no existir todavía (ej. antes del
+#     # primer migrate en una base de datos nueva). Si falla, types_paises
+#     # simplemente queda vacía en vez de tumbar todo el proyecto al arrancar.
+    pass
 
-for paises_I in Paises.objects.all():
-    nomPS = str(paises_I.nombre_pais)
-    types_paises.append((nomPS, nomPS))
-
-## hasta aqui
 
 class ExcelForm(forms.Form):    
     fechaDescarga = forms.DateField(

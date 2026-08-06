@@ -1,0 +1,18 @@
+{% for lectura in lecturas %}
+{% comment %}lectura.detalle_url ya resuelve por id o por placa segun corresponda (placas de relleno tipo "S/P", "SIN NUMERO DE PLACA", etc. no son unicas -- ver _urls_detalle_vehiculo en views.py).{% endcomment %}
+<a href="{{ lectura.detalle_url }}" data-modal-url="{{ lectura.detalle_fragmento_url }}"
+   class="flex items-center justify-between gap-3 px-3 py-2 rounded-lg hover:bg-guinda-50 transition text-sm">
+  <span class="flex flex-col">
+    <span class="font-semibold text-slate-700">{{ lectura.placa }}{% if lectura.placa_ambigua %} (sin placa){% endif %}</span>
+    <span class="text-xs text-slate-400">{{ lectura.fecha|default:"S/F" }}</span>
+  </span>
+  <span class="text-guinda font-semibold text-xs">{{ lectura.km }}</span>
+</a>
+{% empty %}
+<p class="px-3 py-4 text-xs text-slate-400 text-center">Sin lecturas de kilometraje registradas.</p>
+{% endfor %}
+{% if total > 8 %}
+<p class="text-center text-xs text-slate-400 px-3 py-2 border-t border-slate-100 mt-1">
+  Mostrando las 8 más recientes de {{ total }}
+</p>
+{% endif %}

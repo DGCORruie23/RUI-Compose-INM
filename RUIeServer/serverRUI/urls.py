@@ -45,11 +45,13 @@ urlpatterns = [
     path('estadistica/', include('estadistica.urls')),
     # path('info/pruebas/edoFuerza/editarEdoFuerza/<int:id_edo_fuerza>', viewsDash.editar_estado_fuerza, name='editar_estado_fuerza'),
     # path('info/pruebas/usuarios/eliminarUsuario/<int:id_usuario>', viewsDash.eliminarUsuario, name='eliminar_usuario'),
+    path('vehiculos/', include('mapa.urls_vehiculos')),
+
 ]
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 else:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
-
 handler404 = pagina404

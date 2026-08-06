@@ -21,3 +21,7 @@ db.sqlite3
 importar_DB_Django.txt
 /media_volume
 .promps
+docker-compose.override.yaml
+
+data/
+postgres-data/

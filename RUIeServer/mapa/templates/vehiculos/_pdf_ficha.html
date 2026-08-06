@@ -1,0 +1,138 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<style>
+  @page { size: A4; margin: 1.5cm; }
+  body { font-family: Helvetica, Arial, sans-serif; color: #1e293b; font-size: 11px; }
+  .encabezado { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #9A0A38; padding-bottom: 10px; margin-bottom: 16px; }
+  .encabezado img { height: 34px; }
+  .encabezado h1 { color: #9A0A38; font-size: 20px; margin: 0; }
+  .encabezado p { color: #94a3b8; font-size: 9px; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 2px 0; }
+  h2 { color: #9A0A38; font-size: 13px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; margin: 18px 0 8px 0; }
+  .seccion { margin-bottom: 6px; }
+  .grid { display: flex; flex-wrap: wrap; gap: 14px; }
+  .campo { width: 30%; margin-bottom: 8px; }
+  .campo p.label { color: #94a3b8; font-size: 8px; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 2px 0; }
+  .campo p.valor { font-size: 11px; font-weight: bold; margin: 0; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+  th { background: #f8fafc; color: #64748b; font-size: 8px; text-transform: uppercase; text-align: left; padding: 5px 6px; border-bottom: 1px solid #e2e8f0; }
+  td { font-size: 10px; padding: 5px 6px; border-bottom: 1px solid #f1f5f9; }
+  .resumen { display: flex; gap: 18px; margin-bottom: 8px; }
+  .resumen .campo { width: auto; }
+  .total-destacado { color: #9A0A38; font-size: 13px; font-weight: bold; }
+  .fotos { display: flex; gap: 10px; margin-top: 8px; }
+  .fotos div { width: 24%; text-align: center; }
+  .fotos img { width: 100%; height: 90px; object-fit: cover; border: 1px solid #e2e8f0; border-radius: 4px; }
+  .pie { margin-top: 24px; padding-top: 10px; border-top: 1px solid #e2e8f0; text-align: center; }
+  .pie .logo-caja { display: inline-block; background: #0E3B1E; padding: 4px 10px; border-radius: 4px; margin-bottom: 4px; }
+  .pie img { height: 20px; }
+  .pie p { color: #94a3b8; font-size: 8px; margin: 0; }
+</style>
+</head>
+<body>
+
+  <div class="encabezado">
+    <div>
+      <p>Ficha de vehículo &middot; Parque Vehicular</p>
+      <h1>{{ vehiculo.placa }}</h1>
+    </div>
+    <img src="{% static 'vehiculos/img/logo_inm.png' %}" alt="INM">
+  </div>
+
+  <h2>Información de la Unidad</h2>
+  <div class="grid">
+    <div class="campo"><p class="label">Marca</p><p class="valor">{{ vehiculo.marca|default:"—" }}</p></div>
+    <div class="campo"><p class="label">Modelo</p><p class="valor">{{ vehiculo.modelo|default:"—" }}</p></div>
+    <div class="campo"><p class="label">Año</p><p class="valor">{{ vehiculo.anio|default:"—" }}</p></div>
+    <div class="campo"><p class="label">No. de motor</p><p class="valor">{{ vehiculo.no_motor|default:"—" }}</p></div>
+    <div class="campo"><p class="label">Tipo de vehículo</p><p class="valor">{{ vehiculo.tipo_vehiculo|default:"—" }}</p></div>
+  </div>
+
+  <h2>Asignación y Logística</h2>
+  <div class="grid">
+    <div class="campo"><p class="label">Tipo de asignación</p><p class="valor">{{ vehiculo.tipo_asignacion|default:"—" }}</p></div>
+    <div class="campo"><p class="label">Situación</p><p class="valor">{{ vehiculo.situacion|default:"—" }}</p></div>
+    <div class="campo"><p class="label">Estado</p><p class="valor">{{ vehiculo.estado|default:"—" }}</p></div>
+    <div class="campo"><p class="label">Inmueble</p><p class="valor">{{ vehiculo.inmueble_destino|default:"—" }}</p></div>
+    <div class="campo"><p class="label">Tarjeta asignada</p><p class="valor">{{ vehiculo.tarjeta|default:"Sin tarjeta" }}</p></div>
+  </div>
+
+  <h2>Recarga de combustible extraordinaria</h2>
+  {% if combustible %}
+  <p>Total gastado: <span class="total-destacado">${{ monto_total|floatformat:2 }}</span></p>
+  <table>
+    <thead><tr><th>Fecha</th><th>Monto</th></tr></thead>
+    <tbody>
+      {% for c in combustible %}
+      <tr><td>{{ c.fecha|default:"S/F" }}</td><td>${{ c.monto|floatformat:2 }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>Sin registros de combustible externo.</p>
+  {% endif %}
+
+  <h2>Historial de kilometraje</h2>
+  {% if kilometraje %}
+  <div class="resumen">
+    <div class="campo"><p class="label">Inicial</p><p class="valor">{{ km_inicial|floatformat:0 }}</p></div>
+    <div class="campo"><p class="label">Actual</p><p class="valor">{{ km_actual|floatformat:0 }}</p></div>
+    <div class="campo"><p class="label">Recorridos</p><p class="valor total-destacado">{{ km_recorridos|floatformat:0 }}</p></div>
+  </div>
+  <table>
+    <thead><tr><th>Fecha</th><th>Tipo</th><th>Odómetro</th></tr></thead>
+    <tbody>
+      {% for k in kilometraje %}
+      <tr><td>{{ k.fecha|default:"S/F" }}</td><td>{{ k.get_tipo_display }}</td><td>{{ k.odometro }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>Sin lecturas de kilometraje registradas.</p>
+  {% endif %}
+
+  {% if prestamos %}
+  <h2>Historial de préstamos</h2>
+  <table>
+    <thead><tr><th>Fecha</th><th>Estado</th><th>Inmueble</th></tr></thead>
+    <tbody>
+      {% for p in prestamos %}
+      <tr><td>{{ p.fecha_prestamo|default:"S/F" }}</td><td>{{ p.estado.nombre }}</td><td>{{ p.inmueble.nombre_inmueble|default:"Sin asignar" }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  {% if siniestros %}
+  <h2>Siniestros</h2>
+  <table>
+    <thead><tr><th>Fecha</th><th>Folio</th></tr></thead>
+    <tbody>
+      {% for s in siniestros %}
+      <tr><td>{{ s.fecha|default:"S/F" }}</td><td>{{ s.folio|default:"S/F" }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  {% if foto_frente or foto_lateral or foto_trasera or km_evidencia %}
+  <h2>Evidencia fotográfica</h2>
+  <div class="fotos">
+    {% if foto_frente %}<div><img src="{{ foto_frente }}" alt="Frente"><p class="label">Frente</p></div>{% endif %}
+    {% if foto_lateral %}<div><img src="{{ foto_lateral }}" alt="Lateral"><p class="label">Lateral</p></div>{% endif %}
+    {% if foto_trasera %}<div><img src="{{ foto_trasera }}" alt="Trasera"><p class="label">Trasera</p></div>{% endif %}
+    {% if km_evidencia %}<div><img src="{{ km_evidencia }}" alt="Odómetro"><p class="label">Odómetro</p></div>{% endif %}
+  </div>
+  {% endif %}
+
+  <div class="pie">
+    <div class="logo-caja">
+      <img src="{% static 'mapa/fondos/logo_gob.png' %}" alt="Secretaría de Gobernación">
+    </div>
+    <p>Instituto Nacional de Migración &middot; Secretaría de Gobernación &middot; Parque Vehicular</p>
+  </div>
+
+</body>
+</html>
