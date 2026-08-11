@@ -615,10 +615,12 @@ class VehiculosOR(models.Model):
     monto = models.DecimalField(max_digits=10, decimal_places=2) 
     tipoVeh = models.ForeignKey(TipoVeh, on_delete=models.CASCADE, null=True, blank=True)
     asignacion = models.ForeignKey(TipoAsignacionVeh, on_delete=models.CASCADE, db_index=True)
+    fecha_asignacion = models.DateField(null=True, blank=True)
     estado = models.ForeignKey(Estado, on_delete=models.CASCADE, db_index=True)
     inmueble = models.ForeignKey(Inmueble, on_delete=models.CASCADE, null=True, blank=True, db_index=True)
     fotografias = models.ForeignKey(FotosVeh, on_delete=models.CASCADE, null=True, blank=True)
     situacion = models.ForeignKey(SituacionVeh, on_delete=models.CASCADE, null=True, blank=True)
+    balizado = models.BooleanField(default=False, null=True, blank=True)
 
     def __str__(self):
         return f"{self.marca} {self.modelo} ({self.placa})"
