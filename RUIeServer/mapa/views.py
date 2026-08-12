@@ -3831,7 +3831,10 @@ def guardar_vehiculo(request):
         # Limpiar caracteres como signo de pesos o comas
         monto_raw = monto_raw.replace('$', '').replace(',', '').strip()
         monto = float(monto_raw) if monto_raw else 0.0
-            
+
+        fecha_asignacion = request.POST.get('fecha_asignacion') or None
+        balizado = request.POST.get('balizado') == 'on'
+
         defaults = {
             'marca': request.POST.get('marca', '').strip().upper(),
             'modelo': request.POST.get('modelo', '').strip().upper(),
@@ -3847,6 +3850,8 @@ def guardar_vehiculo(request):
             'inmueble_id': request.POST.get('inmueble_id') or None,
             'fotografias': fotos_obj,
             'situacion_id': request.POST.get('situacion_id') or None,
+            'fecha_asignacion': fecha_asignacion,
+            'balizado': balizado,
         }
         
         if vehiculo_id:
@@ -3982,6 +3987,8 @@ def api_get_vehiculo(request, vehiculo_id):
             'foto_lateral_url': vehiculo.fotografias.lateral.url if (vehiculo.fotografias and vehiculo.fotografias.lateral) else '',
             'foto_trasera_url': vehiculo.fotografias.trasera.url if (vehiculo.fotografias and vehiculo.fotografias.trasera) else '',
             'situacion_id': vehiculo.situacion_id or '',
+            'fecha_asignacion': vehiculo.fecha_asignacion.strftime('%Y-%m-%d') if vehiculo.fecha_asignacion else '',
+            'balizado': vehiculo.balizado,
         }
         return JsonResponse({'status': 'success', 'data': data})
     except VehiculosOR.DoesNotExist:
@@ -4563,6 +4570,8 @@ def _vehiculo_a_dict(v, duplicadas=None):
         "estado": v.estado.nombre if v.estado_id else "",
         "inmueble_destino": v.inmueble.nombre_inmueble if v.inmueble_id else "Sin asignar",
         "tarjeta": v.tarjeta_asig or "",
+        "balizado": v.balizado,
+        "fecha_asignacion": v.fecha_asignacion,
     }
 
 
