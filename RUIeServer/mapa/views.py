@@ -3831,7 +3831,7 @@ def guardar_vehiculo(request):
         # Limpiar caracteres como signo de pesos o comas
         monto_raw = monto_raw.replace('$', '').replace(',', '').strip()
         monto = float(monto_raw) if monto_raw else 0.0
-
+            
         fecha_asignacion = request.POST.get('fecha_asignacion') or None
         balizado = request.POST.get('balizado') == 'on'
 
