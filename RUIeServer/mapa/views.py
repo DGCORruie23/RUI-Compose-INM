@@ -4570,6 +4570,8 @@ def _vehiculo_a_dict(v, duplicadas=None):
         "estado": v.estado.nombre if v.estado_id else "",
         "inmueble_destino": v.inmueble.nombre_inmueble if v.inmueble_id else "Sin asignar",
         "tarjeta": v.tarjeta_asig or "",
+        "balizado": v.balizado,
+        "fecha_asignacion": v.fecha_asignacion,
     }
 
 

@@ -85,6 +85,7 @@
         <div><p class="veh-campo-label">Año</p><p class="veh-campo-valor">{{ vehiculo.anio|default:"—" }}</p></div>
         <div><p class="veh-campo-label">Placa</p><p class="veh-campo-valor">{{ vehiculo.placa|default:"—" }}</p></div>
         <div><p class="veh-campo-label">No. de motor</p><p class="veh-campo-valor">{{ vehiculo.no_motor|default:"—" }}</p></div>
+        <div><p class="veh-campo-label">Fecha de asignación</p><p class="veh-campo-valor">{{ vehiculo.fecha_asignacion|date:"d/m/Y"|default:"—" }}</p></div>
       </div>
 
       {% if foto_frente or foto_lateral or foto_trasera or km_evidencia %}
@@ -123,6 +124,7 @@
         <div><p class="veh-campo-label">Estado</p><p class="veh-campo-valor">{{ vehiculo.estado|default:"—" }}</p></div>
         <div><p class="veh-campo-label">Inmueble</p><p class="veh-campo-valor">{{ vehiculo.inmueble_destino|default:"—" }}</p></div>
         <div><p class="veh-campo-label">Tarjeta asignada</p><p class="veh-campo-valor">{{ vehiculo.tarjeta|default:"Sin tarjeta" }}</p></div>
+        <div><p class="veh-campo-label">Balizado</p><p class="veh-campo-valor">{{ vehiculo.balizado|yesno:"Sí,No,—" }}</p></div>
       </div>
 
       {% if prestamos %}
