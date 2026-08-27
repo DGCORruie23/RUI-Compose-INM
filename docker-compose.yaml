@@ -3,8 +3,8 @@ services:
     container_name: RUIEapp
     restart: always
     build: ./RUIeServer
-    command: gunicorn serverRUI.wsgi:application --bind 0.0.0.0:8000 --reload --workers 5 --threads 2 --timeout 120
-    #command: python manage.py runserver 0.0.0.0:8000
+    #command: gunicorn serverRUI.wsgi:application --bind 0.0.0.0:8000 --reload --workers 5 --threads 2 --timeout 120
+    command: python manage.py runserver 0.0.0.0:8000
     expose:
       - 8000
     env_file:
@@ -32,6 +32,20 @@ services:
       - ./postgres_data:/var/lib/postgresql/data
     env_file:
       - .env.db
+
+  # @FADAR -- refresca mapa_mv_reincidencia_rescates cada 20 min, aparte de
+  # cualquier request (el REFRESH CONCURRENTLY mide ~168s, no debe bloquear
+  # al usuario del dashboard). Reusa la imagen de postgres solo por el
+  # cliente psql, no guarda datos propios.
+  cron-reincidencia:
+    container_name: RUIEcronReincidencia
+    restart: always
+    image: postgres:16.4-alpine
+    command: ["/bin/sh", "-c", "while true; do PGPASSWORD=\"$$POSTGRES_PASSWORD\" psql -h db -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\" -c \"REFRESH MATERIALIZED VIEW CONCURRENTLY mapa_mv_reincidencia_rescates;\"; sleep 1200; done"]
+    env_file:
+      - .env.db
+    links:
+      - db
 
   nginx:
     container_name: RuieNginx

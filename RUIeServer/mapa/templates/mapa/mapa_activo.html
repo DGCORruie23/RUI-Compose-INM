@@ -605,6 +605,13 @@
                 </div>
                 <span id="menu_vehiculos" class="text-sm font-extrabold text-[#9A0A38] pl-0.5">…</span>
             </div>
+            <!-- Card: Rescates / Operación -->
+            <div id="card_rescates" onclick="window.open('{% url 'rescates_dashboard' %}', '_blank')" class="bg-inm-verde-100/30 border border-gray-200/60 px-2.5 py-2 rounded-xl flex flex-col items-center gap-1 cursor-pointer hover:bg-gray-200 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200" title="Ver Rescates / Operación (se abre en pestaña nueva)">
+                <div class="flex items-center gap-1.5">
+                    <img src="/static/mapa/icons/agente_activo2.svg" class="w-4 h-4 object-contain flex-shrink-0" alt="Rescates / Operación">
+                    <span class="menu-label-text text-[9px] font-black text-gray-600 uppercase tracking-tight leading-tight">Rescates / Operación</span>
+                </div>
+            </div>
 
         </div>
 

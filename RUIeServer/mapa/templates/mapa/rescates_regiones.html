@@ -1,0 +1,386 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}Regiones — Rescates{% endblock title %}
+
+{% block styles %}
+<link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
+<style>
+    .rescates-tarjeta {
+        background: #ffffff;
+        border-radius: 1rem;
+        border: 1px solid #e5e7eb;
+        padding: 1rem 1.25rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .rescates-tarjeta .valor { font-size: 1.6rem; font-weight: 800; line-height: 1; }
+    .rescates-tarjeta .etiqueta {
+        font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.03em; color: #6b7280; margin-top: 0.35rem;
+    }
+    .rescates-grafica-box {
+        background: #ffffff; border-radius: 1rem; border: 1px solid #e5e7eb;
+        padding: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    #regiones-map {
+        width: 100%; height: 560px; border-radius: 1rem; overflow: hidden;
+        border: 1px solid #e5e7eb;
+    }
+    .leyenda-zona { display: flex; align-items: center; gap: 0.4rem; font-size: 0.78rem; color: #374151; }
+    .leyenda-punto { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+
+    /* @FADAR -- formato ejecutivo para las tablas de Regiones */
+    .tabla-ejecutiva {
+        width: 100%;
+        font-size: 0.78rem;
+        border-collapse: collapse;
+    }
+    .tabla-ejecutiva thead th {
+        background: #f9fafb;
+        color: #6b7280;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        font-size: 0.65rem;
+        font-weight: 700;
+        text-align: left;
+        padding: 0.5rem 0.9rem;
+        border-bottom: 1px solid #e5e7eb;
+        position: sticky;
+        top: 0;
+    }
+    .tabla-ejecutiva th.text-right, .tabla-ejecutiva td.text-right { text-align: right; }
+    .tabla-ejecutiva tbody td {
+        padding: 0.45rem 0.9rem;
+        border-bottom: 1px solid #f3f4f6;
+    }
+    .tabla-ejecutiva tbody tr:nth-child(even) { background: #fafafa; }
+    .tabla-ejecutiva tbody tr:hover { background: #fef2f2; }
+    .tabla-ejecutiva tr.fila-subtotal td {
+        background: #f3f4f6;
+        font-weight: 700;
+        border-top: 1px solid #e5e7eb;
+    }
+    .tabla-ejecutiva tr.fila-total td {
+        background: #9A0A38;
+        color: #fff;
+        font-weight: 800;
+        border-top: 2px solid #7d0830;
+    }
+    .badge-zona {
+        display: inline-block;
+        padding: 0.1rem 0.6rem;
+        border-radius: 999px;
+        font-size: 0.65rem;
+        font-weight: 700;
+        color: #fff;
+        white-space: nowrap;
+    }
+    .cifra-nuevos { color: #15803D; font-weight: 700; }
+    .cifra-reincidentes { color: #DC2626; font-weight: 700; }
+</style>
+{% endblock styles %}
+
+{% block content %}
+<main class="max-w-7xl mx-auto px-4 py-6">
+
+    <div class="flex items-center justify-between mb-6">
+        <h1 class="text-2xl font-bold text-[#9A0A38]">Regiones — Río Bravo · Centro · Suchiate</h1>
+        <div class="flex gap-3">
+            <a href="{% url 'rescates_reporte_regiones' %}?fecha={{ fecha_fin }}&oficina={{ oficina_seleccionada }}" target="_blank"
+               class="inline-flex items-center gap-2 bg-gray-700 hover:bg-gray-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+                📄 Ver reporte (CECO)
+            </a>
+            {# @FADAR #}
+            <a href="{% url 'rescates_reporte_ceco2' %}?fecha={{ fecha_fin }}&oficina={{ oficina_seleccionada }}" target="_blank"
+               class="inline-flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+                📄 Generar CECO 2
+            </a>
+            <a href="{% url 'rescates_dashboard' %}" class="text-sm font-semibold text-gray-500 hover:text-[#9A0A38] transition self-center">
+                ← Volver al dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Filtros: mismo rango de fechas + entidad que el dashboard principal -->
+    <form method="get" class="rescates-tarjeta mb-6 flex flex-wrap items-end gap-4">
+        <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-1">Fecha inicio</label>
+            <input type="date" name="fecha_inicio" value="{{ fecha_inicio }}"
+                   class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm">
+        </div>
+        <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-1">Fecha fin</label>
+            <input type="date" name="fecha_fin" value="{{ fecha_fin }}"
+                   class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm">
+        </div>
+        <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-1">Entidad federativa</label>
+            <select name="oficina" class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm min-w-[200px]">
+                <option value="">Todas las entidades</option>
+                {% for of in oficinas %}
+                <option value="{{ of }}" {% if of == oficina_seleccionada %}selected{% endif %}>{{ of }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="bg-[#9A0A38] hover:bg-[#7d0830] text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
+            Filtrar
+        </button>
+        <a href="{% url 'rescates_regiones' %}" class="text-sm font-semibold text-gray-500 hover:text-[#9A0A38] transition">
+            Limpiar filtros
+        </a>
+    </form>
+
+    <!-- Tarjetas resumen por zona -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+        <div class="rescates-tarjeta">
+            <div class="valor" style="color:#1D4ED8">{{ subtotal_rio_bravo.total|default:0 }}</div>
+            <div class="etiqueta">Río Bravo — {{ subtotal_rio_bravo.nuevos|default:0 }} nuevos / {{ subtotal_rio_bravo.reincidentes|default:0 }} reincidentes</div>
+        </div>
+        <div class="rescates-tarjeta">
+            <div class="valor" style="color:#7C3AED">{{ subtotal_centro.total|default:0 }}</div>
+            <div class="etiqueta">Centro — {{ subtotal_centro.nuevos|default:0 }} nuevos / {{ subtotal_centro.reincidentes|default:0 }} reincidentes</div>
+        </div>
+        <div class="rescates-tarjeta">
+            <div class="valor" style="color:#B45309">{{ subtotal_suchiate.total|default:0 }}</div>
+            <div class="etiqueta">Suchiate — {{ subtotal_suchiate.nuevos|default:0 }} nuevos / {{ subtotal_suchiate.reincidentes|default:0 }} reincidentes</div>
+        </div>
+    </div>
+
+    <!-- Mapa -->
+    <div class="rescates-grafica-box mb-6">
+        <div class="flex items-center justify-between mb-3">
+            <h2 class="text-sm font-semibold text-[#9A0A38]">Mapa por zona</h2>
+            <div class="flex gap-4">
+                <span class="leyenda-zona"><span class="leyenda-punto" style="background:#1D4ED8"></span>Río Bravo</span>
+                <span class="leyenda-zona"><span class="leyenda-punto" style="background:#7C3AED"></span>Centro</span>
+                <span class="leyenda-zona"><span class="leyenda-punto" style="background:#B45309"></span>Suchiate</span>
+            </div>
+        </div>
+        <div id="regiones-map"></div>
+        <p class="text-xs text-gray-400 mt-2">El número sobre cada estado es el total de rescates (nuevos + reincidentes) en el rango filtrado. Pasa el cursor sobre un estado para ver el detalle.</p>
+    </div>
+
+    <!-- Tablas -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="rescates-grafica-box">
+            <h2 class="text-sm font-semibold text-[#9A0A38] mb-2">Por zona y oficina</h2>
+            <div class="max-h-96 overflow-y-auto">
+                <table class="tabla-ejecutiva">
+                    <thead>
+                        <tr>
+                            <th>Zona</th>
+                            <th>Oficina</th>
+                            <th class="text-right">Nuevos</th>
+                            <th class="text-right">Reincidentes</th>
+                            <th class="text-right">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for of, d in zona_rio_bravo.items %}
+                        <tr>
+                            <td><span class="badge-zona" style="background:#1D4ED8">Río Bravo</span></td>
+                            <td>{{ of }}</td>
+                            <td class="text-right cifra-nuevos">{{ d.nuevos }}</td>
+                            <td class="text-right cifra-reincidentes">{{ d.reincidentes }}</td>
+                            <td class="text-right font-semibold">{{ d.total }}</td>
+                        </tr>
+                        {% endfor %}
+                        <tr class="fila-subtotal">
+                            <td colspan="2">Subtotal Río Bravo</td>
+                            <td class="text-right">{{ subtotal_rio_bravo.nuevos }}</td>
+                            <td class="text-right">{{ subtotal_rio_bravo.reincidentes }}</td>
+                            <td class="text-right">{{ subtotal_rio_bravo.total }}</td>
+                        </tr>
+                        {% for of, d in zona_suchiate.items %}
+                        <tr>
+                            <td><span class="badge-zona" style="background:#B45309">Suchiate</span></td>
+                            <td>{{ of }}</td>
+                            <td class="text-right cifra-nuevos">{{ d.nuevos }}</td>
+                            <td class="text-right cifra-reincidentes">{{ d.reincidentes }}</td>
+                            <td class="text-right font-semibold">{{ d.total }}</td>
+                        </tr>
+                        {% endfor %}
+                        <tr class="fila-subtotal">
+                            <td colspan="2">Subtotal Suchiate</td>
+                            <td class="text-right">{{ subtotal_suchiate.nuevos }}</td>
+                            <td class="text-right">{{ subtotal_suchiate.reincidentes }}</td>
+                            <td class="text-right">{{ subtotal_suchiate.total }}</td>
+                        </tr>
+                        {% for of, d in zona_centro.items %}
+                        <tr>
+                            <td><span class="badge-zona" style="background:#7C3AED">Centro</span></td>
+                            <td>{{ of }}</td>
+                            <td class="text-right cifra-nuevos">{{ d.nuevos }}</td>
+                            <td class="text-right cifra-reincidentes">{{ d.reincidentes }}</td>
+                            <td class="text-right font-semibold">{{ d.total }}</td>
+                        </tr>
+                        {% endfor %}
+                        <tr class="fila-subtotal">
+                            <td colspan="2">Subtotal Centro</td>
+                            <td class="text-right">{{ subtotal_centro.nuevos }}</td>
+                            <td class="text-right">{{ subtotal_centro.reincidentes }}</td>
+                            <td class="text-right">{{ subtotal_centro.total }}</td>
+                        </tr>
+                        <tr class="fila-total">
+                            <td colspan="2">TOTAL</td>
+                            <td class="text-right">{{ total_regiones.nuevos }}</td>
+                            <td class="text-right">{{ total_regiones.reincidentes }}</td>
+                            <td class="text-right">{{ total_regiones.total }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="rescates-grafica-box">
+            <h2 class="text-sm font-semibold text-[#9A0A38] mb-2">Por nacionalidad</h2>
+            <div class="max-h-96 overflow-y-auto">
+                <table class="tabla-ejecutiva">
+                    <thead>
+                        <tr>
+                            <th>Nacionalidad</th>
+                            <th class="text-right">Nuevos</th>
+                            <th class="text-right">Reincidentes</th>
+                            <th class="text-right">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for nac, d in nac_1_reinc.items %}
+                        <tr>
+                            <td>{{ nac }}</td>
+                            <td class="text-right cifra-nuevos">{{ d.nuevos }}</td>
+                            <td class="text-right cifra-reincidentes">{{ d.reincidentes }}</td>
+                            <td class="text-right font-semibold">{{ d.total }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="4" class="py-3 text-center text-gray-400">Sin registros en este rango.</td></tr>
+                        {% endfor %}
+                        <tr class="fila-total">
+                            <td>TOTAL</td>
+                            <td class="text-right">{{ total_nac_1_reinc.nuevos }}</td>
+                            <td class="text-right">{{ total_nac_1_reinc.reincidentes }}</td>
+                            <td class="text-right">{{ total_nac_1_reinc.total }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+</main>
+
+<!-- MapLibre GL + Turf.js -- misma libreria/patron que ya usa mapa_interactivo
+     (mapa_activo.html): fuente geojson de estados + capa de relleno +
+     lineas + popup en hover. Aqui el relleno se colorea por zona
+     (propiedad "color_zona_rescates", ya calculada en el servidor) en vez
+     de por ranking de avance, y se agrega una capa de simbolos con el
+     total de cada estado. -->
+<script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+<script>
+    const geoDataRegiones = {{ geo_data_json|safe }};
+
+    document.addEventListener("DOMContentLoaded", () => {
+        const map = new maplibregl.Map({
+            container: 'regiones-map',
+            style: {
+                version: 8,
+                sources: {
+                    'esri-imagery': {
+                        type: 'raster',
+                        tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}'],
+                        tileSize: 256,
+                        attribution: 'INEGI &copy; Esri'
+                    }
+                },
+                layers: [{ id: 'esri-imagery-layer', type: 'raster', source: 'esri-imagery', minzoom: 0, maxzoom: 24 }]
+            },
+            center: [-102.5528, 23.6345],
+            zoom: 4.3,
+            minZoom: 3,
+            maxZoom: 10
+        });
+
+        map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-left');
+
+        map.on('load', () => {
+            map.addSource('regiones-estados', { type: 'geojson', data: geoDataRegiones, generateId: true });
+
+            try {
+                const bbox = turf.bbox(geoDataRegiones);
+                map.fitBounds(bbox, { padding: 40, animate: false });
+            } catch (e) {
+                console.error("Error ajustando el mapa a los limites:", e);
+            }
+
+            const worldMask = turf.mask(geoDataRegiones);
+            map.addSource('regiones-mask', { type: 'geojson', data: worldMask });
+            map.addLayer({ id: 'regiones-mask-fill', type: 'fill', source: 'regiones-mask', paint: { 'fill-color': '#f9fafb', 'fill-opacity': 1 } });
+
+            map.addLayer({
+                id: 'regiones-fill',
+                type: 'fill',
+                source: 'regiones-estados',
+                paint: { 'fill-color': ['get', 'color_zona_rescates'], 'fill-opacity': 0.72 }
+            });
+
+            map.addLayer({
+                id: 'regiones-line',
+                type: 'line',
+                source: 'regiones-estados',
+                paint: { 'line-color': '#ffffff', 'line-width': 1.5 }
+            });
+
+            map.addLayer({
+                id: 'regiones-line-hover',
+                type: 'line',
+                source: 'regiones-estados',
+                paint: { 'line-color': '#111827', 'line-width': 3 },
+                filter: ['==', 'oficina_rescates', '']
+            });
+
+            // Etiqueta con el total, encima de cada estado.
+            map.addLayer({
+                id: 'regiones-labels',
+                type: 'symbol',
+                source: 'regiones-estados',
+                layout: {
+                    'text-field': ['get', 'total_rescates'],
+                    'text-size': 13,
+                    'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+                    'text-allow-overlap': false
+                },
+                paint: {
+                    'text-color': '#111827',
+                    'text-halo-color': '#ffffff',
+                    'text-halo-width': 1.6
+                }
+            });
+
+            const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 12 });
+
+            map.on('mousemove', 'regiones-fill', (e) => {
+                if (!e.features.length) return;
+                const p = e.features[0].properties;
+                map.setFilter('regiones-line-hover', ['==', 'oficina_rescates', p.oficina_rescates]);
+                map.getCanvas().style.cursor = 'pointer';
+                const zona = p.zona_rescates || 'Sin zona';
+                popup.setLngLat(e.lngLat).setHTML(`
+                    <div style="padding:4px; min-width:170px; font-family:Arial, sans-serif;">
+                        <div style="font-size:13px; font-weight:bold; color:${p.color_zona_rescates};">${p.oficina_rescates}</div>
+                        <div style="font-size:11px; color:#6b7280; margin-bottom:4px;">Zona: ${zona}</div>
+                        <div style="font-size:12px; color:#374151;">Nuevos: <strong>${p.nuevos_rescates}</strong></div>
+                        <div style="font-size:12px; color:#374151;">Reincidentes: <strong>${p.reincidentes_rescates}</strong></div>
+                        <div style="font-size:12px; color:#111827;">Total: <strong>${p.total_rescates}</strong></div>
+                    </div>
+                `).addTo(map);
+            });
+
+            map.on('mouseleave', 'regiones-fill', () => {
+                map.setFilter('regiones-line-hover', ['==', 'oficina_rescates', '']);
+                map.getCanvas().style.cursor = '';
+                popup.remove();
+            });
+        });
+    });
+</script>
+{% endblock content %}
