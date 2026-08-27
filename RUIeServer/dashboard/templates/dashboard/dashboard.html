@@ -103,6 +103,16 @@
                         <a href="{% url 'pagina_pruebas_usuarios' %}" class="">Usuarios</a>
                     </div>
                 </div>
+                <div class="py-2 contIcons flex items-center justify-center">
+                    <div class="w-1/2 py-4 px-5 bg-yellow-600 hover:bg-yellow-700 rounded-xl text-white text-center font-bold">
+                        <a href="{% url 'correccion_puntos' %}" class="flex items-center justify-center gap-2">
+                            <svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                            </svg>
+                            Corrección de Puntos
+                        </a>
+                    </div>
+                </div>
             </center>
         </div>
 
@@ -245,7 +255,7 @@
 
             <h1 style="color: black;" class="flex flex-col items-center justify-center mb-2 ">Descargar archivo por fechas</h1>
             <form action="{% url 'fechas_descarga' %}" method="post" enctype="multipart/form-data"
-                class="flex justify-center items-center px-2" onsubmit="return validarFechas()">{% csrf_token %}
+                class="flex justify-center items-center px-2" onsubmit="return descargarExcelOptimizado(event, 'downloadStatus')">{% csrf_token %}
 
             
                 <label for="fechaInicio">Fecha de inicio:</label>
@@ -254,16 +264,19 @@
                 <label class="px-2" for="fechaFin">Fecha de fin:</label>
                 <input type="date" name="fechaFin" id="fechaFin" required="">
 
+                <input type="hidden" value="TODAS" id="oficinaR" name="oficinaR"> 
+
                 <button class=" py-2 px-4 mx-4 bg-inm-verde-100 hover:bg-inm-verde-200 rounded-xl text-white"
                     type="submit">Descargar</button>
             </form>
         </div>
+        <div id="downloadStatus" style="display: none;" class="mx-auto max-w-lg mb-4"></div>
     {% else %}
         <div class="mt-5 my-6">
 
             <p class="flex flex-col items-center justify-center mb-2 ">Descargar archivo por fechas</p>
             <form action="{% url 'fechas_OR' %}" method="post" enctype="multipart/form-data"
-                class="flex justify-center items-center px-2" onsubmit="return validarFechas()">{% csrf_token %}
+                class="flex justify-center items-center px-2" onsubmit="return descargarExcelOptimizado(event, 'downloadStatusOR')">{% csrf_token %}
 
                 <input type="hidden" value="{{usuario.0.oficinaR}}" id="oficinaR" name="oficinaR"> 
 
@@ -279,6 +292,7 @@
                 </button>
             </form>
         </div>
+        <div id="downloadStatusOR" style="display: none;" class="mx-auto max-w-lg mb-4"></div>
     {% endif %}
 
     {% comment %} <div class="mt-5 my-6">
@@ -350,6 +364,126 @@
         }
 
         return true;
+    }
+</script>
+
+<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+<script>
+    async function descargarExcelOptimizado(event, statusId) {
+        event.preventDefault();
+        if (!validarFechas()) return false;
+
+        const form = event.target;
+        const fechaInicio = form.querySelector('[name="fechaInicio"]').value;
+        const fechaFin = form.querySelector('[name="fechaFin"]').value;
+        const oficinaR = form.querySelector('#oficinaR') ? form.querySelector('#oficinaR').value : 'TODAS';
+
+        const statusDiv = document.getElementById(statusId);
+        statusDiv.style.display = 'block';
+        statusDiv.className = 'mt-4 p-4 bg-blue-100 text-blue-800 rounded-xl text-center border-2 border-blue-300 shadow-md';
+        statusDiv.innerHTML = '<strong>Iniciando descarga optimizada...</strong><br>Preparando conexión con el servidor.';
+
+        const start = new Date(fechaInicio + 'T00:00:00');
+        const end = new Date(fechaFin + 'T00:00:00');
+        const totalDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+
+        let allRecords = [];
+        let totalRowsAccumulated = 0;
+        let chunkPart = 1;
+        const MAX_CHUNK_ROWS = 100000;
+
+        const headers = [
+            "Oficina Representación", "Fecha", "Hora", "Nombre Agente", "Aeropuerto", "Carretero", 
+            "Tipo Vehículo", "Línea Autobús", "Número Económico", "Placas", "Vehículo Asegurado", 
+            "Casa Seguridad", "Central Autobús", "Ferrocarril", "Empresa", "Hotel", 
+            "Nombre Hotel", "Puestos a Disposición", "Juez Calificador", "Reclusorio", 
+            "Policía Federal", "DIF", "Policía Estatal", "Policía Municipal", 
+            "Guardia Nacional", "Fiscalía", "Otras Autoridades", "Voluntarios", 
+            "Otro", "Presuntos Delincuentes", "Num Presuntos Delincuentes", "Municipio", 
+            "Punto Estratégico", "Nacionalidad", "ISO3", "Nombre", "Apellidos", 
+            "No Identidad", "Parentesco", "Fecha Nacimiento", "Sexo", "Embarazo", 
+            "Num Familia", "Edad"
+        ];
+
+        for (let d = 0; d < totalDays; d++) {
+            const currentDate = new Date(start);
+            currentDate.setDate(currentDate.getDate() + d);
+            const dateStr = currentDate.toISOString().split('T')[0];
+
+            statusDiv.innerHTML = `<strong>Procesando descarga:</strong><br>Día ${d + 1} de ${totalDays} (${dateStr})<br>Filas actuales: ${totalRowsAccumulated.toLocaleString()}`;
+
+            try {
+                const params = new URLSearchParams({ fecha: dateStr, oficinaR: oficinaR });
+                const response = await fetch(`/info/api/rescates_json?${params.toString()}`);
+                const data = await response.json();
+
+                if (data.error) {
+                    console.error("Error en fecha " + dateStr + ":", data.error);
+                    continue;
+                }
+
+                if (Array.isArray(data) && data.length > 0) {
+                    const formattedRecords = data.map(v => [
+                        v.oficinaRepre, v.fecha, v.hora, v.nombreAgente,
+                        v.aeropuerto ? "1" : "", v.carretero ? "1" : "",
+                        v.tipoVehic, v.lineaAutobus, v.numeroEcono, v.placas,
+                        v.vehiculoAseg ? "1" : "", v.casaSeguridad ? "1" : "",
+                        v.centralAutobus ? "1" : "", v.ferrocarril ? "1" : "",
+                        v.empresa, v.hotel ? "1" : "", v.nombreHotel,
+                        v.puestosADispo ? "1" : "", v.juezCalif ? "1" : "",
+                        v.reclusorio ? "1" : "", v.policiaFede ? "1" : "",
+                        v.dif ? "1" : "", v.policiaEsta ? "1" : "",
+                        v.policiaMuni ? "1" : "", v.guardiaNaci ? "1" : "",
+                        v.fiscalia ? "1" : "", v.otrasAuto ? "1" : "",
+                        v.voluntarios ? "1" : "", v.otro ? "1" : "",
+                        v.presuntosDelincuentes ? "1" : "", 
+                        v.numPresuntosDelincuentes !== 0 ? v.numPresuntosDelincuentes : "",
+                        v.municipio, v.puntoEstra, v.nacionalidad, v.iso3,
+                        v.nombre, v.apellidos, v.noIdentidad, v.parentesco,
+                        v.fechaNacimiento, v.sexo ? "Hombre" : "Mujer",
+                        v.embarazo ? "1" : "",
+                        v.numFamilia !== 0 ? v.numFamilia : "",
+                        v.edad
+                    ]);
+
+                    allRecords = allRecords.concat(formattedRecords);
+                    totalRowsAccumulated += formattedRecords.length;
+
+                    if (allRecords.length >= MAX_CHUNK_ROWS) {
+                        statusDiv.innerHTML = `<strong>Generando bloque ${chunkPart}...</strong><br>Espere un momento.`;
+                        downloadChunkXLSX(allRecords, headers, `Rescates_${oficinaR}_${fechaInicio}_${fechaFin}_Parte${chunkPart}.xlsx`);
+                        chunkPart++;
+                        allRecords = [];
+                    }
+                }
+            } catch (error) {
+                console.error("Error de red en fecha " + dateStr + ":", error);
+            }
+        }
+
+        if (allRecords.length > 0) {
+            downloadChunkXLSX(allRecords, headers, `Rescates_${oficinaR}_${fechaInicio}_${fechaFin}${chunkPart > 1 ? '_Parte' + chunkPart : ''}.xlsx`);
+        } else if (totalRowsAccumulated === 0) {
+            statusDiv.innerHTML = "<strong>Atención:</strong> No se encontraron registros en el periodo seleccionado.";
+            statusDiv.className = "mt-4 p-4 bg-yellow-100 text-yellow-800 rounded-xl text-center border-2 border-yellow-300";
+            return false;
+        }
+
+        statusDiv.innerHTML = `<strong>¡Descarga completada!</strong><br>Se procesaron ${totalRowsAccumulated.toLocaleString()} registros.`;
+        statusDiv.className = "mt-4 p-4 bg-green-100 text-green-800 rounded-xl text-center border-2 border-green-300 shadow-md";
+        setTimeout(() => { 
+            statusDiv.style.opacity = '0';
+            setTimeout(() => { statusDiv.style.display = 'none'; statusDiv.style.opacity = '1'; }, 1000);
+        }, 8000);
+        
+        return false;
+    }
+
+    function downloadChunkXLSX(data, headers, fileName) {
+        const worksheet = XLSX.utils.aoa_to_sheet([headers, ...data]);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Rescates");
+        XLSX.writeFile(workbook, fileName);
     }
 </script>
 

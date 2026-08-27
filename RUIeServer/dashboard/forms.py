@@ -58,27 +58,24 @@ for i in range(10):
     YEARS.append(str(f))
 
 choice_sexo = (
-    (True, 'Hombre'),
-    (False, 'Mujer')
+    ('True', 'Hombre'),
+    ('False', 'Mujer')
 )
 
 choice_embarazo = (
-    (True, 'Si'),
-    (False, 'No')
+    ('True', 'Si'),
+    ('False', 'No')
 )
 
 types_paises = []
 
-try:
-    for paises_I in Paises.objects.all():
-         nomPS = str(paises_I.nombre_pais)
-         types_paises.append((nomPS, nomPS))
-except Exception:
-#     # La tabla usuario_paises puede no existir todavía (ej. antes del
-#     # primer migrate en una base de datos nueva). Si falla, types_paises
-#     # simplemente queda vacía en vez de tumbar todo el proyecto al arrancar.
-    pass
+## Segunda parte para comentar
 
+for paises_I in Paises.objects.all():
+    nomPS = str(paises_I.nombre_pais)
+    types_paises.append((nomPS, nomPS))
+
+## hasta aqui
 
 class ExcelForm(forms.Form):    
     fechaDescarga = forms.DateField(
@@ -174,7 +171,7 @@ class RegistroNewForm(forms.Form):
     hora = forms.CharField(widget=forms.TextInput(attrs={'placeholder':'hrs:mins','type': 'time'}), label="Hora:")
     tipo_punto = forms.ChoiceField(choices=types_Puntos, label="Tipo de punto de Rescate:")
     puntoEstra = forms.ChoiceField(choices=[], label="Nombre punto de Rescate:")
-    nacionalidad = forms.ChoiceField(choices=types_paises, label="Nacionalidad")
+    nacionalidad = forms.ChoiceField(choices=[], label="Nacionalidad")
     nombre = forms.CharField(max_length=100)
     apellidos = forms.CharField(max_length=150)
     parentesco = forms.CharField(max_length=50, required=False)
@@ -186,45 +183,30 @@ class RegistroNewForm(forms.Form):
 
     def __init__(self, *args, **kwargs):
         super(RegistroNewForm, self).__init__(*args, **kwargs)
-        ### Comentar para nueva base
-        types_PRescate = []
-        puntosF_ALL = EstadoFuerza.objects.all()
+        
+        # 1. Población dinámica de Nacionalidades al vuelo (evita problemas si DB no está lista al importar)
+        paises_choices = [(p.nombre_pais.strip(), p.nombre_pais.strip()) for p in Paises.objects.all()]
+        if not paises_choices:
+            paises_choices = [("GUATEMALA", "GUATEMALA"), ("HONDURAS", "HONDURAS"), ("EL SALVADOR", "EL SALVADOR")]
+        
+        # Buscar nacionalidad en kwargs['data'] (POST) o kwargs['initial'] (GET) o args[0] (POST posicional)
+        data_obj = kwargs.get('data') or (args[0] if len(args) > 0 else None) or {}
+        initial_obj = kwargs.get('initial') or {}
+        
+        selected_nacion = data_obj.get('nacionalidad') or initial_obj.get('nacionalidad', '')
+        if selected_nacion and not any(selected_nacion == choice[0] for choice in paises_choices):
+            paises_choices.append((selected_nacion, selected_nacion))
+            
+        self.fields['nacionalidad'].choices = paises_choices
 
-        for puntos in puntosF_ALL:
-            nomS = str(puntos.nomPuntoRevision)
-            nomS1 = ""
-            if nomS[0]== " ":
-                nomS1 = nomS[1:]
-            else:
-                nomS1 = nomS
-
-            types_PRescate.append((nomS1, nomS1))
-
-        for puntos in PuntosInternacion.objects.all():
-            nomS = str(puntos.nombrePunto)
-            nomS1 = ""
-            if nomS[0]== " ":
-                nomS1 = nomS[1:]
-            else:
-                nomS1 = nomS
-
-            types_PRescate.append((nomS1, nomS1))
-
-        types_PRescate.append(("Sin Información", "Sin Información"))
-
-        for mun in Municipios.objects.all():
-            nomS = str(mun.nomMunicipio)
-            nomS1 = ""
-            if nomS[0]== " ":
-                nomS1 = nomS[1:]
-            else:
-                nomS1 = nomS
-
-            types_PRescate.append((nomS1, nomS1))
-
-        ## hasta aqui
-
-        self.fields['puntoEstra'].choices = types_PRescate
+        # 2. Población dinámica del puntoEstra
+        selected_val = data_obj.get('puntoEstra') or initial_obj.get('puntoEstra', '') or "Sin Información"
+        
+        # Limpiar espacios en blanco
+        selected_val = str(selected_val).strip()
+        
+        # Agregamos dinámicamente el valor actual como una opción válida
+        self.fields['puntoEstra'].choices = [(selected_val, selected_val), ("Sin Información", "Sin Información")]
 
     def save(self, commit=True):
         
@@ -237,50 +219,63 @@ class RegistroNewForm(forms.Form):
         db_puestos = False
         db_volunt = False
 
-        puntoEstra = self.data['puntoEstra']
+        puntoEstra = self.cleaned_data['puntoEstra']
+        tipo_punto = self.cleaned_data['tipo_punto']
 
-        if(self.data['tipo_punto'] == 'aeropuerto'):
+        if(tipo_punto == 'aeropuerto'):
             db_aerop = True
-        elif(self.data['tipo_punto'] == 'carretero'):
+        elif(tipo_punto == 'carretero'):
             db_carre = True
-        elif(self.data['tipo_punto'] == 'central de autobus'):
+        elif(tipo_punto == 'central de autobus'):
             db_centralA = True
-        elif(self.data['tipo_punto'] == 'disuadidos'):
+        elif(tipo_punto == 'disuadidos'):
             db_casaS = True
-        elif(self.data['tipo_punto'] == 'ferrocarril'):
+        elif(tipo_punto == 'ferrocarril'):
             db_ferro = True
-        elif(self.data['tipo_punto'] == 'visitas de verificación'):
+        elif(tipo_punto == 'visitas de verificación'):
             db_hotel = True
-        elif(self.data['tipo_punto'] == 'puestos a disposición'):
+        elif(tipo_punto == 'puestos a disposición'):
             db_puestos = True
             puntoEstra = ""
         else:
             db_volunt = True
             puntoEstra = ""
 
-        db_nacionalid = self.data['nacionalidad']
+        db_nacionalid = self.cleaned_data['nacionalidad']
         paisI = Paises.objects.filter(nombre_pais=db_nacionalid)
-        db_iso3 = paisI[0].iso3
+        db_iso3 = paisI[0].iso3 if paisI.exists() else ""
 
-        fecha_nacimiento = datetime.datetime.strptime(self.data['fechaNacimiento'], '%Y-%m-%d')
-        db_edad = datetime.datetime.now().year - fecha_nacimiento.year
-        fecha_nacimiento = fecha_nacimiento.strftime('%d/%m/%Y')
+        # Manejo más seguro de la fecha de nacimiento
+        try:
+            fecha_nacimiento = datetime.datetime.strptime(self.cleaned_data['fechaNacimiento'], '%Y-%m-%d')
+            db_edad = datetime.datetime.now().year - fecha_nacimiento.year
+            fecha_nacimiento_str = fecha_nacimiento.strftime('%d/%m/%Y')
+        except Exception:
+            # Fallback en caso de que ya venga en formato dd/mm/yyyy
+            try:
+                fecha_nacimiento = datetime.datetime.strptime(self.cleaned_data['fechaNacimiento'], '%d/%m/%Y')
+                db_edad = datetime.datetime.now().year - fecha_nacimiento.year
+                fecha_nacimiento_str = self.cleaned_data['fechaNacimiento']
+            except Exception:
+                fecha_nacimiento_str = self.cleaned_data['fechaNacimiento']
+                db_edad = 0
 
-        sexo1 = self.data['sexo'] 
-        embarazo1 = self.data['embarazo']
+        sexo1 = self.cleaned_data['sexo'] 
+        embarazo1 = self.cleaned_data['embarazo']
 
-        if sexo1 == "True":
-            embarazo1 = False
-        elif sexo1 == "False":
-            embarazo1 = self.data['embarazo']
+        # Conversiones booleanas explícitas ya que ChoiceField devuelve string 'True' o 'False'
+        is_hombre = (sexo1 == 'True' or sexo1 is True)
+        is_embarazada = (embarazo1 == 'True' or embarazo1 is True)
+
+        if is_hombre:
+            db_embarazo = False
         else:
-            print(self.data['sexo'])
-            print(embarazo1)
+            db_embarazo = is_embarazada
 
-        datosActualizados = RescatePunto.objects.filter(pk=self.data['idRescate']).update(
+        datosActualizados = RescatePunto.objects.filter(pk=self.cleaned_data['idRescate']).update(
             
-            fecha=self.data['fecha'],
-            hora=self.data['hora'],
+            fecha=self.cleaned_data['fecha'],
+            hora=self.cleaned_data['hora'],
 
             puntoEstra=puntoEstra.upper(),
 
@@ -295,19 +290,114 @@ class RegistroNewForm(forms.Form):
 
             nacionalidad=str(db_nacionalid).upper(),
             iso3=str(db_iso3),
-            nombre=str(self.data['nombre']).upper(),
-            apellidos=str(self.data['apellidos']).upper(),
-            parentesco=str(self.data['parentesco']),
-            fechaNacimiento=fecha_nacimiento,
-            sexo=self.data['sexo'],
-            embarazo=embarazo1,
-            numFamilia=self.data['numFamilia'],
+            nombre=str(self.cleaned_data['nombre']).upper(),
+            apellidos=str(self.cleaned_data['apellidos']).upper(),
+            parentesco=str(self.cleaned_data['parentesco'] or ''),
+            fechaNacimiento=fecha_nacimiento_str,
+            sexo=is_hombre,
+            embarazo=db_embarazo,
+            numFamilia=self.cleaned_data['numFamilia'],
             edad=db_edad,
-            oficinaRepre = self.data['oficinaR'],
+            oficinaRepre = self.cleaned_data['oficinaR'],
             )
-        # datosActualizados = RescatePunto.objects.update_or_create(idRescate=self.data['idRescate'], sexo=self.data['sexo'] )
         return datosActualizados
-    
+
+
+class RegistroCreateForm(RegistroNewForm):
+    idRescate = forms.IntegerField(widget=forms.NumberInput(attrs={'type' : 'hidden'}), label="id", required=False)
+    nombreAgente = forms.CharField(max_length=300, required=False, label="Nombre del Agente:")
+
+    def __init__(self, *args, **kwargs):
+        super(RegistroCreateForm, self).__init__(*args, **kwargs)
+
+    def save(self, commit=True):
+        db_aerop = False
+        db_carre = False
+        db_centralA = False
+        db_casaS = False
+        db_ferro = False
+        db_hotel = False
+        db_puestos = False
+        db_volunt = False
+
+        puntoEstra = self.cleaned_data['puntoEstra']
+        tipo_punto = self.cleaned_data['tipo_punto']
+
+        if(tipo_punto == 'aeropuerto'):
+            db_aerop = True
+        elif(tipo_punto == 'carretero'):
+            db_carre = True
+        elif(tipo_punto == 'central de autobus'):
+            db_centralA = True
+        elif(tipo_punto == 'disuadidos'):
+            db_casaS = True
+        elif(tipo_punto == 'ferrocarril'):
+            db_ferro = True
+        elif(tipo_punto == 'visitas de verificación'):
+            db_hotel = True
+        elif(tipo_punto == 'puestos a disposición'):
+            db_puestos = True
+            puntoEstra = ""
+        else:
+            db_volunt = True
+            puntoEstra = ""
+
+        db_nacionalid = self.cleaned_data['nacionalidad']
+        paisI = Paises.objects.filter(nombre_pais=db_nacionalid)
+        db_iso3 = paisI[0].iso3 if paisI.exists() else ""
+
+        try:
+            fecha_nacimiento = datetime.datetime.strptime(self.cleaned_data['fechaNacimiento'], '%Y-%m-%d')
+            db_edad = datetime.datetime.now().year - fecha_nacimiento.year
+            fecha_nacimiento_str = fecha_nacimiento.strftime('%d/%m/%Y')
+        except Exception:
+            try:
+                fecha_nacimiento = datetime.datetime.strptime(self.cleaned_data['fechaNacimiento'], '%d/%m/%Y')
+                db_edad = datetime.datetime.now().year - fecha_nacimiento.year
+                fecha_nacimiento_str = self.cleaned_data['fechaNacimiento']
+            except Exception:
+                fecha_nacimiento_str = self.cleaned_data['fechaNacimiento']
+                db_edad = 0
+
+        sexo1 = self.cleaned_data['sexo'] 
+        embarazo1 = self.cleaned_data['embarazo']
+
+        is_hombre = (sexo1 == 'True' or sexo1 is True)
+        is_embarazada = (embarazo1 == 'True' or embarazo1 is True)
+
+        if is_hombre:
+            db_embarazo = False
+        else:
+            db_embarazo = is_embarazada
+
+        nuevoRescate = RescatePunto.objects.create(
+            fecha=self.cleaned_data['fecha'],
+            hora=self.cleaned_data['hora'],
+            nombreAgente=str(self.cleaned_data.get('nombreAgente') or '').upper(),
+            puntoEstra=puntoEstra.upper(),
+            aeropuerto=db_aerop,
+            carretero=db_carre,
+            casaSeguridad=db_casaS,
+            centralAutobus=db_centralA,
+            ferrocarril=db_ferro,
+            hotel=db_hotel,
+            puestosADispo=db_puestos,
+            voluntarios=db_volunt,
+            nacionalidad=str(db_nacionalid).upper(),
+            iso3=str(db_iso3),
+            nombre=str(self.cleaned_data['nombre']).upper(),
+            apellidos=str(self.cleaned_data['apellidos']).upper(),
+            parentesco=str(self.cleaned_data['parentesco'] or ''),
+            fechaNacimiento=fecha_nacimiento_str,
+            sexo=is_hombre,
+            embarazo=db_embarazo,
+            numFamilia=self.cleaned_data['numFamilia'],
+            edad=db_edad,
+            oficinaRepre=self.cleaned_data['oficinaR'],
+            numPresuntosDelincuentes=0,
+        )
+        return nuevoRescate
+
 
 class EstadoFuerzaForm(forms.ModelForm):
     class Meta:

@@ -1,11 +1,11 @@
 {% extends "base/base.html" %}
 
 {% block title %}
-Editar Registro
+Agregar Registro
 {% endblock title %}
 
 {% block navigation %}
-Edición de registros
+Añadir registro
 {% endblock navigation %}
 
 {% block content %}
@@ -18,7 +18,7 @@ Edición de registros
 
 <div class="flex-grow flex justify-center py-12 px-4 bg-[#ffffff00] text-black min-h-screen">
     <div class="w-full max-w-lg bg-[#D4C19C] rounded-xl shadow-lg p-6">
-        <h2 class="text-2xl font-bold text-center mb-6 text-[#4E232E]">Editar Registro</h2>
+        <h2 class="text-2xl font-bold text-center mb-6 text-[#4E232E]">Agregar Rescate</h2>
 
         {% if messages %}
         <div class="mb-4 space-y-2">
@@ -43,53 +43,62 @@ Edición de registros
         </div>
         {% endif %}
 
-        <form method="post" action="#" enctype="multipart/form-data" class="space-y-4">
+        <form method="post" action="" enctype="multipart/form-data" class="space-y-4">
             {% csrf_token %}
 
-            <input type="hidden" name="idRescate" value="{{datosR.idRescate}}" id="id_idRescate">
+            <input type="hidden" name="idRescate" value="" id="id_idRescate">
             
-
-            <div class="flex flex-col {% if not request.user.is_superuser %} hidden  {% endif %}">
+            <div class="flex flex-col {% if not request.user.is_superuser %} hidden {% endif %}">
                 <label for="id_oficinaRepre" class="font-bold mb-1">Oficina:</label>
                 <select name="oficinaR" id="id_oficinaRepre"
                     class="w-full p-1 border-2 border-[#4E232E] rounded bg-[#285C4D] text-white outline-none focus:ring-2 focus:ring-[#9F2241]">
-                    <!-- Renderizar las opciones usando las llaves del diccionario para evitar hardcoding de 32 estados -->
-                    <!-- Usamos los keys puros que envia Django, o forzamos el render a la lista estatica -->
                     <option value="AGUASCALIENTES" {% if datosR.oficinaR == 'AGUASCALIENTES' %}selected{% endif %}>AGUASCALIENTES</option>
-                        <option value="BAJA CALIFORNIA" {% if datosR.oficinaR == 'BAJA CALIFORNIA' %}selected{% endif %}>BAJA CALIFORNIA</option>
-                        <option value="BAJA CALIFORNIA SUR" {% if datosR.oficinaR == 'BAJA CALIFORNIA SUR' %}selected{% endif %}>BAJA CALIFORNIA SUR</option>
-                        <option value="CAMPECHE" {% if datosR.oficinaR == 'CAMPECHE' %}selected{% endif %}>CAMPECHE</option>
-                        <option value="CDMX" {% if datosR.oficinaR == 'CDMX' %}selected{% endif %}>CDMX</option>
-                        <option value="CHIAPAS" {% if datosR.oficinaR == 'CHIAPAS' %}selected{% endif %}>CHIAPAS</option>
-                        <option value="CHIHUAHUA" {% if datosR.oficinaR == 'CHIHUAHUA' %}selected{% endif %}>CHIHUAHUA</option>
-                        <option value="COAHUILA" {% if datosR.oficinaR == 'COAHUILA' %}selected{% endif %}>COAHUILA</option>
-                        <option value="COLIMA" {% if datosR.oficinaR == 'COLIMA' %}selected{% endif %}>COLIMA</option>
-                        <option value="DURANGO" {% if datosR.oficinaR == 'DURANGO' %}selected{% endif %}>DURANGO</option>
-                        <option value="EDOMEX" {% if datosR.oficinaR == 'EDOMEX' %}selected{% endif %}>EDOMEX</option>
-                        <option value="GUERRERO" {% if datosR.oficinaR == 'GUERRERO' %}selected{% endif %}>GUERRERO</option>
-                        <option value="GUANAJUATO" {% if datosR.oficinaR == 'GUANAJUATO' %}selected{% endif %}>GUANAJUATO</option>
-                        <option value="HIDALGO" {% if datosR.oficinaR == 'HIDALGO' %}selected{% endif %}>HIDALGO</option>
-                        <option value="JALISCO" {% if datosR.oficinaR == 'JALISCO' %}selected{% endif %}>JALISCO</option>
-                        <option value="MICHOACÁN" {% if datosR.oficinaR == 'MICHOACÁN' %}selected{% endif %}>MICHOACÁN</option>
-                        <option value="MORELOS" {% if datosR.oficinaR == 'MORELOS' %}selected{% endif %}>MORELOS</option>
-                        <option value="NAYARIT" {% if datosR.oficinaR == 'NAYARIT' %}selected{% endif %}>NAYARIT</option>
-                        <option value="NUEVO LEÓN" {% if datosR.oficinaR == 'NUEVO LEÓN' %}selected{% endif %}>NUEVO LEÓN</option>
-                        <option value="OAXACA" {% if datosR.oficinaR == 'OAXACA' %}selected{% endif %}>OAXACA</option>
-                        <option value="PUEBLA" {% if datosR.oficinaR == 'PUEBLA' %}selected{% endif %}>PUEBLA</option>
-                        <option value="QUERÉTARO" {% if datosR.oficinaR == 'QUERÉTARO' %}selected{% endif %}>QUERÉTARO</option>
-                        <option value="QUINTANA ROO" {% if datosR.oficinaR == 'QUINTANA ROO' %}selected{% endif %}>QUINTANA ROO</option>
-                        <option value="SAN LUIS POTOSÍ" {% if datosR.oficinaR == 'SAN LUIS POTOSÍ' %}selected{% endif %}>SAN LUIS POTOSÍ</option>
-                        <option value="SINALOA" {% if datosR.oficinaR == 'SINALOA' %}selected{% endif %}>SINALOA</option>
-                        <option value="SONORA" {% if datosR.oficinaR == 'SONORA' %}selected{% endif %}>SONORA</option>
-                        <option value="TABASCO" {% if datosR.oficinaR == 'TABASCO' %}selected{% endif %}>TABASCO</option>
-                        <option value="TAMAULIPAS" {% if datosR.oficinaR == 'TAMAULIPAS' %}selected{% endif %}>TAMAULIPAS</option>
-                        <option value="TLAXCALA" {% if datosR.oficinaR == 'TLAXCALA' %}selected{% endif %}>TLAXCALA</option>
-                        <option value="VERACRUZ" {% if datosR.oficinaR == 'VERACRUZ' %}selected{% endif %}>VERACRUZ</option>
-                        <option value="YUCATÁN" {% if datosR.oficinaR == 'YUCATÁN' %}selected{% endif %}>YUCATÁN</option>
-                        <option value="ZACATECAS" {% if datosR.oficinaR == 'ZACATECAS' %}selected{% endif %}>ZACATECAS</option>
+                    <option value="BAJA CALIFORNIA" {% if datosR.oficinaR == 'BAJA CALIFORNIA' %}selected{% endif %}>BAJA CALIFORNIA</option>
+                    <option value="BAJA CALIFORNIA SUR" {% if datosR.oficinaR == 'BAJA CALIFORNIA SUR' %}selected{% endif %}>BAJA CALIFORNIA SUR</option>
+                    <option value="CAMPECHE" {% if datosR.oficinaR == 'CAMPECHE' %}selected{% endif %}>CAMPECHE</option>
+                    <option value="CDMX" {% if datosR.oficinaR == 'CDMX' %}selected{% endif %}>CDMX</option>
+                    <option value="CHIAPAS" {% if datosR.oficinaR == 'CHIAPAS' %}selected{% endif %}>CHIAPAS</option>
+                    <option value="CHIHUAHUA" {% if datosR.oficinaR == 'CHIHUAHUA' %}selected{% endif %}>CHIHUAHUA</option>
+                    <option value="COAHUILA" {% if datosR.oficinaR == 'COAHUILA' %}selected{% endif %}>COAHUILA</option>
+                    <option value="COLIMA" {% if datosR.oficinaR == 'COLIMA' %}selected{% endif %}>COLIMA</option>
+                    <option value="DURANGO" {% if datosR.oficinaR == 'DURANGO' %}selected{% endif %}>DURANGO</option>
+                    <option value="EDOMEX" {% if datosR.oficinaR == 'EDOMEX' %}selected{% endif %}>EDOMEX</option>
+                    <option value="GUERRERO" {% if datosR.oficinaR == 'GUERRERO' %}selected{% endif %}>GUERRERO</option>
+                    <option value="GUANAJUATO" {% if datosR.oficinaR == 'GUANAJUATO' %}selected{% endif %}>GUANAJUATO</option>
+                    <option value="HIDALGO" {% if datosR.oficinaR == 'HIDALGO' %}selected{% endif %}>HIDALGO</option>
+                    <option value="JALISCO" {% if datosR.oficinaR == 'JALISCO' %}selected{% endif %}>JALISCO</option>
+                    <option value="MICHOACÁN" {% if datosR.oficinaR == 'MICHOACÁN' %}selected{% endif %}>MICHOACÁN</option>
+                    <option value="MORELOS" {% if datosR.oficinaR == 'MORELOS' %}selected{% endif %}>MORELOS</option>
+                    <option value="NAYARIT" {% if datosR.oficinaR == 'NAYARIT' %}selected{% endif %}>NAYARIT</option>
+                    <option value="NUEVO LEÓN" {% if datosR.oficinaR == 'NUEVO LEÓN' %}selected{% endif %}>NUEVO LEÓN</option>
+                    <option value="OAXACA" {% if datosR.oficinaR == 'OAXACA' %}selected{% endif %}>OAXACA</option>
+                    <option value="PUEBLA" {% if datosR.oficinaR == 'PUEBLA' %}selected{% endif %}>PUEBLA</option>
+                    <option value="QUERÉTARO" {% if datosR.oficinaR == 'QUERÉTARO' %}selected{% endif %}>QUERÉTARO</option>
+                    <option value="QUINTANA ROO" {% if datosR.oficinaR == 'QUINTANA ROO' %}selected{% endif %}>QUINTANA ROO</option>
+                    <option value="SAN LUIS POTOSÍ" {% if datosR.oficinaR == 'SAN LUIS POTOSÍ' %}selected{% endif %}>SAN LUIS POTOSÍ</option>
+                    <option value="SINALOA" {% if datosR.oficinaR == 'SINALOA' %}selected{% endif %}>SINALOA</option>
+                    <option value="SONORA" {% if datosR.oficinaR == 'SONORA' %}selected{% endif %}>SONORA</option>
+                    <option value="TABASCO" {% if datosR.oficinaR == 'TABASCO' %}selected{% endif %}>TABASCO</option>
+                    <option value="TAMAULIPAS" {% if datosR.oficinaR == 'TAMAULIPAS' %}selected{% endif %}>TAMAULIPAS</option>
+                    <option value="TLAXCALA" {% if datosR.oficinaR == 'TLAXCALA' %}selected{% endif %}>TLAXCALA</option>
+                    <option value="VERACRUZ" {% if datosR.oficinaR == 'VERACRUZ' %}selected{% endif %}>VERACRUZ</option>
+                    <option value="YUCATÁN" {% if datosR.oficinaR == 'YUCATÁN' %}selected{% endif %}>YUCATÁN</option>
+                    <option value="ZACATECAS" {% if datosR.oficinaR == 'ZACATECAS' %}selected{% endif %}>ZACATECAS</option>
                 </select>
                 <label for="id_fecha" class="font-bold mb-1">Fecha:</label>
                 <input type="text" name="fecha" value="{{datosR.fecha}}" id="id_fecha">
+            </div>
+
+            <!-- Si no es superusuario, igual enviamos la oficina y fecha actuales del día de forma oculta para el form -->
+            {% if not request.user.is_superuser %}
+                <input type="hidden" name="oficinaR" value="{{datosR.oficinaR}}">
+                <input type="hidden" name="fecha" value="{{datosR.fecha}}">
+            {% endif %}
+
+            <div class="flex flex-col {% if not request.user.is_superuser %} hidden {% endif %}">
+                <label for="id_nombreAgente" class="font-bold mb-1">Nombre del Agente:</label>
+                <input type="text" name="nombreAgente" value="{{datosR.nombreAgente}}" required id="id_nombreAgente"
+                    class="w-full p-1 border-2 border-[#4E232E] rounded bg-[#285C4D] text-white uppercase">
             </div>
 
             <div class="flex flex-col">
@@ -177,10 +186,9 @@ Edición de registros
 
             <div class="pt-4 text-center">
                 <button type="submit"
-                    class="w-full bg-[#C30E2E] hover:bg-[#9F2241] text-white font-bold py-3 px-4 rounded transition-colors shadow-md">
-                    Actualizar datos
+                    class="w-full bg-[#285C4D] hover:bg-[#1f473b] text-white font-bold py-3 px-4 rounded transition-colors shadow-md">
+                    Guardar Registro
                 </button>
-                <!-- Cancelar dinámico que apunta al listado de la fecha correspondiente -->
                 <a href="/dashboard" id="btn-cancelar"
                     class="block w-full text-center mt-3 bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-4 rounded transition-colors shadow-md">
                     Cancelar
@@ -194,14 +202,13 @@ Edición de registros
     document.addEventListener('DOMContentLoaded', function () {
         // 1. Configurar botón Cancelar dinámicamente si hay fecha
         const btnCancelar = document.getElementById('btn-cancelar');
-        const fechaOriginal = "{{ datosR.fecha }}".trim(); // ej. "17-07-26" o "17-07-2026"
+        const fechaOriginal = "{{ datosR.fecha }}".trim(); // ej. "17-07-26"
         if (btnCancelar && fechaOriginal) {
             const parts = fechaOriginal.split('-');
             if (parts.length === 3) {
                 let day = parts[0];
                 let month = parts[1];
                 let year = parts[2];
-                // Si el año viene en formato 2 dígitos (ej. "26"), lo pasamos a 4 dígitos
                 if (year.length === 2) {
                     year = "20" + year;
                 }
@@ -210,7 +217,7 @@ Edición de registros
         }
 
         // 2. Mayúsculas automáticas al escribir
-        ['id_nombre', 'id_apellidos', 'id_parentesco'].forEach(id => {
+        ['id_nombre', 'id_apellidos', 'id_parentesco', 'id_nombreAgente'].forEach(id => {
             const input = document.getElementById(id);
             if (input) {
                 input.addEventListener('input', function() {
@@ -225,7 +232,7 @@ Edición de registros
             inputFechaNacimiento.max = new Date().toISOString().split("T")[0];
         }
 
-        // 4. Leer diccionarios embebidos de Django json_script de forma segura
+        // 4. Leer diccionarios embebidos de Django json_script
         const elEstra = document.getElementById('datosEstrategicos');
         const elInter = document.getElementById('datosInternacion');
         const elMun = document.getElementById('datosMunicipios');
@@ -306,7 +313,6 @@ Edición de registros
 
         selectOficina.addEventListener('change', () => {
             const puntos = getPuntosParaTipo(selectOficina.value, selectTipo.value);
-            // Al cambiar la oficina, auto-seleccionamos el primer punto disponible
             poblarPuntos(puntos, puntos.length > 0 ? puntos[0] : "Sin Información");
         });
         selectTipo.addEventListener('change', () => {
@@ -314,9 +320,8 @@ Edición de registros
             poblarPuntos(puntos, puntos.length > 0 ? puntos[0] : "Sin Información");
         });
 
-        // Poblar al inicio con el valor inicial cargado de la DB
         onSelectChange();
     });
 </script>
-    {% endif %}
+{% endif %}
 {% endblock content %}

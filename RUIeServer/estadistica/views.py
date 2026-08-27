@@ -175,20 +175,21 @@ def reincidentes_xfechas_ajax(request):
         array_fechasDia = [(fechaIN + timedelta(days=d)).strftime("%d-%m-%y") for d in range((fechaFIN - fechaIN).days + 1)]
 
         # Rescates por dia de las OR sin chiapas y tabasco
-        rescates_por_dia = RescatePunto.objects.filter(fecha__in= array_fechasDia).exclude(oficinaRepre__in=["CHIAPAS"]) \
+        rescates_por_dia = RescatePunto.objects.filter(fecha__in= array_fechasDia) \
             .values('nombre', 'apellidos', 'nacionalidad', 'puntoEstra', 'oficinaRepre', 'fecha', 'sexo', 'fechaNacimiento', 'numFamilia') \
             .order_by('nacionalidad')
 
         datosORs = list(rescates_por_dia)
 
-        # Rescates por dia de la OR CHIS
-        rescates_por_dia_CHIS = RescatePunto.objects.filter(fecha__in=array_fechasDia, oficinaRepre="CHIAPAS") \
-            .values('nombre', 'apellidos', 'nacionalidad', 'puntoEstra', 'oficinaRepre', 'fecha', 'sexo', 'fechaNacimiento', 'numFamilia') \
-            .order_by('nacionalidad')
+        # # Rescates por dia de la OR CHIS
+        # rescates_por_dia_CHIS = RescatePunto.objects.filter(fecha__in=array_fechasDia, oficinaRepre="CHIAPAS") \
+        #     .values('nombre', 'apellidos', 'nacionalidad', 'puntoEstra', 'oficinaRepre', 'fecha', 'sexo', 'fechaNacimiento', 'numFamilia') \
+        #     .order_by('nacionalidad')
         
-        total_dia = rescates_por_dia.count() + rescates_por_dia_CHIS.count()
+        # total_dia = rescates_por_dia.count() + rescates_por_dia_CHIS.count()
+        total_dia = rescates_por_dia.count()
 
-        datosCHIS = list(rescates_por_dia_CHIS)
+        # datosCHIS = list(rescates_por_dia_CHIS)
 
     # Valores duplicados desde un año atras
         valores_duplicados = RescatePunto.objects.all() \
@@ -218,15 +219,15 @@ def reincidentes_xfechas_ajax(request):
             # else:
             #     reincidentesOR.append({**dato, 'veces': 1})  # Si no existe, agregar 'veces': 0 o lo que prefieras
 
-        # Comparar cada entrada de datos1 con valores_unicos y obtener el valor de veces si existe
-        for dato in datosCHIS:
-            clave = (dato['nombre'], dato['apellidos'], dato['nacionalidad'])
-            veces = valores_duplicados1year.get(clave)  # Buscar en el diccionario
-            if veces is not None:
-                # print(veces)
-                reincidentesOR.append({**dato, 'veces': veces + 1})
-            else:
-                reincidentesOR.append({**dato, 'veces': 1})  # Si no existe, agregar 'veces': 0 o lo que prefieras
+        # # Comparar cada entrada de datos1 con valores_unicos y obtener el valor de veces si existe
+        # for dato in datosCHIS:
+        #     clave = (dato['nombre'], dato['apellidos'], dato['nacionalidad'])
+        #     veces = valores_duplicados1year.get(clave)  # Buscar en el diccionario
+        #     if veces is not None:
+        #         # print(veces)
+        #         reincidentesOR.append({**dato, 'veces': veces + 1})
+        #     else:
+        #         reincidentesOR.append({**dato, 'veces': 1})  # Si no existe, agregar 'veces': 0 o lo que prefieras
 
         conteo = len(reincidentesOR)
         # # Crear el archivo Excel
