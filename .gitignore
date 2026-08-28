@@ -25,3 +25,8 @@ docker-compose.override.yaml
 
 data/
 postgres-data/
+
+# @FADAR -- datos reales de un usuario (fotos de vehiculo + export), no
+# archivos de prueba: no deben vivir en el repo.
+/img/
+/vehiculos_test.xlsx
