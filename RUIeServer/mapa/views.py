@@ -7826,21 +7826,19 @@ def _rescates_ceco_v_detalle(fecha_str, solo_primera_vez=False):
     ]
     fila_total_horizontal = [b["total"] for b in bloques_lista]
 
-    # @FADAR -- cuadro "SUCHIATE / RÍO BRAVO / CENTRO / TOTAL" (mismo que ya
-    # se usa en el reporte CECO), reutilizado tal cual via _rescates_regiones
-    # -- V1 usa el total (nuevos+reincidentes), V2 usa solo "nuevos"
-    # (= primera vez, misma definicion del resto de este reporte).
-    (
-        _zrb, _zc, _zs, subtotal_rio_bravo, subtotal_centro, subtotal_suchiate,
-        total_regiones, _nac, _tnac,
-    ) = _rescates_regiones(fecha_str, fecha_str)
-    campo_zona = "nuevos" if solo_primera_vez else "total"
+    # @FADAR -- cuadro "SUCHIATE / RÍO BRAVO / CENTRO / TOTAL": se arma
+    # sumando los mismos totales_entidad ya calculados arriba (que ya
+    # respetan el filtro solo_primera_vez de este reporte), en vez de
+    # llamar a _rescates_regiones() -- esa funcion aplica una excepcion de
+    # Chiapas (100% reincidente) ajena a la definicion de este reporte, y
+    # dejaba fuera sus rescates de primera vez (causaba que el cuadro no
+    # cuadrara contra "NACIONAL POR DÍA").
     resumen_zonas = {
-        "suchiate": subtotal_suchiate[campo_zona],
-        "rio_bravo": subtotal_rio_bravo[campo_zona],
-        "centro": subtotal_centro[campo_zona],
-        "total": total_regiones[campo_zona],
+        "rio_bravo": sum(totales_entidad[of]["total"] for of in RESCATES_ZONA_RIO_BRAVO if of in totales_entidad),
+        "centro": sum(totales_entidad[of]["total"] for of in RESCATES_ZONA_CENTRO if of in totales_entidad),
+        "suchiate": sum(totales_entidad[of]["total"] for of in RESCATES_ZONA_SUCHIATE if of in totales_entidad),
     }
+    resumen_zonas["total"] = resumen_zonas["rio_bravo"] + resumen_zonas["centro"] + resumen_zonas["suchiate"]
 
     return {
         "resumen_zonas": resumen_zonas,
