@@ -1,0 +1,141 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}CECO 2{% endblock title %}
+
+{% block styles %}
+<style>
+    .rescates-tarjeta {
+        background: #ffffff; border-radius: 1rem; border: 1px solid #e5e7eb;
+        padding: 1rem 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    /* @FADAR -- CECO 2: mismo estilo visual del Excel de referencia
+       (cabeceras azules, filas alternadas). */
+    .ceco2-caja { background: #fff; border-radius: 1rem; border: 1px solid #e5e7eb; box-shadow: 0 1px 3px rgba(0,0,0,0.06); overflow: hidden; }
+    .ceco2-resumen { display: grid; grid-template-columns: 1fr 1fr; }
+    .ceco2-resumen > div { padding: 1rem; text-align: center; border-right: 1px solid #e5e7eb; }
+    .ceco2-resumen > div:last-child { border-right: none; }
+    .ceco2-resumen .etiqueta { background: #4472C4; color: #fff; font-weight: 700; padding: 0.4rem; border-radius: 0.4rem; margin-bottom: 0.5rem; font-size: 0.85rem; }
+    .ceco2-resumen .valor { font-size: 1.6rem; font-weight: 800; color: #1F3864; }
+    table.ceco2-tabla { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    table.ceco2-tabla thead th { background: #4472C4; color: #fff; font-weight: 700; padding: 0.5rem 0.75rem; text-align: left; }
+    table.ceco2-tabla thead th.text-right { text-align: right; }
+    table.ceco2-tabla td { padding: 0.4rem 0.75rem; border-bottom: 1px solid #DCE6F1; }
+    table.ceco2-tabla td.text-right { text-align: right; }
+    table.ceco2-tabla td.text-center { text-align: center; }
+    table.ceco2-tabla tbody tr:nth-child(even) { background: #DCE6F1; }
+    table.ceco2-tabla tr.fila-total-ceco2 td { background: #1F3864; color: #fff; font-weight: 700; }
+</style>
+{% endblock styles %}
+
+{% block content %}
+<main class="max-w-6xl mx-auto px-4 py-6">
+
+    <div class="flex items-center justify-between mb-4">
+        <h1 class="text-2xl font-bold text-[#9A0A38]">Reporte — CECO 2</h1>
+        {# @FADAR -- dashboard y Regiones ya viven en Reportes_Analisis #}
+        <a href="{% url 'Reportes_Analisis:rescates_dashboard' %}" class="text-sm font-semibold text-gray-500 hover:text-[#9A0A38] transition">← Volver al dashboard</a>
+    </div>
+
+    {# @FADAR -- barra de reportes relacionados, aparte del titulo #}
+    <div class="rescates-tarjeta mb-6 flex flex-wrap gap-3">
+        <a href="{% url 'Reportes_Analisis:rescates_reporte_regiones' %}" target="_blank"
+           class="inline-flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold px-4 py-2 rounded-lg transition">
+            CECO
+        </a>
+        <a href="{% url 'Reportes_Analisis:rescates_reporte_cecov1' %}" target="_blank"
+           class="inline-flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
+            Generar CECO V1
+        </a>
+        <a href="{% url 'Reportes_Analisis:rescates_reporte_cecov2' %}" target="_blank"
+           class="inline-flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
+            Generar CECO V2
+        </a>
+    </div>
+
+    <form method="get" class="rescates-tarjeta mb-8 flex flex-wrap items-end gap-4">
+        <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-1">Fecha</label>
+            <input type="date" name="fecha" value="{{ fecha_iso }}"
+                   class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm">
+        </div>
+        <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-1">Entidad federativa</label>
+            <select name="oficina" class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm min-w-[200px]">
+                <option value="">Nacional (todas)</option>
+                {% for of in oficinas %}
+                <option value="{{ of }}" {% if of == oficina_seleccionada %}selected{% endif %}>{{ of }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="bg-[#9A0A38] hover:bg-[#7d0830] text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
+            Generar
+        </button>
+        <div class="flex-1"></div>
+        <a href="{% url 'Reportes_Analisis:rescates_reporte_ceco2_pdf' %}?fecha={{ fecha_iso }}&oficina={{ oficina_seleccionada }}"
+           class="inline-flex items-center gap-2 bg-gray-700 hover:bg-gray-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+            ⬇ Descargar PDF
+        </a>
+        <a href="{% url 'Reportes_Analisis:rescates_reporte_ceco2_excel' %}?fecha={{ fecha_iso }}&oficina={{ oficina_seleccionada }}"
+           class="inline-flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+            ⬇ Descargar Excel
+        </a>
+    </form>
+
+    <p class="text-xs text-gray-400 mb-4">
+        "TIPO" se calcula a partir del medio de rescate real capturado en cada registro (no del catálogo manual) —
+        por eso el total siempre cuadra exacto contra los rescates reales del día.
+    </p>
+
+    <div class="ceco2-caja mb-6">
+        <div class="ceco2-resumen">
+            <div>
+                <div class="etiqueta">Fecha</div>
+                <div class="valor" style="font-size:1.2rem;">{{ fecha_actual }} — {{ oficina }}</div>
+            </div>
+            <div>
+                <div class="etiqueta">Total</div>
+                <div class="valor">{{ total|default:0 }}</div>
+            </div>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="ceco2-tabla">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>OR</th>
+                        <th>PRH</th>
+                        <th class="text-right">Rescates total</th>
+                        <th class="text-right">Primera vez/Rescates reales</th>
+                        <th class="text-right">Reincidencias</th>
+                        <th>Tipo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for f in filas %}
+                    <tr>
+                        <td class="text-center">{{ fecha_actual }}</td>
+                        <td>{{ f.oficina }}</td>
+                        <td>{{ f.prh|default:"OTRA AUTORIDAD" }}</td>
+                        <td class="text-right">{{ f.rescates }}</td>
+                        <td class="text-right">{{ f.primera_vez }}</td>
+                        <td class="text-right">{{ f.reincidencias }}</td>
+                        <td>{{ f.tipo }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="7" class="text-center">Sin registros en esta fecha/entidad.</td></tr>
+                    {% endfor %}
+                    <tr class="fila-total-ceco2">
+                        <td colspan="3">TOTAL</td>
+                        <td class="text-right">{{ total|default:0 }}</td>
+                        <td class="text-right">{{ total_primera_vez|default:0 }}</td>
+                        <td class="text-right">{{ total_reincidencias|default:0 }}</td>
+                        <td></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</main>
+{% endblock content %}

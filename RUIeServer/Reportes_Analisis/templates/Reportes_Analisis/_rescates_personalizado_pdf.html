@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Reporte Personalizado {{ fecha_inicio }} a {{ fecha_fin }}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        @page { size: A4 portrait; margin: 12mm; }
+        body { font-family: 'Montserrat', sans-serif; padding: 0; margin: 0; }
+        h5 { text-align: center; margin: 8px 0; font-size: 12pt; }
+        .titulo-inm { text-align: center; font-size: 9pt; margin: 0 0 6px; }
+        .colorFondo { background-color: #4E1224; text-align: center; color: #f2f2f2; padding: 6px; border-radius: 4px; font-size: 9pt; }
+        .filtros { text-align: center; font-size: 8.5pt; color: #4b5563; margin: 8px 0 12px; }
+
+        table { border-collapse: collapse; margin-top: 6px; width: 100%; }
+        table, th, td { border: 1px solid black; }
+        th, td { text-align: center; padding: 3px 5px; font-size: 8pt; }
+        .letraT1 { color: #ffffff; background-color: #761B36; }
+        .letraT2 { color: rgb(0, 0, 0); background-color: #d9d9d9; }
+        .letraT0 { color: rgb(233, 232, 232); background-color: rgb(179, 142, 93); }
+        .col-txt { text-align: left; }
+        /* @FADAR -- nacionalidades extracontinentales (fuera de America) */
+        .letraT2.extracontinental { background-color: #B45309; color: #fff; }
+
+        .tarjeta-total { width: 220px; margin: 0 auto 14px; text-align: center; }
+        .tarjeta-total .valor { font-size: 20pt; font-weight: bold; color: #9A0A38; }
+        .tarjeta-total .etiqueta { font-size: 8pt; color: #6b7280; text-transform: uppercase; }
+    </style>
+</head>
+<body>
+
+    <p class="titulo-inm">INSTITUTO NACIONAL DE MIGRACIÓN<br>DIRECCIÓN GENERAL DE COORDINACIÓN DE OFICINAS DE REPRESENTACION</p>
+    <div class="colorFondo">
+        <strong>Reporte Personalizado — {{ fecha_inicio }} a {{ fecha_fin }}</strong>
+    </div>
+    <p class="filtros">
+        Entidad: {{ oficina }} · Zona: {{ zona }} · Tipo de rescate: {{ tipo_rescate }} ·
+        Categoría: {{ categoria }} · Nacionalidad: {{ nacionalidad }}
+    </p>
+
+    <div class="tarjeta-total">
+        <div class="valor">{{ total_general }}</div>
+        <div class="etiqueta">Total con estos filtros</div>
+    </div>
+
+    <h5>Resultados por oficina y nacionalidad</h5>
+    <table>
+        <thead>
+            <tr>
+                <th class="letraT1">Oficina</th>
+                <th class="letraT1">Nacionalidad</th>
+                <th class="letraT1">Hombres</th>
+                <th class="letraT1">Mujeres</th>
+                <th class="letraT1">Niños</th>
+                <th class="letraT1">Niñas</th>
+                <th class="letraT1">Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for f in filas_tabla %}
+            <tr>
+                <td class="letraT2 col-txt">{{ f.oficina }}</td>
+                <td class="letraT2 col-txt{% if f.nacionalidad in nacionalidades_extracontinentales %} extracontinental{% endif %}">{{ f.nacionalidad }}</td>
+                <td>{{ f.hombres }}</td>
+                <td>{{ f.mujeres }}</td>
+                <td>{{ f.ninos }}</td>
+                <td>{{ f.ninas }}</td>
+                <td class="letraT0">{{ f.total }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="7">Sin registros con estos filtros.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+</body>
+</html>

@@ -1,0 +1,180 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}Reporte — Cuadro de Datos{% endblock title %}
+
+{% block styles %}
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
+<style>
+    .rescates-tarjeta {
+        background: #ffffff;
+        border-radius: 1rem;
+        border: 1px solid #e5e7eb;
+        padding: 1rem 1.25rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+
+    /* --- A partir de aqui, mismos colores/estilos exactos que el PDF
+       oficial (estadistica/cuadroDATOS.html) -- para que pantalla y PDF
+       se vean identicos. --- */
+    .informe-oficial { font-family: 'Montserrat', sans-serif; }
+    .informe-oficial .titulo-inm { text-align: center; color: rgb(5, 11, 9); margin: 0 0 0.25rem; font-size: 1rem; font-weight: 700; }
+    .informe-oficial .titulo-cuadro { text-align: center; color: rgb(5, 11, 9); margin: 0.5rem 0 1.25rem; font-size: 1.25rem; font-weight: 700; }
+
+    .tabla-resumen { width: 100%; max-width: 420px; border-collapse: collapse; margin: 0 auto 2.5rem; }
+    .tabla-resumen th, .tabla-resumen td { border: 1px solid #000; padding: 6px 10px; text-align: center; font-size: 13px; }
+    .tabla-resumen th { background: #fff; color: rgb(98,17,50); font-weight: 700; }
+    .tabla-resumen td { color: #000; }
+    .tabla-resumen tr:last-child td { background: rgb(98,17,50); color: #fafafa; font-weight: 700; }
+    .tabla-resumen tr.letras-temp td:last-child { color: rgb(157,36,73); }
+    .tabla-resumen tr.color-temp td { background: rgb(217, 217, 217); }
+    .tabla-resumen td:first-child { text-align: left; }
+
+    .contenedor-2T { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; max-width: 900px; margin: 0 auto; }
+    .tabla-oficina, .tabla-oficina1 { width: 100%; border-collapse: collapse; }
+    .tabla-oficina th, .tabla-oficina td, .tabla-oficina1 th, .tabla-oficina1 td { border: 1px solid #000; padding: 6px 10px; text-align: center; font-size: 12px; }
+    .tabla-oficina th, .tabla-oficina1 th { background: #fff; color: #000; font-weight: 700; }
+    .tabla-oficina td { color: rgb(139,107,65); }
+    .tabla-oficina tr:last-child td { background: rgb(139,107,65); color: #fafafa; font-weight: 700; }
+    .tabla-oficina1 td { color: rgb(112,48,160); }
+    .tabla-oficina1 tr:last-child td { background: rgb(112,48,160); color: #fafafa; font-weight: 700; }
+    .titulo-EM { text-align: center; color: rgb(40, 92, 77); font-weight: 700; margin-bottom: 0.5rem; }
+    .titulo-DIF { text-align: center; color: rgb(112,48,160); font-weight: 700; margin-bottom: 0.5rem; }
+
+    /* @FADAR -- Retornados: bloque independiente del cuadro oficial de
+       arriba, azul celeste. */
+    .caja-retornados {
+        background: #F0F9FF;
+        border: 1px solid #BAE6FD;
+        border-radius: 1rem;
+        padding: 1.25rem;
+        margin-bottom: 2.5rem;
+    }
+    .caja-retornados h3 { color: #0369A1; font-weight: 700; font-size: 0.95rem; margin-bottom: 0.75rem; }
+    .total-retornados-voluntarios { margin-bottom: 1rem; }
+    .total-retornados-voluntarios .valor { font-size: 1.8rem; font-weight: 800; color: #0EA5E9; line-height: 1; }
+    .total-retornados-voluntarios .etiqueta { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: #0369A1; margin-top: 0.25rem; }
+    .tabla-retornados-detalle { width: 100%; max-width: 480px; border-collapse: collapse; }
+    .tabla-retornados-detalle th, .tabla-retornados-detalle td { padding: 6px 10px; text-align: right; font-size: 12px; border-bottom: 1px solid #BAE6FD; }
+    .tabla-retornados-detalle th:first-child, .tabla-retornados-detalle td:first-child { text-align: left; }
+    .tabla-retornados-detalle thead th { color: #0369A1; text-transform: uppercase; font-size: 10px; letter-spacing: .03em; }
+    .tabla-retornados-detalle tbody tr:last-child td { font-weight: 700; background: #0EA5E9; color: #fff; border-bottom: none; }
+</style>
+{% endblock styles %}
+
+{% block content %}
+<main class="max-w-5xl mx-auto px-4 py-6">
+
+    <div class="flex items-center justify-between mb-6">
+        <h1 class="text-2xl font-bold text-[#9A0A38]">Reporte — Cuadro de Datos</h1>
+        <div class="flex gap-3">
+            <a href="{% url 'Reportes_Analisis:rescates_reporte_informe' %}" class="text-sm font-semibold text-gray-500 hover:text-[#9A0A38] transition">Informe Diario</a>
+            <a href="{% url 'Reportes_Analisis:rescates_reporte_regiones' %}" class="text-sm font-semibold text-gray-500 hover:text-[#9A0A38] transition">Regiones (CECO)</a>
+            <a href="{% url 'Reportes_Analisis:rescates_dashboard' %}" class="text-sm font-semibold text-gray-500 hover:text-[#9A0A38] transition">← Volver al dashboard</a>
+        </div>
+    </div>
+
+    <form method="get" class="rescates-tarjeta mb-8 flex flex-wrap items-end gap-4">
+        <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-1">Fecha</label>
+            <input type="date" name="fecha" value="{{ fecha_iso }}"
+                   class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm">
+        </div>
+        <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-1">Entidad federativa</label>
+            <select name="oficina" class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm min-w-[200px]">
+                <option value="">Nacional (todas)</option>
+                {% for of in oficinas %}
+                <option value="{{ of }}" {% if of == oficina_seleccionada %}selected{% endif %}>{{ of }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="bg-[#9A0A38] hover:bg-[#7d0830] text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
+            Generar
+        </button>
+        <div class="flex-1"></div>
+        <a href="{% url 'Reportes_Analisis:rescates_reporte_cuadro_pdf' %}?fecha={{ fecha_iso }}&oficina={{ oficina_seleccionada }}"
+           class="inline-flex items-center gap-2 bg-gray-700 hover:bg-gray-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+            ⬇ Descargar PDF
+        </a>
+        <a href="{% url 'Reportes_Analisis:rescates_reporte_cuadro_excel' %}?fecha={{ fecha_iso }}&oficina={{ oficina_seleccionada }}"
+           class="inline-flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+            ⬇ Descargar Excel
+        </a>
+    </form>
+
+    <!-- Vista previa, formato identico al PDF oficial -->
+    <div class="informe-oficial bg-white rounded-2xl border border-gray-200 shadow-sm p-8 mb-10">
+        <p class="titulo-inm">INSTITUTO NACIONAL DE MIGRACIÓN<br>DIRECCIÓN GENERAL DE COORDINACIÓN DE OFICINAS DE REPRESENTACION</p>
+        <p class="titulo-cuadro">Cuadro de Datos<br>{{ fecha }} — {{ oficina }}</p>
+
+        <table class="tabla-resumen">
+            <thead>
+                <tr><th>FECHA</th><th>{{ fecha }}</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Rescatados:</td><td>{{ rescatados }}</td></tr>
+                <tr class="letras-temp"><td>Reincidentes:</td><td>-{{ reincidentes }}</td></tr>
+                <tr class="color-temp"><td>Subtotal:</td><td>{{ subtotal1 }}</td></tr>
+                <tr class="letras-temp"><td>Inadmitidos:</td><td>-{{ inadmitidos }}</td></tr>
+                <tr class="color-temp"><td>Subtotal:</td><td>{{ subtotal2 }}</td></tr>
+                <tr class="letras-temp"><td>Retornados:</td><td>-{{ retornados }}</td></tr>
+                <tr class="color-temp"><td>Subtotal:</td><td><strong>{{ rescates_nuevos }}</strong></td></tr>
+                <tr><td>De estos:</td><td>{{ EM_total }} Alojados en EM y<br>{{ DIF_total }} canalizados al DIF</td></tr>
+            </tbody>
+        </table>
+
+        <div class="contenedor-2T">
+            <div>
+                <h3 class="titulo-EM">Alojados en EM</h3>
+                <table class="tabla-oficina">
+                    <thead><tr><th>NACIONALIDAD</th><th>TOTAL</th></tr></thead>
+                    <tbody>
+                        {% for nombre, total in rescates_EM.items %}
+                        <tr><td>{{ nombre }}</td><td>{{ total }}</td></tr>
+                        {% empty %}
+                        <tr><td colspan="2"><strong>Sin rescates.</strong></td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div>
+                <h3 class="titulo-DIF">Alojados en DIF/ALBERGUE</h3>
+                <table class="tabla-oficina1">
+                    <thead><tr><th>NACIONALIDAD</th><th>TOTAL</th></tr></thead>
+                    <tbody>
+                        {% for nombre, total in rescates_DIF.items %}
+                        <tr><td>{{ nombre }}</td><td>{{ total }}</td></tr>
+                        {% empty %}
+                        <tr><td colspan="2"><strong>Sin rescates.</strong></td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- @FADAR -- Retornados: apartado independiente del cuadro de arriba -->
+    <div class="caja-retornados">
+        <div class="total-retornados-voluntarios">
+            <div class="valor">{{ retornados_detalle.total_retornado }}</div>
+            <div class="etiqueta">Retornados</div>
+        </div>
+        <h3>Retornados — detalle por {{ retornados_detalle.columna }}</h3>
+        <table class="tabla-retornados-detalle">
+            <thead>
+                <tr><th>{{ retornados_detalle.columna }}</th><th>Deportados</th><th>Retornados</th><th>Total</th></tr>
+            </thead>
+            <tbody>
+                {% for f in retornados_detalle.filas %}
+                <tr><td>{{ f.nombre }}</td><td>{{ f.deportado }}</td><td>{{ f.retornado }}</td><td>{{ f.total }}</td></tr>
+                {% empty %}
+                <tr><td colspan="4">Sin retornados en esta fecha.</td></tr>
+                {% endfor %}
+                <tr><td>TOTAL</td><td>{{ retornados_detalle.total_deportado }}</td><td>{{ retornados_detalle.total_retornado }}</td><td>{{ retornados_detalle.total_general }}</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+</main>
+{% endblock content %}

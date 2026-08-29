@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ titulo }} {{ fecha_actual }}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,700;0,900&display=swap" rel="stylesheet">
+    <style>
+        @page { size: A4 landscape; margin: 8mm; }
+        body { font-family: 'Montserrat', sans-serif; padding: 0; margin: 0; }
+        .titulo-inm { text-align: center; font-size: 9pt; margin: 0 0 4px; }
+
+        /* @FADAR -- colores/fuente/estructura extraidos EXACTOS del archivo
+           de referencia (Rescatados_25AGO2026-CECO(rescates+reincidentes).xlsx,
+           hoja "CECCO 2"), celda por celda -- 4 filas de encabezado, no 3,
+           y una columna "NUCLEOS FAMILIARES" que se habia pasado en la
+           primera version. */
+        h2.cecov-header {
+            text-align: center; font-size: 13pt; font-weight: 900; color: #fff;
+            padding: 6px 0; margin: 0 0 8px; border-radius: 4px;
+        }
+        .col-gris { background-color: #808080; }
+        .col-naranja-header { background-color: #ED7D31; }
+        .col-azulgris { background-color: #44546A; }
+        .col-verde { background-color: #70AD47; }
+
+        table.cecov-tabla { border-collapse: collapse; width: 100%; }
+        table.cecov-tabla th, table.cecov-tabla td { border: 1px solid #B4C6E7; padding: 3px 5px; text-align: center; font-size: 7.5pt; }
+        table.cecov-tabla td:first-child { text-align: left; font-weight: bold; }
+        table.cecov-tabla th.col-total, table.cecov-tabla td.col-total { background-color: #4472C4; color: #fff; font-weight: bold; }
+        table.cecov-tabla th.col-naranja, table.cecov-tabla td.col-naranja { background-color: #ED7D31; color: #fff; font-weight: bold; }
+        table.cecov-tabla th.col-verdeosc, table.cecov-tabla td.col-verdeosc { background-color: #13322B; color: #fff; font-weight: bold; }
+        table.cecov-tabla th.col-nucleos, table.cecov-tabla td.col-nucleos { background-color: #70AD47; color: #fff; font-weight: bold; }
+        table.cecov-tabla tbody td.dato-total { background-color: #E7E6E6; font-weight: bold; }
+        table.cecov-tabla tr.total-fila td { background-color: #000000; color: #fff; font-weight: bold; }
+        /* @FADAR -- nacionalidades extracontinentales (fuera de America) */
+        table.cecov-tabla td.extracontinental { background-color: #B45309; color: #fff; }
+        th.col-rescatados { background-color: #70AD47; color: #fff; font-size: 8pt; }
+
+        /* @FADAR -- cada bloque (entidad) en su propia pagina; el formato
+           de 331 columnas del Excel original no cabe en una pagina de PDF,
+           segmentado por pagina segun quedo acordado. */
+        .salto-pagina { page-break-before: always; }
+
+        /* @FADAR -- cuadro "SUCHIATE / RÍO BRAVO / CENTRO / TOTAL", mismos
+           colores exactos del archivo de referencia. */
+        table.caja-resumen-ceco { width: 320px; margin: 40px auto 0; border-radius: 6px; border: none; font-family: Georgia, 'Times New Roman', serif; }
+        table.caja-resumen-ceco td { border: none; color: #fff; font-weight: bold; font-size: 13pt; padding: 8px 16px; }
+    </style>
+</head>
+<body>
+
+    {% for bloque in bloques_lista %}
+    <div class="{% if not forloop.first %}salto-pagina{% endif %}">
+        <p class="titulo-inm">INSTITUTO NACIONAL DE MIGRACIÓN<br>DIRECCIÓN GENERAL DE COORDINACIÓN DE OFICINAS DE REPRESENTACION</p>
+        <h2 class="cecov-header {% if forloop.last %}col-verde{% else %}{% cycle 'col-gris' 'col-naranja-header' 'col-azulgris' %}{% endif %}">
+            {{ titulo }} — {{ bloque.nombre }} — {{ fecha_actual }}
+        </h2>
+        <table class="cecov-tabla">
+            <thead>
+                <tr>
+                    <th rowspan="3" class="col-rescatados">RESCATADOS<br>{{ fecha_actual }}</th>
+                    <th rowspan="3" class="col-total">Total</th>
+                    <th colspan="2" rowspan="2" class="col-naranja">Mayores de edad solos</th>
+                    <th colspan="2" rowspan="2" class="col-verdeosc">Mayores de edad que acompañan NNA</th>
+                    <th colspan="4" class="col-verdeosc">Menores de edad</th>
+                    <th rowspan="3" class="col-nucleos">Núcleos familiares</th>
+                </tr>
+                <tr>
+                    <th colspan="2" class="col-verdeosc">Acompañados</th>
+                    <th colspan="2" class="col-naranja">No acompañados</th>
+                </tr>
+                <tr>
+                    <th class="col-naranja">H</th><th class="col-naranja">M</th>
+                    <th class="col-verdeosc">H</th><th class="col-verdeosc">M</th>
+                    <th class="col-verdeosc">H</th><th class="col-verdeosc">M</th>
+                    <th class="col-naranja">H</th><th class="col-naranja">M</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for fila in bloque.filas %}
+                <tr>
+                    <td{% if fila.nacionalidad in nacionalidades_extracontinentales %} class="extracontinental"{% endif %}>{{ fila.nacionalidad }}</td>
+                    <td class="dato-total">{{ fila.total }}</td>
+                    <td>{{ fila.H_AS }}</td><td>{{ fila.M_AS }}</td>
+                    <td>{{ fila.H_AA }}</td><td>{{ fila.M_AA }}</td>
+                    <td>{{ fila.H_mA }}</td><td>{{ fila.M_mA }}</td>
+                    <td>{{ fila.H_mS }}</td><td>{{ fila.M_mS }}</td>
+                    <td>{{ fila.nucleos }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="11">Sin registros en esta fecha.</td></tr>
+                {% endfor %}
+                <tr class="total-fila">
+                    <td>TOTAL</td>
+                    <td>{{ bloque.total.total }}</td>
+                    <td>{{ bloque.total.H_AS }}</td><td>{{ bloque.total.M_AS }}</td>
+                    <td>{{ bloque.total.H_AA }}</td><td>{{ bloque.total.M_AA }}</td>
+                    <td>{{ bloque.total.H_mA }}</td><td>{{ bloque.total.M_mA }}</td>
+                    <td>{{ bloque.total.H_mS }}</td><td>{{ bloque.total.M_mS }}</td>
+                    <td>{{ bloque.total.nucleos }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    {% endfor %}
+
+    <div class="salto-pagina">
+        <p class="titulo-inm">INSTITUTO NACIONAL DE MIGRACIÓN<br>DIRECCIÓN GENERAL DE COORDINACIÓN DE OFICINAS DE REPRESENTACION</p>
+        <h2 class="cecov-header col-verde">{{ titulo }} — Resumen por zona — {{ fecha_actual }}</h2>
+        <table class="caja-resumen-ceco">
+            <tr style="background-color:#44546A;"><td style="text-align:left;">SUCHIATE</td><td style="text-align:right;">{{ resumen_zonas.suchiate }}</td></tr>
+            <tr style="background-color:#ED7D31;"><td style="text-align:left;">RÍO BRAVO</td><td style="text-align:right;">{{ resumen_zonas.rio_bravo }}</td></tr>
+            <tr style="background-color:#808080;"><td style="text-align:left;">CENTRO</td><td style="text-align:right;">{{ resumen_zonas.centro }}</td></tr>
+            <tr style="background-color:#70AD47;"><td style="text-align:left;color:#44546A;">TOTAL</td><td style="text-align:right;color:#44546A;">{{ resumen_zonas.total }}</td></tr>
+        </table>
+    </div>
+
+</body>
+</html>

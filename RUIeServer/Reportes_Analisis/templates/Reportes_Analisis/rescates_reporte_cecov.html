@@ -1,0 +1,167 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}{{ titulo }}{% endblock title %}
+
+{% block styles %}
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,700;0,900&display=swap" rel="stylesheet">
+<style>
+    .rescates-tarjeta {
+        background: #ffffff; border-radius: 1rem; border: 1px solid #e5e7eb;
+        padding: 1rem 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    /* @FADAR -- colores/fuente extraidos EXACTOS del archivo de referencia
+       (Rescatados_25AGO2026-CECO(rescates+reincidentes).xlsx, hoja
+       "CECCO 2"). Tabla unica horizontal (como el Excel), con scroll
+       lateral, en vez de bloques apilados hacia abajo -- primera columna
+       (Nacionalidad) fija con position:sticky para no perder la
+       referencia al desplazarse. */
+    .cecov-scroll { overflow-x: auto; border-radius: 1rem; border: 1px solid #e5e7eb; box-shadow: 0 1px 3px rgba(0,0,0,0.06); max-height: 75vh; overflow-y: auto; }
+    table.cecov-tabla-h { border-collapse: collapse; font-size: 0.72rem; font-family: 'Montserrat', sans-serif; }
+    table.cecov-tabla-h th, table.cecov-tabla-h td { padding: 0.3rem 0.5rem; text-align: center; border: 1px solid #DCE6F1; white-space: nowrap; }
+    table.cecov-tabla-h thead th { position: sticky; top: 0; z-index: 2; color: #fff; font-weight: 700; }
+    table.cecov-tabla-h thead tr:first-child th { top: 0; }
+    table.cecov-tabla-h thead tr:last-child th { top: 1.6rem; }
+    table.cecov-tabla-h td.col-nac, table.cecov-tabla-h th.col-nac {
+        position: sticky; left: 0; z-index: 3; background: #fff; text-align: left; font-weight: 700;
+        box-shadow: 2px 0 3px rgba(0,0,0,0.08);
+    }
+    table.cecov-tabla-h thead th.col-nac { z-index: 4; background: #70AD47; font-size: 0.68rem; line-height: 1.3; }
+    .col-gris { background: #808080; }
+    .col-naranja-h { background: #ED7D31; }
+    .col-azulgris { background: #44546A; }
+    .col-verde { background: #70AD47; }
+    .col-total { background: #4472C4; }
+    .col-naranja { background: #ED7D31; }
+    .col-verdeosc { background: #13322B; }
+    .col-nucleos { background: #70AD47; }
+    table.cecov-tabla-h tbody tr:nth-child(even) td:not(.col-nac) { background: #F5F8FE; }
+    table.cecov-tabla-h tbody tr.fila-total td { background: #000000 !important; color: #fff; font-weight: 700; }
+    /* @FADAR -- nacionalidades extracontinentales (fuera de America) */
+    table.cecov-tabla-h td.col-nac.extracontinental { background: #B45309 !important; color: #fff; }
+
+    /* @FADAR -- cuadro "SUCHIATE / RÍO BRAVO / CENTRO / TOTAL", mismos
+       colores exactos del archivo de referencia. */
+    .caja-resumen-ceco {
+        max-width: 480px; margin: 2rem auto 0; border-radius: 0.75rem;
+        overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+        font-family: Georgia, 'Times New Roman', serif;
+    }
+    .fila-resumen-ceco {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 1rem 1.5rem; font-weight: 700; font-size: 1.15rem;
+    }
+</style>
+{% endblock styles %}
+
+{% block content %}
+<main class="max-w-full mx-auto px-4 py-6">
+
+    <div class="flex items-center justify-between mb-4">
+        <h1 class="text-2xl font-bold text-[#9A0A38]">Reporte — {{ titulo }}</h1>
+        {# @FADAR -- dashboard y Regiones ya viven en Reportes_Analisis #}
+        <a href="{% url 'Reportes_Analisis:rescates_dashboard' %}" class="text-sm font-semibold text-gray-500 hover:text-[#9A0A38] transition">← Volver al dashboard</a>
+    </div>
+
+    {# @FADAR -- barra de reportes relacionados, aparte del titulo #}
+    <div class="rescates-tarjeta mb-6 flex flex-wrap gap-3">
+        <a href="{% url 'Reportes_Analisis:rescates_reporte_regiones' %}" target="_blank"
+           class="inline-flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold px-4 py-2 rounded-lg transition">
+            CECO
+        </a>
+        <a href="{% url 'Reportes_Analisis:rescates_reporte_ceco2' %}" target="_blank"
+           class="inline-flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold px-4 py-2 rounded-lg transition">
+            CECO 2
+        </a>
+    </div>
+
+    <form method="get" class="rescates-tarjeta mb-6 flex flex-wrap items-end gap-4">
+        <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-1">Fecha</label>
+            <input type="date" name="fecha" value="{{ fecha_iso }}"
+                   class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm">
+        </div>
+        <button type="submit" class="bg-[#9A0A38] hover:bg-[#7d0830] text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
+            Generar
+        </button>
+        <div class="flex-1"></div>
+        <a href="{% url url_pdf %}?fecha={{ fecha_iso }}"
+           class="inline-flex items-center gap-2 bg-gray-700 hover:bg-gray-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+            ⬇ Descargar PDF
+        </a>
+        <a href="{% url url_excel %}?fecha={{ fecha_iso }}"
+           class="inline-flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+            ⬇ Descargar Excel
+        </a>
+    </form>
+
+    <p class="text-xs text-gray-400 mb-4">
+        {{ nacionalidades|length }} nacionalidad(es) × {{ oficinas|length }} entidades + el bloque nacional, para el <strong>{{ fecha_actual }}</strong>.
+        Desplázate horizontalmente para ver todas las entidades — misma organización que el Excel.
+    </p>
+    <p class="text-xs text-gray-400 mb-4">
+        <span style="display:inline-block; width:10px; height:10px; background:#B45309; border-radius:2px; vertical-align:middle;"></span>
+        Nacionalidad extracontinental (fuera de América)
+    </p>
+
+    <div class="cecov-scroll">
+        <table class="cecov-tabla-h">
+            <thead>
+                <tr>
+                    <th class="col-nac" rowspan="2">RESCATADOS<br>{{ fecha_actual }}</th>
+                    {% for bloque in bloques_lista %}
+                    <th colspan="10" class="{% if forloop.last %}col-verde{% else %}{% cycle 'col-gris' 'col-naranja-h' 'col-azulgris' %}{% endif %}">{{ bloque.nombre }}</th>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    {% for bloque in bloques_lista %}
+                    <th class="col-total">Total</th>
+                    <th class="col-naranja">H sol</th><th class="col-naranja">M sol</th>
+                    <th class="col-verdeosc">H acomp NNA</th><th class="col-verdeosc">M acomp NNA</th>
+                    <th class="col-verdeosc">H men acomp</th><th class="col-verdeosc">M men acomp</th>
+                    <th class="col-naranja">H men solo</th><th class="col-naranja">M men solo</th>
+                    <th class="col-nucleos">Núcleos</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for fila in filas_horizontal %}
+                <tr>
+                    <td class="col-nac{% if fila.nacionalidad in nacionalidades_extracontinentales %} extracontinental{% endif %}">{{ fila.nacionalidad }}</td>
+                    {% for d in fila.por_bloque %}
+                    <td>{{ d.total }}</td>
+                    <td>{{ d.H_AS }}</td><td>{{ d.M_AS }}</td>
+                    <td>{{ d.H_AA }}</td><td>{{ d.M_AA }}</td>
+                    <td>{{ d.H_mA }}</td><td>{{ d.M_mA }}</td>
+                    <td>{{ d.H_mS }}</td><td>{{ d.M_mS }}</td>
+                    <td>{{ d.nucleos }}</td>
+                    {% endfor %}
+                </tr>
+                {% empty %}
+                <tr><td colspan="2">Sin registros en esta fecha.</td></tr>
+                {% endfor %}
+                <tr class="fila-total">
+                    <td class="col-nac">TOTAL</td>
+                    {% for d in fila_total_horizontal %}
+                    <td>{{ d.total }}</td>
+                    <td>{{ d.H_AS }}</td><td>{{ d.M_AS }}</td>
+                    <td>{{ d.H_AA }}</td><td>{{ d.M_AA }}</td>
+                    <td>{{ d.H_mA }}</td><td>{{ d.M_mA }}</td>
+                    <td>{{ d.H_mS }}</td><td>{{ d.M_mS }}</td>
+                    <td>{{ d.nucleos }}</td>
+                    {% endfor %}
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    {# @FADAR -- cuadro "SUCHIATE / RÍO BRAVO / CENTRO / TOTAL" #}
+    <div class="caja-resumen-ceco">
+        <div class="fila-resumen-ceco" style="background:#44546A; color:#fff;"><span>SUCHIATE</span><span>{{ resumen_zonas.suchiate|default:0 }}</span></div>
+        <div class="fila-resumen-ceco" style="background:#ED7D31; color:#fff;"><span>RÍO BRAVO</span><span>{{ resumen_zonas.rio_bravo|default:0 }}</span></div>
+        <div class="fila-resumen-ceco" style="background:#808080; color:#fff;"><span>CENTRO</span><span>{{ resumen_zonas.centro|default:0 }}</span></div>
+        <div class="fila-resumen-ceco" style="background:#70AD47; color:#44546A;"><span>TOTAL</span><span>{{ resumen_zonas.total|default:0 }}</span></div>
+    </div>
+
+</main>
+{% endblock content %}

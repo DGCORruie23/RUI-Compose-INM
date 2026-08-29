@@ -1,0 +1,622 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}Rescates / Operación{% endblock title %}
+
+{% block styles %}
+<link href="https://cdn.bokeh.org/bokeh/release/bokeh-3.6.2.min.css" rel="stylesheet" type="text/css">
+<link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet">
+<style>
+    .rescates-tarjeta {
+        background: #ffffff;
+        border-radius: 1rem;
+        border: 1px solid #e5e7eb;
+        padding: 1rem 1.25rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .rescates-tarjeta .valor {
+        font-size: 1.6rem;
+        font-weight: 800;
+        color: #9A0A38;
+        line-height: 1;
+    }
+    .rescates-tarjeta .etiqueta {
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        color: #6b7280;
+        margin-top: 0.35rem;
+    }
+    .rescates-grafica-box {
+        background: #ffffff;
+        border-radius: 1rem;
+        border: 1px solid #e5e7eb;
+        padding: 1rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+
+    /* @FADAR -- formato ejecutivo para las tablas de nucleos familiares */
+    .familia-card {
+        border: 1px solid #e5e7eb;
+        border-radius: 0.75rem;
+        overflow: hidden;
+    }
+    .familia-header {
+        background: #9A0A38;
+        color: #fff;
+        padding: 0.55rem 1rem;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.35rem 1rem;
+        font-size: 0.75rem;
+    }
+    .familia-header .num-familia {
+        background: rgba(255,255,255,0.2);
+        padding: 0.15rem 0.6rem;
+        border-radius: 999px;
+        font-weight: 700;
+    }
+    .familia-header .integrantes-badge {
+        margin-left: auto;
+        background: #fff;
+        color: #9A0A38;
+        padding: 0.15rem 0.65rem;
+        border-radius: 999px;
+        font-weight: 700;
+        font-size: 0.7rem;
+    }
+    .tabla-ejecutiva {
+        width: 100%;
+        font-size: 0.78rem;
+        border-collapse: collapse;
+    }
+    .tabla-ejecutiva thead th {
+        background: #f9fafb;
+        color: #6b7280;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        font-size: 0.65rem;
+        font-weight: 700;
+        text-align: left;
+        padding: 0.5rem 0.9rem;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    .tabla-ejecutiva th.text-right, .tabla-ejecutiva td.text-right { text-align: right; }
+    .tabla-ejecutiva tbody td {
+        padding: 0.45rem 0.9rem;
+        border-bottom: 1px solid #f3f4f6;
+    }
+    .tabla-ejecutiva tbody tr:nth-child(even) { background: #fafafa; }
+    .tabla-ejecutiva tbody tr:last-child td { border-bottom: none; }
+    .tabla-ejecutiva tbody tr:hover { background: #fef2f2; }
+    .badge-sexo {
+        display: inline-block;
+        padding: 0.1rem 0.55rem;
+        border-radius: 999px;
+        font-size: 0.68rem;
+        font-weight: 700;
+    }
+    .badge-sexo.hombre { background: #E0F2FE; color: #0369A1; }
+    .badge-sexo.mujer { background: #FCE7F3; color: #BE185D; }
+    .badge-parentesco {
+        display: inline-block;
+        padding: 0.1rem 0.5rem;
+        border-radius: 0.35rem;
+        font-size: 0.68rem;
+        font-weight: 600;
+        background: #F3F4F6;
+        color: #374151;
+    }
+</style>
+{% endblock styles %}
+
+{% block content %}
+{# @FADAR -- librerias externas: cargan UNA sola vez, fuera de rescates-live (la region que se reemplaza en cada refresco en vivo). #}
+<script src="https://cdn.bokeh.org/bokeh/release/bokeh-3.6.2.min.js"></script>
+<script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+
+<div id="rescates-live">
+<main class="max-w-7xl mx-auto px-4 py-6">
+
+    <div class="flex items-center justify-between mb-6">
+        <h1 class="text-2xl font-bold text-[#9A0A38]">Rescates / Operación</h1>
+        <div class="flex gap-3">
+            <a href="{% url 'Reportes_Analisis:rescates_reporte_cuadro' %}" target="_blank"
+               class="inline-flex items-center gap-2 bg-[#9A0A38] hover:bg-[#7d0830] text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+                📄 Reportes diarios
+            </a>
+            <a href="{% url 'Reportes_Analisis:reporte_mex_extranjeros' %}" target="_blank"
+               class="inline-flex items-center gap-2 bg-gray-700 hover:bg-gray-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+                🌎 Mexicanos y Extranjeros
+            </a>
+            <a href="{% url 'Reportes_Analisis:rescates_reporte_personalizado' %}" target="_blank"
+               class="inline-flex items-center gap-2 bg-gray-700 hover:bg-gray-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+                🎛️ Reporte Personalizado
+            </a>
+        </div>
+    </div>
+
+    <!-- Filtros: rango de fechas + entidad federativa -->
+    <form method="get" class="rescates-tarjeta mb-6 flex flex-wrap items-end gap-4">
+        <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-1">Fecha inicio</label>
+            <input type="date" name="fecha_inicio" value="{{ fecha_inicio }}"
+                   class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm">
+        </div>
+        <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-1">Fecha fin</label>
+            <input type="date" name="fecha_fin" value="{{ fecha_fin }}"
+                   class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm">
+        </div>
+        <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-1">Entidad federativa</label>
+            <select name="oficina" class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm min-w-[200px]">
+                <option value="">Todas las entidades</option>
+                {% for of in oficinas %}
+                <option value="{{ of }}" {% if of == oficina_seleccionada %}selected{% endif %}>{{ of }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit"
+                class="bg-[#9A0A38] hover:bg-[#7d0830] text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
+            Filtrar
+        </button>
+        <a href="{% url 'Reportes_Analisis:rescates_dashboard' %}"
+           class="text-sm font-semibold text-gray-500 hover:text-[#9A0A38] transition">
+            Limpiar filtros
+        </a>
+    </form>
+
+    <!-- Tarjetas resumen -->
+    <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
+        <div class="rescates-tarjeta">
+            <div class="valor">{{ total_rango|default:0 }}</div>
+            <div class="etiqueta">{% if oficina_seleccionada %}Total por Estado{% else %}Total Nacional{% endif %}</div>
+        </div>
+        <div class="rescates-tarjeta">
+            <div class="valor" style="color:#0EA5E9">{{ hombres|default:0 }}</div>
+            <div class="etiqueta">Hombres</div>
+        </div>
+        <div class="rescates-tarjeta">
+            <div class="valor" style="color:#EC4899">{{ mujeres|default:0 }}</div>
+            <div class="etiqueta">Mujeres</div>
+        </div>
+        <div class="rescates-tarjeta">
+            <div class="valor" style="color:#38BDF8">{{ ninos|default:0 }}</div>
+            <div class="etiqueta">Niños</div>
+        </div>
+        <div class="rescates-tarjeta">
+            <div class="valor" style="color:#F9A8D4">{{ ninas|default:0 }}</div>
+            <div class="etiqueta">Niñas</div>
+        </div>
+    </div>
+
+    {% if total_rango == 0 %}
+    <div class="rescates-tarjeta mb-6 text-sm text-gray-500">
+        No hay registros capturados en el rango/entidad seleccionados. La base actual solo tiene datos
+        hasta el 27 de mayo de 2026 — prueba con un rango dentro de ese periodo, o espera a que existan
+        datos más recientes en producción.
+    </div>
+    {% endif %}
+
+    <!-- @FADAR -- Reincidentes: >=2 apariciones (nombre+apellidos+nacionalidad)
+         en usuario_rescatepunto, via vista materializada mapa_mv_reincidencia_rescates -->
+    <div class="rescates-grafica-box mb-6">
+        <h2 class="text-sm font-semibold text-[#9A0A38] mb-1">Reincidencia en rescates</h2>
+        <div class="mb-4">
+            <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Rango filtrado</div>
+            <div class="grid grid-cols-2 gap-3" style="max-width:460px;">
+                <div class="rescates-tarjeta">
+                    <div class="valor" style="color:#DC2626">{{ total_reincidentes|default:0 }}</div>
+                    <div class="etiqueta">Reincidentes identificados</div>
+                </div>
+                <div class="rescates-tarjeta">
+                    <div class="valor" style="color:#15803D">{{ total_primera_vez|default:0 }}</div>
+                    <div class="etiqueta">Primera vez/Rescates reales</div>
+                </div>
+            </div>
+        </div>
+        <div class="mb-4">
+            <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Histórico (toda la base)</div>
+            <div class="grid grid-cols-2 gap-3" style="max-width:460px;">
+                <div class="rescates-tarjeta">
+                    <div class="valor" style="color:#991B1B">{{ total_reincidentes_historico|default:0 }}</div>
+                    <div class="etiqueta">Reincidentes reales</div>
+                </div>
+                <div class="rescates-tarjeta">
+                    <div class="valor" style="color:#065F46">{{ total_primera_vez_historico|default:0 }}</div>
+                    <div class="etiqueta">Primera vez</div>
+                </div>
+            </div>
+        </div>
+        {{ div_reincidentes_dia|safe }}
+    </div>
+
+    <!-- Retornados -- tabla distinta a RescatePunto (mapa_retornados) -->
+    <div class="rescates-grafica-box mb-6">
+        <h2 class="text-sm font-semibold text-[#9A0A38] mb-1">Retornados</h2>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3" style="max-width:800px;">
+            <div class="rescates-tarjeta">
+                <div class="valor" style="color:#0EA5E9">{{ total_retornados|default:0 }}</div>
+                <div class="etiqueta">Retornados en el rango filtrado</div>
+            </div>
+            <div class="rescates-tarjeta">
+                <div class="valor" style="color:#0EA5E9">{{ retornados_deportado|default:0 }}</div>
+                <div class="etiqueta">Deportados</div>
+            </div>
+            <div class="rescates-tarjeta">
+                <div class="valor" style="color:#0EA5E9">{{ retornados_retornado|default:0 }}</div>
+                <div class="etiqueta">Retornados (voluntarios)</div>
+            </div>
+            <div class="rescates-tarjeta">
+                <div class="valor" style="color:#0369A1">{{ total_retornados_historico|default:0 }}</div>
+                <div class="etiqueta">General histórico (toda la base)</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Medio / tipo de rescate -->
+    <div class="rescates-grafica-box mb-6">
+        <h2 class="text-sm font-semibold text-[#9A0A38] mb-1">Tipo de rescate</h2>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div class="rescates-tarjeta">
+                <div class="valor">{{ carretero|default:0 }}</div>
+                <div class="etiqueta">Carretero</div>
+            </div>
+            <div class="rescates-tarjeta">
+                <div class="valor">{{ aereo|default:0 }}</div>
+                <div class="etiqueta">Aéreo</div>
+            </div>
+            <div class="rescates-tarjeta">
+                <div class="valor">{{ ferroviario|default:0 }}</div>
+                <div class="etiqueta">Ferroviario</div>
+            </div>
+            <div class="rescates-tarjeta">
+                <div class="valor">{{ central_autobus|default:0 }}</div>
+                <div class="etiqueta">Central de autobuses</div>
+            </div>
+            <div class="rescates-tarjeta">
+                <div class="valor">{{ casa_seguridad|default:0 }}</div>
+                <div class="etiqueta">Casa de seguridad</div>
+            </div>
+            <div class="rescates-tarjeta">
+                <div class="valor">{{ hotel|default:0 }}</div>
+                <div class="etiqueta">Hotel</div>
+            </div>
+            <div class="rescates-tarjeta">
+                <div class="valor">{{ reclusorio|default:0 }}</div>
+                <div class="etiqueta">Reclusorio</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Regiones (Rio Bravo/Centro/Suchiate) -- mini-mapa embebido aqui
+         mismo; el detalle completo (tablas por oficina/nacionalidad) vive
+         en su propia pagina (rescates_regiones, ya trasladada). -->
+    <div class="rescates-grafica-box mb-6">
+        <div class="flex items-center justify-between mb-3">
+            <h2 class="text-sm font-semibold text-[#9A0A38]">Regiones</h2>
+            <a href="{% url 'Reportes_Analisis:rescates_regiones' %}?fecha_inicio={{ fecha_inicio }}&fecha_fin={{ fecha_fin }}&oficina={{ oficina_seleccionada }}" target="_blank"
+               class="text-xs font-semibold text-[#9A0A38] hover:underline whitespace-nowrap">Ver detalle completo (tablas) →</a>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+            <div class="rescates-tarjeta">
+                <div class="valor" style="color:#1D4ED8">{{ subtotal_rio_bravo.total|default:0 }}</div>
+                <div class="etiqueta">Río Bravo</div>
+            </div>
+            <div class="rescates-tarjeta">
+                <div class="valor" style="color:#7C3AED">{{ subtotal_centro.total|default:0 }}</div>
+                <div class="etiqueta">Centro</div>
+            </div>
+            <div class="rescates-tarjeta">
+                <div class="valor" style="color:#B45309">{{ subtotal_suchiate.total|default:0 }}</div>
+                <div class="etiqueta">Suchiate</div>
+            </div>
+        </div>
+
+        <div id="regiones-mapa-mini" style="width:100%; height:360px; border-radius:0.75rem; overflow:hidden; border:1px solid #e5e7eb;"></div>
+    </div>
+
+    {% if mostrar_seccion_entidad %}
+    <!-- Barras horizontales por entidad -- solo cuando NO hay una entidad ya filtrada -->
+    <div class="rescates-grafica-box mb-6">
+        <h2 class="text-sm font-semibold text-[#9A0A38] mb-1">Rescates por entidad federativa</h2>
+        {% if div_entidad %}
+            {{ div_entidad|safe }}
+        {% else %}
+            <p class="text-sm text-gray-400 py-6 text-center">Sin registros en este rango para comparar entidades.</p>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Diagrama de dispersión -->
+    <div class="rescates-grafica-box mb-6">
+        {{ div_dispersion|safe }}
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <!-- Barras por hora -->
+        <div class="rescates-grafica-box">
+            {{ div_horas|safe }}
+        </div>
+        <!-- Barras hombres/mujeres/niños/niñas -->
+        <div class="rescates-grafica-box">
+            {{ div_sexo|safe }}
+        </div>
+    </div>
+
+    <!-- Nacionalidades atípicas -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
+        <div class="rescates-grafica-box">
+            {{ div_pie|safe }}
+        </div>
+        <div class="rescates-grafica-box">
+            <h2 class="text-sm font-semibold text-[#9A0A38] mb-3">
+                Detalle — {{ total_atipicas|default:0 }} rescates de nacionalidades atípicas
+            </h2>
+            <div class="grid grid-cols-5 gap-2 mb-3">
+                <div class="rescates-tarjeta" style="padding:0.5rem;">
+                    <div class="valor" style="font-size:1.1rem;color:#0EA5E9">{{ atip_hombres|default:0 }}</div>
+                    <div class="etiqueta" style="font-size:0.6rem;">Hombres</div>
+                </div>
+                <div class="rescates-tarjeta" style="padding:0.5rem;">
+                    <div class="valor" style="font-size:1.1rem;color:#EC4899">{{ atip_mujeres|default:0 }}</div>
+                    <div class="etiqueta" style="font-size:0.6rem;">Mujeres</div>
+                </div>
+                <div class="rescates-tarjeta" style="padding:0.5rem;">
+                    <div class="valor" style="font-size:1.1rem;color:#38BDF8">{{ atip_ninos|default:0 }}</div>
+                    <div class="etiqueta" style="font-size:0.6rem;">Niños</div>
+                </div>
+                <div class="rescates-tarjeta" style="padding:0.5rem;">
+                    <div class="valor" style="font-size:1.1rem;color:#F9A8D4">{{ atip_ninas|default:0 }}</div>
+                    <div class="etiqueta" style="font-size:0.6rem;">Niñas</div>
+                </div>
+                <div class="rescates-tarjeta" style="padding:0.5rem;">
+                    <div class="valor" style="font-size:1.1rem;">{{ atip_nucleos|default:0 }}</div>
+                    <div class="etiqueta" style="font-size:0.6rem;">Núcleos familiares</div>
+                </div>
+            </div>
+            <div class="max-h-72 overflow-y-auto">
+                <table class="w-full text-xs">
+                    <thead class="text-gray-500 uppercase tracking-wide sticky top-0 bg-white">
+                        <tr>
+                            <th class="text-left py-1">Nacionalidad</th>
+                            <th class="text-left py-1">Región</th>
+                            <th class="text-right py-1">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for fila in detalle_atipicas %}
+                        <tr class="border-t border-gray-100">
+                            <td class="py-1">{{ fila.nombre }}</td>
+                            <td class="py-1 text-gray-500">{{ fila.region }}</td>
+                            <td class="py-1 text-right font-semibold">{{ fila.total }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="3" class="py-3 text-center text-gray-400">Sin nacionalidades atípicas en este rango.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Familias detectadas: nucleos familiares (numFamilia + hora + punto + agente) con sus integrantes -->
+    <div class="rescates-grafica-box mb-10">
+        <h2 class="text-sm font-semibold text-[#9A0A38] mb-1">
+            Núcleos familiares detectados — {{ familias_detectadas|length }} (top 15)
+        </h2>
+        <div class="max-h-[36rem] overflow-y-auto space-y-4">
+            {% for familia in familias_detectadas %}
+            <div class="familia-card">
+                <div class="familia-header">
+                    <span style="font-weight:700;">{{ familia.oficina }}</span>
+                    <span>{{ familia.fecha|date:"d/m/Y" }} · {{ familia.hora }}</span>
+                    <span>{{ familia.punto }}</span>
+                    <span class="num-familia">N.º familia {{ familia.num_familia }}</span>
+                    <span class="integrantes-badge">{{ familia.integrantes }} integrantes</span>
+                </div>
+                <table class="tabla-ejecutiva">
+                    <thead>
+                        <tr>
+                            <th>Nombre</th>
+                            <th>Apellidos</th>
+                            <th>Parentesco</th>
+                            <th>Nacionalidad</th>
+                            <th>Fecha de nacimiento</th>
+                            <th class="text-right">Edad</th>
+                            <th>Sexo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for m in familia.miembros %}
+                        <tr>
+                            <td style="font-weight:600;">{{ m.nombre }}</td>
+                            <td>{{ m.apellidos }}</td>
+                            <td><span class="badge-parentesco">{{ m.parentesco }}</span></td>
+                            <td>{{ m.nacionalidad }}</td>
+                            <td>{{ m.fecha_nac }}</td>
+                            <td class="text-right">{{ m.edad }}</td>
+                            <td>
+                                {% if m.sexo %}<span class="badge-sexo hombre">Hombre</span>
+                                {% else %}<span class="badge-sexo mujer">Mujer</span>{% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% empty %}
+            <p class="text-center text-gray-400 py-3">Sin núcleos familiares detectados en este rango.</p>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Numero de Familia -- solo el conteo de familias en la seleccion -->
+    <div class="rescates-grafica-box mb-10">
+        <h2 class="text-sm font-semibold text-[#9A0A38] mb-1">Número de Familia</h2>
+        <div class="rescates-tarjeta" style="max-width:220px;">
+            <div class="valor">{{ total_familias|default:0 }}</div>
+            <div class="etiqueta">Familias en esta selección</div>
+        </div>
+    </div>
+
+</main>
+
+{{ plot_script|safe }}
+
+<!-- Mini-mapa de Regiones -- mismo patron MapLibre/Turf que la pagina
+     dedicada rescates_regiones (y que mapa_interactivo), aqui en version
+     compacta embebida directo en el dashboard. -->
+<script>
+    const geoDataRegionesMini = {{ geo_data_regiones_json|safe }};
+
+    (function () {
+        // @FADAR -- sin DOMContentLoaded: este script se re-ejecuta en cada
+        // refresco en vivo (ver orquestador al final del bloque), no solo en
+        // la carga inicial. El orquestador ya destruye el mapa anterior antes
+        // de reemplazar el DOM (ver mas abajo) -- esto es solo un respaldo
+        // por si el script se dispara sin pasar por ahi. Envuelto en
+        // try/catch: remove() puede fallar si el contenedor ya no esta en el
+        // documento, y eso no debe frenar la creacion del mapa nuevo.
+        if (window._rescatesMapaMini) {
+            try { window._rescatesMapaMini.remove(); } catch (e) { console.error('Error al remover el mini-mapa:', e); }
+            window._rescatesMapaMini = null;
+        }
+        const mapaMini = new maplibregl.Map({
+            container: 'regiones-mapa-mini',
+            style: {
+                version: 8,
+                sources: {
+                    'esri-imagery-mini': {
+                        type: 'raster',
+                        tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}'],
+                        tileSize: 256,
+                        attribution: 'INEGI &copy; Esri'
+                    }
+                },
+                layers: [{ id: 'esri-imagery-mini-layer', type: 'raster', source: 'esri-imagery-mini', minzoom: 0, maxzoom: 24 }]
+            },
+            center: [-102.5528, 23.6345],
+            zoom: 3.6,
+            minZoom: 3,
+            maxZoom: 9,
+            interactive: true,
+            attributionControl: false,
+        });
+        window._rescatesMapaMini = mapaMini;
+
+        mapaMini.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-left');
+
+        mapaMini.on('load', () => {
+            mapaMini.addSource('regiones-mini-estados', { type: 'geojson', data: geoDataRegionesMini, generateId: true });
+
+            try {
+                const bbox = turf.bbox(geoDataRegionesMini);
+                mapaMini.fitBounds(bbox, { padding: 16, animate: false });
+            } catch (e) {
+                console.error("Error ajustando el mini-mapa a los limites:", e);
+            }
+
+            const worldMaskMini = turf.mask(geoDataRegionesMini);
+            mapaMini.addSource('regiones-mini-mask', { type: 'geojson', data: worldMaskMini });
+            mapaMini.addLayer({ id: 'regiones-mini-mask-fill', type: 'fill', source: 'regiones-mini-mask', paint: { 'fill-color': '#f9fafb', 'fill-opacity': 1 } });
+
+            mapaMini.addLayer({
+                id: 'regiones-mini-fill',
+                type: 'fill',
+                source: 'regiones-mini-estados',
+                paint: { 'fill-color': ['get', 'color_zona_rescates'], 'fill-opacity': 0.72 }
+            });
+            mapaMini.addLayer({
+                id: 'regiones-mini-line',
+                type: 'line',
+                source: 'regiones-mini-estados',
+                paint: { 'line-color': '#ffffff', 'line-width': 1 }
+            });
+            mapaMini.addLayer({
+                id: 'regiones-mini-labels',
+                type: 'symbol',
+                source: 'regiones-mini-estados',
+                layout: { 'text-field': ['get', 'total_rescates'], 'text-size': 10, 'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'] },
+                paint: { 'text-color': '#111827', 'text-halo-color': '#ffffff', 'text-halo-width': 1.4 }
+            });
+
+            const popupMini = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 10 });
+            mapaMini.on('mousemove', 'regiones-mini-fill', (e) => {
+                if (!e.features.length) return;
+                const p = e.features[0].properties;
+                mapaMini.getCanvas().style.cursor = 'pointer';
+                popupMini.setLngLat(e.lngLat).setHTML(`
+                    <div style="padding:3px; min-width:150px; font-family:Arial, sans-serif;">
+                        <div style="font-size:12px; font-weight:bold; color:${p.color_zona_rescates};">${p.oficina_rescates}</div>
+                        <div style="font-size:10px; color:#6b7280;">${p.zona_rescates || 'Sin zona'} · Total: <strong>${p.total_rescates}</strong></div>
+                    </div>
+                `).addTo(mapaMini);
+            });
+            mapaMini.on('mouseleave', 'regiones-mini-fill', () => {
+                mapaMini.getCanvas().style.cursor = '';
+                popupMini.remove();
+            });
+        });
+    })();
+</script>
+</div><!-- #rescates-live -->
+
+<script>
+    // @FADAR -- refresco en vivo del dashboard, sin recargar la pagina.
+    // Cada INTERVALO_MS vuelve a pedir la MISMA url (mismos filtros de
+    // fecha/entidad ya aplicados), toma solo el contenido de #rescates-live
+    // de la respuesta y lo reemplaza -- luego re-ejecuta a mano los <script>
+    // que trae adentro (Bokeh + el mini-mapa), porque el navegador NO corre
+    // scripts insertados via innerHTML por si solo.
+    (function () {
+        const INTERVALO_MS = 60000; // 60s -- el dashboard corre varias consultas pesadas sobre usuario_rescatepunto (1.5M filas)
+        const contenedor = document.getElementById('rescates-live');
+
+        function estaEditandoFiltros() {
+            const activo = document.activeElement;
+            return activo && contenedor.contains(activo) &&
+                ['INPUT', 'SELECT', 'TEXTAREA'].includes(activo.tagName);
+        }
+
+        function reejecutarScripts(raiz) {
+            raiz.querySelectorAll('script').forEach((viejo) => {
+                const nuevo = document.createElement('script');
+                for (const attr of viejo.attributes) nuevo.setAttribute(attr.name, attr.value);
+                nuevo.textContent = viejo.textContent;
+                viejo.replaceWith(nuevo);
+            });
+        }
+
+        async function refrescar() {
+            if (estaEditandoFiltros()) return; // no interrumpir al usuario a medio llenar el formulario
+            try {
+                const resp = await fetch(window.location.href, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                if (!resp.ok) return;
+                const doc = new DOMParser().parseFromString(await resp.text(), 'text/html');
+                const nuevoContenido = doc.getElementById('rescates-live');
+                if (!nuevoContenido) return;
+
+                // destruir el mapa viejo ANTES de reemplazar el DOM -- remove()
+                // necesita que su contenedor todavia este en el documento.
+                if (window._rescatesMapaMini) {
+                    try { window._rescatesMapaMini.remove(); } catch (e) { console.error('Error al remover el mini-mapa:', e); }
+                    window._rescatesMapaMini = null;
+                }
+                if (window.Bokeh) window.Bokeh.documents = []; // evita que se acumulen documentos viejos en memoria
+                contenedor.innerHTML = nuevoContenido.innerHTML;
+                reejecutarScripts(contenedor);
+            } catch (e) {
+                console.error('No se pudo refrescar el dashboard en vivo:', e);
+            }
+        }
+
+        setInterval(refrescar, INTERVALO_MS);
+    })();
+</script>
+{% endblock content %}
