@@ -22,6 +22,20 @@ services:
       - ./RUIeServer/usuarioL:/src/backendRUIe/usuarioL
       - ./RUIeServer/serverRUI:/src/backendRUIe/serverRUI
       - ./RUIeServer/vehiculos:/src/backendRUIe/vehiculos
+      - ./RUIeServer/Reportes_Analisis:/src/backendRUIe/Reportes_Analisis
+
+  # @FADAR -- refresca mapa_mv_reincidencia_rescates cada 20 min, aparte de
+  # cualquier request. Reusa la imagen de postgres solo por el cliente psql,
+  # no guarda datos propios.
+  cron-reincidencia:
+    container_name: RUIEcronReincidencia
+    restart: always
+    image: postgres:16.4-alpine
+    command: ["/bin/sh", "-c", "while true; do PGPASSWORD=\"$$POSTGRES_PASSWORD\" psql -h db -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\" -c \"REFRESH MATERIALIZED VIEW CONCURRENTLY mapa_mv_reincidencia_rescates;\"; sleep 600; done"]
+    env_file:
+      - .env.db
+    links:
+      - db
 
   db:
     container_name: dbPGruie

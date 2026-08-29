@@ -35,6 +35,7 @@ urlpatterns = [
     path('login/validar/', views.login_user),
     path('info/', include('usuario.urls')),
     path('mapa/', include('mapa.urls')),
+    path('reportes-analisis/', include('Reportes_Analisis.urls')),  # @FADAR
 
     path('registro/insertR', views.insert_rescates),
     path('registro/insertC', views.insert_conteo),

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>CECO 2 {{ fecha_actual }}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        @page { size: A4 portrait; margin: 10mm; }
+        body { font-family: 'Montserrat', sans-serif; padding: 0; margin: 0; }
+        .titulo-inm { text-align: center; font-size: 9pt; margin: 0 0 8px; }
+
+        /* @FADAR -- CECO 2: mismo estilo visual del Excel de referencia */
+        table.ceco2-resumen { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+        table.ceco2-resumen td { border: 1px solid #B4C6E7; padding: 4px 8px; text-align: center; font-size: 9pt; }
+        table.ceco2-resumen .etiqueta { background-color: #4472C4; color: #fff; font-weight: bold; }
+        table.ceco2-resumen .valor { font-weight: bold; font-size: 13pt; color: #1F3864; }
+
+        table.ceco2-tabla { width: 100%; border-collapse: collapse; }
+        table.ceco2-tabla th, table.ceco2-tabla td { border: 1px solid #B4C6E7; padding: 3px 6px; font-size: 7.5pt; }
+        table.ceco2-tabla thead th { background-color: #4472C4; color: #fff; font-weight: bold; text-align: left; }
+        table.ceco2-tabla thead th.col-rescates { text-align: right; }
+        table.ceco2-tabla td.col-rescates { text-align: right; }
+        table.ceco2-tabla td.col-fecha { text-align: center; }
+        table.ceco2-tabla tbody tr:nth-child(even) { background-color: #DCE6F1; }
+    </style>
+</head>
+<body>
+
+    <p class="titulo-inm">INSTITUTO NACIONAL DE MIGRACIÓN<br>DIRECCIÓN GENERAL DE COORDINACIÓN DE OFICINAS DE REPRESENTACION</p>
+
+    <table class="ceco2-resumen">
+        <tr>
+            <td class="etiqueta" style="width:50%;">Fecha</td>
+            <td class="etiqueta" style="width:50%;">Total</td>
+        </tr>
+        <tr>
+            <td class="valor">{{ fecha_actual }} — {{ oficina }}</td>
+            <td class="valor">{{ total|default:0 }}</td>
+        </tr>
+    </table>
+
+    <table class="ceco2-tabla">
+        <thead>
+            <tr>
+                <th>Fecha</th>
+                <th>OR</th>
+                <th>PRH</th>
+                <th class="col-rescates">Rescates total</th>
+                <th class="col-rescates">Primera vez/Rescates reales</th>
+                <th class="col-rescates">Reincidencias</th>
+                <th>Tipo</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for f in filas %}
+            <tr>
+                <td class="col-fecha">{{ fecha_actual }}</td>
+                <td>{{ f.oficina }}</td>
+                <td>{{ f.prh|default:"OTRA AUTORIDAD" }}</td>
+                <td class="col-rescates">{{ f.rescates }}</td>
+                <td class="col-rescates">{{ f.primera_vez }}</td>
+                <td class="col-rescates">{{ f.reincidencias }}</td>
+                <td>{{ f.tipo }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="7" style="text-align:center;">Sin registros en esta fecha/entidad.</td></tr>
+            {% endfor %}
+            <tr style="background-color:#1F3864; color:#fff; font-weight:bold;">
+                <td colspan="3">TOTAL</td>
+                <td class="col-rescates">{{ total|default:0 }}</td>
+                <td class="col-rescates">{{ total_primera_vez|default:0 }}</td>
+                <td class="col-rescates">{{ total_reincidencias|default:0 }}</td>
+                <td></td>
+            </tr>
+        </tbody>
+    </table>
+
+</body>
+</html>
