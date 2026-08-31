@@ -165,13 +165,13 @@
                 <img src="{% static 'icons/logo3.jpg' %}" alt="Logo Completo" class="scale-[0.6]">
               </a>
         </div>
-        
         <!-- Columna C: Logo -->
-        <!-- <div class="w-1/4 flex justify-end p-2">
-            {% comment %} <img src="{% static 'icons/LOGO3.png' %}" alt="Logo G" class="h-16"> {% endcomment %}
-            <img src="{% static 'icons/logo2.png' %}" alt="Logo C" class="h-16 scale-60">
+        {% comment %}
+        <div class="w-1/4 flex justify-end p-2">
+            <img src="{% static 'icons/logo2.jpg' %}" alt="Logo C" class="h-16 scale-60">
         </div>
-    </div> -->
+        {% endcomment %}
+    </div>
 </header>
    
   {% if request.user.is_authenticated %}
