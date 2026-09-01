@@ -1,0 +1,187 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}CECO{% endblock title %}
+
+{% block styles %}
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
+<style>
+    .rescates-tarjeta {
+        background: #ffffff; border-radius: 1rem; border: 1px solid #e5e7eb;
+        padding: 1rem 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .informe-oficial { font-family: 'Montserrat', sans-serif; }
+    .informe-oficial table { border-collapse: collapse; width: 100%; }
+    .informe-oficial th, .informe-oficial td {
+        border: 1px solid #000; text-align: center; font-size: 12px; padding: 5px 8px;
+    }
+    .colorFondo { background-color: #4E1224; color: #f2f2f2; text-align: center; padding: 0.5rem; border-radius: 0.5rem; }
+    .letraT0 { color: rgb(233, 232, 232); background-color: rgb(179, 142, 93); }
+    .letraT1 { color: #ffffff; background-color: #761B36; }
+    .letraT2 { color: rgb(0, 0, 0); background-color: #d9d9d9; }
+    .zona-etiqueta { color: #9CA3AF; font-size: 11px; }
+    .subtotal-fila td { background-color: #F3F4F6; font-weight: 700; }
+    .total-fila td { border-top: 2px solid #000; font-weight: 700; }
+
+    /* @FADAR -- cuadro resumen final del reporte CECO, mismos colores de
+       zona que ya usa el mapa (RESCATES_ZONA_COLOR), total en verde. */
+    .caja-resumen-ceco {
+        max-width: 480px; margin: 2rem auto 0; border-radius: 0.75rem;
+        overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+        font-family: Georgia, 'Times New Roman', serif;
+    }
+    .fila-resumen-ceco {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 1rem 1.5rem; color: #fff; font-weight: 700; font-size: 1.15rem;
+    }
+</style>
+{% endblock styles %}
+
+{% block content %}
+<main class="max-w-6xl mx-auto px-4 py-6">
+
+    <div class="flex items-center justify-between mb-4">
+        <h1 class="text-2xl font-bold text-[#9A0A38]">Reporte — Regiones (CECO)</h1>
+        <a href="{% url 'rescates_dashboard' %}" class="text-sm font-semibold text-gray-500 hover:text-[#9A0A38] transition">← Volver al dashboard</a>
+    </div>
+
+    {# @FADAR -- barra de reportes relacionados, aparte del titulo #}
+    <div class="rescates-tarjeta mb-6 flex flex-wrap gap-3">
+        <a href="{% url 'rescates_reporte_cuadro' %}" target="_blank"
+           class="inline-flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold px-4 py-2 rounded-lg transition">
+            Cuadro de Datos
+        </a>
+        <a href="{% url 'rescates_reporte_informe' %}" target="_blank"
+           class="inline-flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold px-4 py-2 rounded-lg transition">
+            Informe Diario
+        </a>
+        <a href="{% url 'rescates_reporte_ceco2' %}" target="_blank"
+           class="inline-flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
+            Generar CECO 2
+        </a>
+        <a href="{% url 'rescates_reporte_cecov1' %}" target="_blank"
+           class="inline-flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
+            Generar CECO V1
+        </a>
+        <a href="{% url 'rescates_reporte_cecov2' %}" target="_blank"
+           class="inline-flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
+            Generar CECO V2
+        </a>
+    </div>
+
+    <form method="get" class="rescates-tarjeta mb-8 flex flex-wrap items-end gap-4">
+        <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-1">Fecha</label>
+            <input type="date" name="fecha" value="{{ fecha_iso }}"
+                   class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm">
+        </div>
+        <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-1">Entidad federativa</label>
+            <select name="oficina" class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm min-w-[200px]">
+                <option value="">Nacional (todas)</option>
+                {% for of in oficinas %}
+                <option value="{{ of }}" {% if of == oficina_seleccionada %}selected{% endif %}>{{ of }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="bg-[#9A0A38] hover:bg-[#7d0830] text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
+            Generar
+        </button>
+        <div class="flex-1"></div>
+        <a href="{% url 'rescates_reporte_regiones_pdf' %}?fecha={{ fecha_iso }}&oficina={{ oficina_seleccionada }}"
+           class="inline-flex items-center gap-2 bg-gray-700 hover:bg-gray-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+            ⬇ Descargar PDF
+        </a>
+        <a href="{% url 'rescates_reporte_regiones_excel' %}?fecha={{ fecha_iso }}&oficina={{ oficina_seleccionada }}"
+           class="inline-flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+            ⬇ Descargar Excel
+        </a>
+    </form>
+
+    <div class="informe-oficial bg-white rounded-2xl border border-gray-200 shadow-sm p-6 mb-8">
+        <p style="text-align:center;">INSTITUTO NACIONAL DE MIGRACIÓN<br>DIRECCIÓN GENERAL DE COORDINACIÓN DE OFICINAS DE REPRESENTACION</p>
+        <div class="colorFondo my-3">
+            <strong>Informe de personas extranjeras rescatadas registradas por primera vez y reincidentes<br>{{ fecha_actual }} — {{ oficina }}</strong>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 my-4">
+            <div class="rescates-tarjeta">
+                <div class="text-2xl font-bold" style="color:#1D4ED8">{{ subtotal_rio_bravo.total|default:0 }}</div>
+                <div class="text-xs text-gray-500">Río Bravo — {{ subtotal_rio_bravo.nuevos|default:0 }} nuevos / {{ subtotal_rio_bravo.reincidentes|default:0 }} reincidentes</div>
+            </div>
+            <div class="rescates-tarjeta">
+                <div class="text-2xl font-bold" style="color:#B45309">{{ subtotal_suchiate.total|default:0 }}</div>
+                <div class="text-xs text-gray-500">Suchiate — {{ subtotal_suchiate.nuevos|default:0 }} nuevos / {{ subtotal_suchiate.reincidentes|default:0 }} reincidentes</div>
+            </div>
+            <div class="rescates-tarjeta">
+                <div class="text-2xl font-bold" style="color:#7C3AED">{{ subtotal_centro.total|default:0 }}</div>
+                <div class="text-xs text-gray-500">Centro — {{ subtotal_centro.nuevos|default:0 }} nuevos / {{ subtotal_centro.reincidentes|default:0 }} reincidentes</div>
+            </div>
+        </div>
+
+        <h2 class="text-center font-semibold my-3">Rescates por CECO y oficina</h2>
+        <div class="overflow-x-auto mb-6">
+            <table>
+                <thead>
+                    <tr>
+                        <th class="letraT1">CECO</th>
+                        <th class="letraT1">Oficina de representación</th>
+                        <th class="letraT1">Rescates primera vez</th>
+                        <th class="letraT1">Reincidentes</th>
+                        <th class="letraT1">Total CECO</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for of, d in zona_rio_bravo.items %}
+                    <tr><td class="zona-etiqueta">Río Bravo</td><td>{{ of }}</td><td>{{ d.nuevos }}</td><td>{{ d.reincidentes }}</td><td>{{ d.total }}</td></tr>
+                    {% endfor %}
+                    <tr class="subtotal-fila"><td></td><td>SUBTOTAL RÍO BRAVO</td><td>{{ subtotal_rio_bravo.nuevos }}</td><td>{{ subtotal_rio_bravo.reincidentes }}</td><td>{{ subtotal_rio_bravo.total }}</td></tr>
+
+                    {% for of, d in zona_suchiate.items %}
+                    <tr><td class="zona-etiqueta">Suchiate</td><td>{{ of }}</td><td>{{ d.nuevos }}</td><td>{{ d.reincidentes }}</td><td>{{ d.total }}</td></tr>
+                    {% endfor %}
+                    <tr class="subtotal-fila"><td></td><td>SUBTOTAL SUCHIATE</td><td>{{ subtotal_suchiate.nuevos }}</td><td>{{ subtotal_suchiate.reincidentes }}</td><td>{{ subtotal_suchiate.total }}</td></tr>
+
+                    {% for of, d in zona_centro.items %}
+                    <tr><td class="zona-etiqueta">Centro</td><td>{{ of }}</td><td>{{ d.nuevos }}</td><td>{{ d.reincidentes }}</td><td>{{ d.total }}</td></tr>
+                    {% endfor %}
+                    <tr class="subtotal-fila"><td></td><td>SUBTOTAL CENTRO</td><td>{{ subtotal_centro.nuevos }}</td><td>{{ subtotal_centro.reincidentes }}</td><td>{{ subtotal_centro.total }}</td></tr>
+
+                    <tr class="total-fila"><td></td><td>TOTAL</td><td>{{ total_regiones.nuevos }}</td><td>{{ total_regiones.reincidentes }}</td><td>{{ total_regiones.total }}</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2 class="text-center font-semibold my-3">Rescates por nacionalidad</h2>
+        <div class="overflow-x-auto">
+            <table>
+                <thead>
+                    <tr>
+                        <th class="letraT1">Nacionalidad</th>
+                        <th class="letraT1">Rescates primera vez</th>
+                        <th class="letraT1">Reincidentes</th>
+                        <th class="letraT1">Total rescates</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for nac, d in nac_1_reinc.items %}
+                    <tr><td class="letraT2" style="text-align:left;">{{ nac }}</td><td>{{ d.nuevos }}</td><td>{{ d.reincidentes }}</td><td class="letraT0">{{ d.total }}</td></tr>
+                    {% empty %}
+                    <tr><td colspan="4">Sin registros disponibles.</td></tr>
+                    {% endfor %}
+                    <tr class="total-fila"><td>TOTAL</td><td>{{ total_nac_1_reinc.nuevos }}</td><td>{{ total_nac_1_reinc.reincidentes }}</td><td>{{ total_nac_1_reinc.total }}</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- @FADAR -- resumen final del reporte CECO -->
+    <div class="caja-resumen-ceco">
+        <div class="fila-resumen-ceco" style="background:#B45309;"><span>SUCHIATE</span><span>{{ subtotal_suchiate.total|default:0 }}</span></div>
+        <div class="fila-resumen-ceco" style="background:#1D4ED8;"><span>RÍO BRAVO</span><span>{{ subtotal_rio_bravo.total|default:0 }}</span></div>
+        <div class="fila-resumen-ceco" style="background:#7C3AED;"><span>CENTRO</span><span>{{ subtotal_centro.total|default:0 }}</span></div>
+        <div class="fila-resumen-ceco" style="background:#16A34A;"><span>TOTAL</span><span>{{ total_regiones.total|default:0 }}</span></div>
+    </div>
+
+</main>
+{% endblock content %}

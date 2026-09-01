@@ -1,0 +1,229 @@
+{% extends "base/base.html" %}
+{% load static %}
+{# @FADAR #}
+
+{% block title %}Mexicanos y Extranjeros{% endblock title %}
+
+{% block styles %}
+<link href="https://cdn.bokeh.org/bokeh/release/bokeh-3.6.2.min.css" rel="stylesheet" type="text/css">
+<style>
+    .rescates-tarjeta {
+        background: #ffffff; border-radius: 1rem; border: 1px solid #e5e7eb;
+        padding: 1rem 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .rescates-grafica-box {
+        background: #ffffff; border-radius: 1rem; border: 1px solid #e5e7eb;
+        padding: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    /* @FADAR -- tarjetas de periodo: solo viven en el modulo (pantalla),
+       se descartaron del reporte descargable (PDF), no de aqui. */
+    .periodo-card {
+        border-radius: 1rem; padding: 1.25rem 1.5rem; color: white;
+        display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    }
+    .periodo-card .titulo { font-size: 1rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.03em; }
+    .periodo-card .fechas { font-size: 0.75rem; opacity: 0.85; }
+    .periodo-card .total { font-size: 2.4rem; font-weight: 800; line-height: 1; }
+    .periodo-card .promedio { font-size: 0.72rem; opacity: 0.85; }
+    .periodo-card .desglose { display: flex; gap: 0.75rem; }
+    .periodo-card .chip { background: rgba(255,255,255,0.18); border-radius: 0.6rem; padding: 0.4rem 0.75rem; text-align: center; min-width: 90px; }
+    .periodo-card .chip .valor { font-size: 1.1rem; font-weight: 800; }
+    .periodo-card .chip .etq { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.03em; opacity: 0.9; }
+
+    /* @FADAR -- mismo formato que FORMATO_MEX-.xlsm: negro/blanco en
+       titulo y encabezados, gris en filas de dato, verde #235B4E en total. */
+    .tabla-mex-ext { width: 100%; border-collapse: collapse; font-family: Calibri, sans-serif; }
+    .tabla-mex-ext th, .tabla-mex-ext td { border: 1px solid #000; padding: 4px 8px; text-align: center; font-size: 0.78rem; }
+    .tabla-mex-ext thead tr.grupo th { background: #000; color: #fff; font-size: 0.85rem; }
+    .tabla-mex-ext thead tr.sub th { background: transparent; color: #000; font-weight: 600; }
+    .tabla-mex-ext tbody td:first-child, .tabla-mex-ext tbody th:first-child { text-align: left; }
+    .tabla-mex-ext tbody tr.fila-dato td { background: #C9B182; }
+    .tabla-mex-ext tbody tr.fila-total td { background: #235B4E; color: #fff; font-weight: 700; }
+    .tabla-mex-ext tbody tr.fila-puntos td { background: #fff; color: #6b7280; padding-left: 1.5rem; }
+    .tabla-mex-ext tbody tr.fila-puntos td:first-child { text-align: left; }
+</style>
+{% endblock styles %}
+
+{% block content %}
+<main class="max-w-6xl mx-auto px-4 py-6">
+
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-[#9A0A38]">Mexicanos y Extranjeros</h1>
+            <p class="text-xs text-gray-400">Repatriados (mexicanos) vs Recibidos (extranjeros) — mismas reglas de negocio del tablero /mapa/reportes.</p>
+        </div>
+        <div class="flex gap-3">
+            <a href="{% url 'reporte_mex_extranjeros_pdf' %}?fecha_inicio={{ fecha_inicio }}&fecha_fin={{ fecha_fin }}" class="inline-flex items-center gap-2 bg-gray-700 hover:bg-gray-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition">⬇ Descargar PDF</a>
+            <a href="{% url 'reporte_mex_extranjeros_excel' %}?fecha_inicio={{ fecha_inicio }}&fecha_fin={{ fecha_fin }}" class="inline-flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition">⬇ Descargar Excel</a>
+            <a href="{% url 'reportes' %}?rubro=Recibidos" class="text-sm font-semibold text-gray-500 hover:text-[#9A0A38] transition self-center">← Volver al tablero</a>
+        </div>
+    </div>
+
+    {# @FADAR #}
+    <form method="get" class="rescates-tarjeta mb-6 flex flex-wrap items-end gap-4">
+        <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-1">Fecha inicio</label>
+            <input type="date" name="fecha_inicio" value="{{ fecha_inicio }}" class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm">
+        </div>
+        <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-1">Fecha fin</label>
+            <input type="date" name="fecha_fin" value="{{ fecha_fin }}" class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm">
+        </div>
+        <button type="submit" class="bg-[#9A0A38] hover:bg-[#7d0830] text-white text-sm font-semibold px-4 py-2 rounded-lg transition">Filtrar</button>
+    </form>
+
+    <div class="periodo-card mb-6" style="background:#285C4D;">
+        <div>
+            <div class="titulo">Personalizado</div>
+            <div class="fechas">{{ card_personalizado.periodo }}</div>
+        </div>
+        <div>
+            <div class="total">{{ card_personalizado.total_fmt }}</div>
+            <div class="promedio">promedio diario {{ card_personalizado.promedio }}</div>
+        </div>
+        <div class="desglose">
+            <div class="chip"><div class="valor">{{ card_personalizado.mex_fmt }}</div><div class="etq">Mex {{ card_personalizado.p_mex }}%</div></div>
+            <div class="chip"><div class="valor">{{ card_personalizado.ext_fmt }}</div><div class="etq">Ext {{ card_personalizado.p_ext }}%</div></div>
+        </div>
+    </div>
+
+    <!-- Tarjetas de periodo (Semana / CSP / Trump) -->
+    <div class="space-y-3 mb-6">
+        <div class="periodo-card" style="background:#7E8D85;">
+            <div>
+                <div class="titulo">Semana</div>
+                <div class="fechas">{{ card_semana.periodo }}</div>
+            </div>
+            <div>
+                <div class="total">{{ card_semana.total_fmt }}</div>
+                <div class="promedio">promedio diario {{ card_semana.promedio }}</div>
+            </div>
+            <div class="desglose">
+                <div class="chip"><div class="valor">{{ card_semana.mex_fmt }}</div><div class="etq">Mex {{ card_semana.p_mex }}%</div></div>
+                <div class="chip"><div class="valor">{{ card_semana.ext_fmt }}</div><div class="etq">Ext {{ card_semana.p_ext }}%</div></div>
+            </div>
+        </div>
+        <div class="periodo-card" style="background:#B56B6B;">
+            <div>
+                <div class="titulo">Periodo CSP</div>
+                <div class="fechas">{{ card_csp.periodo }}</div>
+            </div>
+            <div>
+                <div class="total">{{ card_csp.total_fmt }}</div>
+                <div class="promedio">promedio diario {{ card_csp.promedio }}</div>
+            </div>
+            <div class="desglose">
+                <div class="chip"><div class="valor">{{ card_csp.mex_fmt }}</div><div class="etq">Mex {{ card_csp.p_mex }}%</div></div>
+                <div class="chip"><div class="valor">{{ card_csp.ext_fmt }}</div><div class="etq">Ext {{ card_csp.p_ext }}%</div></div>
+            </div>
+        </div>
+        <div class="periodo-card" style="background:#B0AF91;">
+            <div>
+                <div class="titulo">Periodo Trump</div>
+                <div class="fechas">{{ card_trump.periodo }}</div>
+            </div>
+            <div>
+                <div class="total">{{ card_trump.total_fmt }}</div>
+                <div class="promedio">promedio diario {{ card_trump.promedio }}</div>
+            </div>
+            <div class="desglose">
+                <div class="chip"><div class="valor">{{ card_trump.mex_fmt }}</div><div class="etq">Mex {{ card_trump.p_mex }}%</div></div>
+                <div class="chip"><div class="valor">{{ card_trump.ext_fmt }}</div><div class="etq">Ext {{ card_trump.p_ext }}%</div></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="text-center mb-6">
+        <p class="text-[#9A0A38] font-black text-lg">En 2026 se han recibido/repatriado <span class="text-xl">{{ total_2026 }}</span> personas (mexicanos + extranjeros)</p>
+    </div>
+
+    <div class="rescates-grafica-box mb-6">{{ plot_bar_div|safe }}</div>
+    <div class="rescates-grafica-box mb-6">{{ plot_line_div|safe }}</div>
+    <div class="rescates-grafica-box mb-6">{{ plot_top_div|safe }}</div>
+
+    {# @FADAR -- mismo formato visual que FORMATO_MEX-.xlsm, tabulado a nivel estado (no punto: esa columna no existe en la base) #}
+    <div class="rescates-grafica-box mb-6">
+        <table class="tabla-mex-ext">
+            <thead>
+                <tr class="grupo">
+                    <th rowspan="2">ESTADO</th>
+                    <th colspan="3">MEXICANOS</th>
+                    <th colspan="3">EXTRANJEROS</th>
+                    <th rowspan="2">TOTAL GENERAL</th>
+                </tr>
+                <tr class="sub">
+                    <th>Adultos</th><th>Menores</th><th>Total</th>
+                    <th>Adultos</th><th>Menores</th><th>Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for e in tabla_estados %}
+                <tr class="fila-dato">
+                    <td>{{ e.estado }}</td>
+                    <td>{{ e.mex_ad }}</td><td>{{ e.mex_me }}</td><td>{{ e.mex }}</td>
+                    <td>{{ e.ext_ad }}</td><td>{{ e.ext_me }}</td><td>{{ e.ext }}</td>
+                    <td>{{ e.total }}</td>
+                </tr>
+                {% for punto in e.puntos %}
+                <tr class="fila-puntos">
+                    <td>{{ punto.nombre }}</td>
+                    {% if punto.con_datos %}
+                    <td>{{ punto.mex_ad }}</td><td>{{ punto.mex_me }}</td><td>{{ punto.mex }}</td>
+                    <td>{{ punto.ext_ad }}</td><td>{{ punto.ext_me }}</td><td>{{ punto.ext }}</td>
+                    <td>{{ punto.total }}</td>
+                    {% else %}
+                    <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+                {% empty %}
+                <tr><td colspan="8">Sin registros en este rango.</td></tr>
+                {% endfor %}
+                {% if tabla_estados %}
+                <tr class="fila-total">
+                    <td>TOTAL</td>
+                    <td>{{ total_estados.mex_ad }}</td><td>{{ total_estados.mex_me }}</td><td>{{ total_estados.mex }}</td>
+                    <td>{{ total_estados.ext_ad }}</td><td>{{ total_estados.ext_me }}</td><td>{{ total_estados.ext }}</td>
+                    <td>{{ total_estados.total }}</td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="rescates-grafica-box mb-10">
+        <table class="tabla-mex-ext">
+            <thead>
+                <tr class="grupo">
+                    <th rowspan="2">PAÍS</th>
+                    <th colspan="3">EXTRANJEROS</th>
+                </tr>
+                <tr class="sub">
+                    <th>Adultos</th><th>Menores</th><th>Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for n in tabla_nacionalidades %}
+                <tr class="fila-dato">
+                    <td>{{ n.nacionalidad }}</td>
+                    <td>{{ n.ext_ad }}</td><td>{{ n.ext_me }}</td><td>{{ n.ext }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="4">Sin registros en este rango.</td></tr>
+                {% endfor %}
+                {% if tabla_nacionalidades %}
+                <tr class="fila-total">
+                    <td>TOTAL</td>
+                    <td>{{ total_nacionalidades.ext_ad }}</td><td>{{ total_nacionalidades.ext_me }}</td><td>{{ total_nacionalidades.ext }}</td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+
+</main>
+
+<script src="https://cdn.bokeh.org/bokeh/release/bokeh-3.6.2.min.js"></script>
+{{ plot_script|safe }}
+{% endblock content %}

@@ -1,0 +1,115 @@
+<!-- @FADAR -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Mexicanos y Extranjeros — {{ fecha_max }}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        @page { size: A4 portrait; margin: 12mm; }
+        body { font-family: 'Montserrat', sans-serif; padding: 0; margin: 0; }
+        h5 { text-align: center; margin: 10px 0 6px; font-size: 12pt; }
+        .colorFondo { background-color: #4E1224; text-align: center; color: #f2f2f2; padding: 6px; border-radius: 4px; }
+        .subtitulo { text-align: center; font-size: 8.5pt; color: #6b7280; margin: 4px 0 12px; }
+
+        table { border-collapse: collapse; margin-top: 6px; width: 100%; }
+        table, th, td { border: 1px solid black; }
+        th, td { text-align: center; padding: 3px 5px; font-size: 8pt; }
+        .letraT1 { color: #ffffff; background-color: #761B36; }
+        .letraT2 { color: rgb(0, 0, 0); background-color: #d9d9d9; }
+        .letraT0 { color: rgb(233, 232, 232); background-color: rgb(179, 142, 93); }
+        .col-txt { text-align: left; }
+        .salto-pagina { page-break-before: always; }
+
+        /* @FADAR -- mismo formato que FORMATO_MEX-.xlsm */
+        .grupo-mex-ext th { background: #000; color: #fff; }
+        .sub-mex-ext th { background: transparent; color: #000; }
+        .fila-dato-mex-ext td { background: #C9B182; }
+        .fila-total-mex-ext td { background: #235B4E; color: #fff; font-weight: bold; }
+        .fila-puntos-mex-ext td { background: #fff; color: #6b7280; font-size: 7pt; padding-left: 10px; }
+        .fila-puntos-mex-ext td:first-child { text-align: left; }
+    </style>
+</head>
+<body>
+
+    <div class="colorFondo"><strong>MEXICANOS - EXTRANJEROS RECIBIDOS</strong></div>
+    <p class="subtitulo">{{ fecha_inicio }} a {{ fecha_fin }}</p>
+    <table>
+        <thead>
+            <tr class="grupo-mex-ext">
+                <th rowspan="2">ESTADO</th>
+                <th colspan="3">MEXICANOS</th>
+                <th colspan="3">EXTRANJEROS</th>
+                <th rowspan="2">TOTAL GENERAL</th>
+            </tr>
+            <tr class="sub-mex-ext">
+                <th>Adultos</th><th>Menores</th><th>Total</th>
+                <th>Adultos</th><th>Menores</th><th>Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for e in tabla_estados %}
+            <tr class="fila-dato-mex-ext">
+                <td class="col-txt">{{ e.estado }}</td>
+                <td>{{ e.mex_ad }}</td><td>{{ e.mex_me }}</td><td>{{ e.mex }}</td>
+                <td>{{ e.ext_ad }}</td><td>{{ e.ext_me }}</td><td>{{ e.ext }}</td>
+                <td>{{ e.total }}</td>
+            </tr>
+            {% for punto in e.puntos %}
+            <tr class="fila-puntos-mex-ext">
+                <td class="col-txt">{{ punto.nombre }}</td>
+                {% if punto.con_datos %}
+                <td>{{ punto.mex_ad }}</td><td>{{ punto.mex_me }}</td><td>{{ punto.mex }}</td>
+                <td>{{ punto.ext_ad }}</td><td>{{ punto.ext_me }}</td><td>{{ punto.ext }}</td>
+                <td>{{ punto.total }}</td>
+                {% else %}
+                <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
+                {% endif %}
+            </tr>
+            {% endfor %}
+            {% empty %}
+            <tr><td colspan="8">Sin registros.</td></tr>
+            {% endfor %}
+            {% if tabla_estados %}
+            <tr class="fila-total-mex-ext">
+                <td class="col-txt">TOTAL</td>
+                <td>{{ total_estados.mex_ad }}</td><td>{{ total_estados.mex_me }}</td><td>{{ total_estados.mex }}</td>
+                <td>{{ total_estados.ext_ad }}</td><td>{{ total_estados.ext_me }}</td><td>{{ total_estados.ext }}</td>
+                <td>{{ total_estados.total }}</td>
+            </tr>
+            {% endif %}
+        </tbody>
+    </table>
+
+    <div class="colorFondo" style="margin-top:14px;"><strong>NACIONALIDADES</strong></div>
+    <p class="subtitulo">{{ fecha_inicio }} a {{ fecha_fin }}</p>
+    <table>
+        <thead>
+            <tr class="grupo-mex-ext">
+                <th rowspan="2">PAÍS</th>
+                <th colspan="3">EXTRANJEROS</th>
+            </tr>
+            <tr class="sub-mex-ext">
+                <th>Adultos</th><th>Menores</th><th>Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for n in tabla_nacionalidades %}
+            <tr class="fila-dato-mex-ext">
+                <td class="col-txt">{{ n.nacionalidad }}</td>
+                <td>{{ n.ext_ad }}</td><td>{{ n.ext_me }}</td><td>{{ n.ext }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4">Sin registros.</td></tr>
+            {% endfor %}
+            {% if tabla_nacionalidades %}
+            <tr class="fila-total-mex-ext">
+                <td class="col-txt">TOTAL</td>
+                <td>{{ total_nacionalidades.ext_ad }}</td><td>{{ total_nacionalidades.ext_me }}</td><td>{{ total_nacionalidades.ext }}</td>
+            </tr>
+            {% endif %}
+        </tbody>
+    </table>
+
+</body>
+</html>

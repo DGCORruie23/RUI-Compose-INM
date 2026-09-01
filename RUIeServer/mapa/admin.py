@@ -1,6 +1,6 @@
 from django.contrib import admin
 from .models import (
-    Estado, Nacionalidad, Repatriados, Recibidos, ExtRescatados, 
+    Estado, Nacionalidad, Repatriados, Recibidos, RegistroMexExtPunto, ExtRescatados,
     Ingresos, Tramites, Retornados, Inadmitidos,
     PuntosInternacionEstacion, CatalogoOR, Encuentros,
     TipoPRH, PRHs, Titular, Estudio, GradoAcademico,
@@ -35,6 +35,12 @@ class RecibidosAdmin(admin.ModelAdmin):
     list_display = ('fecha', 'estado', 'nacionalidad', 'ext_rec', 'adultos', 'menores')
     list_filter = ('estado', 'nacionalidad', 'fecha')
     search_fields = ('estado__nombre', 'nacionalidad__nombre')
+
+@admin.register(RegistroMexExtPunto)
+class RegistroMexExtPuntoAdmin(admin.ModelAdmin):
+    list_display = ('fecha', 'estado', 'punto', 'categoria', 'nacionalidad', 'hombres', 'mujeres', 'ninos', 'ninas')
+    list_filter = ('estado', 'punto', 'categoria', 'fecha')
+    search_fields = ('punto', 'nacionalidad__nombre')
 
 @admin.register(ExtRescatados)
 class ExtRescatadosAdmin(admin.ModelAdmin):

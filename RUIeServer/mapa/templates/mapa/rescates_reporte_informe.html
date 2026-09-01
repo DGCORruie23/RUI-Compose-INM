@@ -1,0 +1,224 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}Reporte — Informe Diario{% endblock title %}
+
+{% block styles %}
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
+<style>
+    .rescates-tarjeta {
+        background: #ffffff; border-radius: 1rem; border: 1px solid #e5e7eb;
+        padding: 1rem 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .informe-oficial { font-family: 'Montserrat', sans-serif; }
+    .informe-oficial table { border-collapse: collapse; width: max-content; min-width: 100%; }
+    .informe-oficial th, .informe-oficial td {
+        border: 1px solid #000; text-align: center; font-size: 11px; padding: 4px 6px; white-space: nowrap;
+    }
+    .colorFondo { background-color: #4E1224; color: #f2f2f2; text-align: center; padding: 0.5rem; border-radius: 0.5rem; }
+    .letraT0 { color: rgb(233, 232, 232); background-color: rgb(179, 142, 93); }
+    .letraT1 { color: #ffffff; background-color: #761B36; }
+    .letraT2 { color: rgb(0, 0, 0); background-color: #d9d9d9; }
+    .letraT3 { color: rgb(0, 0, 0); background-color: rgb(75, 172, 198); }
+    .letraT4 { color: rgb(237, 237, 237); background-color: rgb(19, 50, 43); }
+    .letraT6 { color: rgb(234, 234, 234); background-color: rgb(112, 48, 160); }
+
+    /* @FADAR -- Retornados: bloque independiente, azul celeste */
+    .caja-retornados {
+        background: #F0F9FF;
+        border: 1px solid #BAE6FD;
+        border-radius: 1rem;
+        padding: 1.25rem;
+    }
+    .caja-retornados h3 { color: #0369A1; font-weight: 700; font-size: 0.95rem; margin-bottom: 0.75rem; }
+    .total-retornados-voluntarios { margin-bottom: 1rem; }
+    .total-retornados-voluntarios .valor { font-size: 1.8rem; font-weight: 800; color: #0EA5E9; line-height: 1; }
+    .total-retornados-voluntarios .etiqueta { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: #0369A1; margin-top: 0.25rem; }
+    .tabla-retornados-detalle { width: 100%; max-width: 480px; border-collapse: collapse; }
+    .tabla-retornados-detalle th, .tabla-retornados-detalle td { padding: 6px 10px; text-align: right; font-size: 12px; border-bottom: 1px solid #BAE6FD; }
+    .tabla-retornados-detalle th:first-child, .tabla-retornados-detalle td:first-child { text-align: left; }
+    .tabla-retornados-detalle thead th { color: #0369A1; text-transform: uppercase; font-size: 10px; letter-spacing: .03em; }
+    .tabla-retornados-detalle tbody tr:last-child td { font-weight: 700; background: #0EA5E9; color: #fff; border-bottom: none; }
+</style>
+{% endblock styles %}
+
+{% block content %}
+<main class="max-w-7xl mx-auto px-4 py-6">
+
+    <div class="flex items-center justify-between mb-6">
+        <h1 class="text-2xl font-bold text-[#9A0A38]">Reporte — Informe Diario de Rescatados</h1>
+        <div class="flex gap-3">
+            <a href="{% url 'rescates_reporte_cuadro' %}" class="text-sm font-semibold text-gray-500 hover:text-[#9A0A38] transition">Cuadro de Datos</a>
+            <a href="{% url 'rescates_reporte_regiones' %}" class="text-sm font-semibold text-gray-500 hover:text-[#9A0A38] transition">Regiones (CECO)</a>
+            <a href="{% url 'rescates_dashboard' %}" class="text-sm font-semibold text-gray-500 hover:text-[#9A0A38] transition">← Volver al dashboard</a>
+        </div>
+    </div>
+
+    <form method="get" class="rescates-tarjeta mb-8 flex flex-wrap items-end gap-4">
+        <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-1">Fecha</label>
+            <input type="date" name="fecha" value="{{ fecha_iso }}"
+                   class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm">
+        </div>
+        <button type="submit" class="bg-[#9A0A38] hover:bg-[#7d0830] text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
+            Generar
+        </button>
+        <div class="flex-1"></div>
+        <a href="{% url 'rescates_reporte_informe_pdf' %}?fecha={{ fecha_iso }}"
+           class="inline-flex items-center gap-2 bg-gray-700 hover:bg-gray-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+            ⬇ Descargar PDF
+        </a>
+        <a href="{% url 'rescates_reporte_informe_excel' %}?fecha={{ fecha_iso }}"
+           class="inline-flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+            ⬇ Descargar Excel
+        </a>
+    </form>
+
+    <div class="informe-oficial bg-white rounded-2xl border border-gray-200 shadow-sm p-6 mb-8">
+        <p style="text-align:center;">INSTITUTO NACIONAL DE MIGRACIÓN<br>DIRECCIÓN GENERAL DE COORDINACIÓN DE OFICINAS DE REPRESENTACION</p>
+        <div class="colorFondo my-3">
+            <strong>Informe Diario de Rescatados<br>{{ fecha_actual }}</strong>
+        </div>
+
+        <h2 class="text-center font-semibold my-3">Reporte de Rescates por Oficina</h2>
+        <div class="overflow-x-auto mb-6">
+            <table>
+                <thead>
+                    <tr><th class="letraT1">Rubro</th>{% for oficina in rescates %}<th class="letraT1">{{ oficina }}</th>{% endfor %}</tr>
+                </thead>
+                <tbody>
+                    <tr><td class="letraT2"><strong>Aeropuertos</strong></td>{% for oficina, d in rescates.items %}<td class="letraT2">{{ d.total_aereos }}</td>{% endfor %}</tr>
+                    <tr><td class="letraT2"><strong>Carreteros</strong></td>{% for oficina, d in rescates.items %}<td class="letraT2">{{ d.total_carreteros }}</td>{% endfor %}</tr>
+                    <tr><td class="letraT2"><strong>Central de Autobús</strong></td>{% for oficina, d in rescates.items %}<td class="letraT2">{{ d.total_central }}</td>{% endfor %}</tr>
+                    <tr><td class="letraT2"><strong>Ferroviarios</strong></td>{% for oficina, d in rescates.items %}<td class="letraT2">{{ d.total_ferro }}</td>{% endfor %}</tr>
+                    <tr><td class="letraT2"><strong>Puestos a Disposición</strong></td>{% for oficina, d in rescates.items %}<td class="letraT2">{{ d.total_puestos }}</td>{% endfor %}</tr>
+                    <tr><td class="letraT2"><strong>Otros</strong></td>{% for oficina, d in rescates.items %}<td class="letraT2">{{ d.total_otros }}</td>{% endfor %}</tr>
+                    <tr><td class="letraT1"><strong>TOTAL MIGRANTES RESCATADOS</strong></td>{% for oficina, d in rescates.items %}<td class="letraT1">{{ d.total }}</td>{% endfor %}</tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="overflow-x-auto mb-6">
+            <table>
+                <thead>
+                    <tr><th class="letraT4">Rubro</th>{% for oficina in reincidentes %}<th class="letraT4">{{ oficina }}</th>{% endfor %}</tr>
+                </thead>
+                <tbody>
+                    <tr><td class="letraT2"><strong>Reincidentes</strong></td>{% for oficina, d in reincidentes.items %}<td class="letraT2">{{ d.total_reincidentes }}</td>{% endfor %}</tr>
+                    <tr><td class="letraT2"><strong>Registros Nuevos</strong></td>{% for oficina, d in reincidentes.items %}<td class="letraT2">{{ d.total_nuevos }}</td>{% endfor %}</tr>
+                    <tr><td class="letraT0"><strong>TOTAL MIGRANTES RESCATADOS</strong></td>{% for oficina, d in reincidentes.items %}<td class="letraT0">{{ d.total }}</td>{% endfor %}</tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2 class="text-center font-semibold my-3">Reporte de Rescates por nacionalidad</h2>
+
+        <h3 class="font-semibold mb-2">Nacionalidades de Rescates Nuevos</h3>
+        <div class="overflow-x-auto mb-2">
+            <table>
+                <thead>
+                    <tr>
+                        <th class="letraT1">Nacionalidad</th>
+                        {% for clave, etiqueta in categorias %}<th class="letraT2">{{ etiqueta }}</th>{% endfor %}
+                        <th class="letraT0">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for nacio, d in nacionalidades.items %}
+                    <tr>
+                        <td class="letraT1">{{ nacio }}</td>
+                        <td>{{ d.H_AS }}</td><td>{{ d.M_AS }}</td>
+                        <td>{{ d.H_AA }}</td><td>{{ d.M_AA }}</td>
+                        <td>{{ d.H_mA }}</td><td>{{ d.M_mA }}</td>
+                        <td>{{ d.H_mS }}</td><td>{{ d.M_mS }}</td>
+                        <td class="letraT0">{{ d.total }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="10">No hay datos disponibles.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <table class="mb-6">
+            <thead><tr><th class="letraT6">TOTAL DE RETORNADOS A SU PAÍS DE ORIGEN</th><th class="letraT6">{{ dato }}</th></tr></thead>
+        </table>
+
+        <h3 class="font-semibold mb-2">Nacionalidades de Reincidentes</h3>
+        <div class="overflow-x-auto mb-6">
+            <table>
+                <thead>
+                    <tr>
+                        <th class="letraT1">Nacionalidad</th>
+                        {% for clave, etiqueta in categorias %}<th class="letraT2">{{ etiqueta }}</th>{% endfor %}
+                        <th class="letraT0">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for nacio, d in nacionalidades_re.items %}
+                    <tr>
+                        <td class="letraT1">{{ nacio }}</td>
+                        <td>{{ d.H_AS }}</td><td>{{ d.M_AS }}</td>
+                        <td>{{ d.H_AA }}</td><td>{{ d.M_AA }}</td>
+                        <td>{{ d.H_mA }}</td><td>{{ d.M_mA }}</td>
+                        <td>{{ d.H_mS }}</td><td>{{ d.M_mS }}</td>
+                        <td class="letraT0">{{ d.total }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="10">No hay datos disponibles.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <h3 class="font-semibold mb-2">Nacionalidades de Inadmitidos</h3>
+        <div class="overflow-x-auto">
+            <table>
+                <thead>
+                    <tr>
+                        <th class="letraT1">Nacionalidad</th>
+                        <th class="letraT3">Adultos Hombres</th>
+                        <th class="letraT3">Adultos Mujeres</th>
+                        <th class="letraT3">Menores Hombres</th>
+                        <th class="letraT3">Menores Mujeres</th>
+                        <th class="letraT0">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for nacio, d in nacionalidades_inadm.items %}
+                    <tr>
+                        <td class="letraT1">{{ nacio }}</td>
+                        <td>{{ d.H_A }}</td><td>{{ d.M_A }}</td><td>{{ d.H_m }}</td><td>{{ d.M_m }}</td>
+                        <td class="letraT0">{{ d.total }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="6">No hay datos disponibles.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- @FADAR -- Retornados: apartado independiente del informe de arriba -->
+    <div class="caja-retornados">
+        <div class="total-retornados-voluntarios">
+            <div class="valor">{{ retornados_detalle.total_retornado }}</div>
+            <div class="etiqueta">Retornados</div>
+        </div>
+        <h3>Retornados — detalle por {{ retornados_detalle.columna }}</h3>
+        <table class="tabla-retornados-detalle">
+            <thead>
+                <tr><th>{{ retornados_detalle.columna }}</th><th>Deportados</th><th>Retornados</th><th>Total</th></tr>
+            </thead>
+            <tbody>
+                {% for f in retornados_detalle.filas %}
+                <tr><td>{{ f.nombre }}</td><td>{{ f.deportado }}</td><td>{{ f.retornado }}</td><td>{{ f.total }}</td></tr>
+                {% empty %}
+                <tr><td colspan="4">Sin retornados en esta fecha.</td></tr>
+                {% endfor %}
+                <tr><td>TOTAL</td><td>{{ retornados_detalle.total_deportado }}</td><td>{{ retornados_detalle.total_retornado }}</td><td>{{ retornados_detalle.total_general }}</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+</main>
+{% endblock content %}

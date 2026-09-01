@@ -110,6 +110,60 @@ class Recibidos(models.Model):
         verbose_name_plural = "Recibidos"
         unique_together = ['fecha', 'estado', 'nacionalidad']
 
+# @FADAR -- catalogo "de prueba" a nivel app (no en la base): unica fuente
+# de verdad de los 5 estados / 12 puntos, para no mantenerlo duplicado
+# entre este modelo y el reporte Mexicanos y Extranjeros (mapa/views.py).
+CATALOGO_PUNTOS_MEX_EXT = {
+    "BAJA CALIFORNIA": ["TIJUANA", "MEXICALI"],
+    "SONORA": ["SAN LUIS RÍO COLORADO", "NOGALES", "AGUA PRIETA"],
+    "CHIHUAHUA": ["CIUDAD JUÁREZ", "OJINAGA"],
+    "COAHUILA": ["CIUDAD ACUÑA", "PIEDRAS NEGRAS"],
+    "TAMAULIPAS": ["NUEVO LAREDO", "REYNOSA", "MATAMOROS"],
+}
+
+
+# @FADAR -- captura real por punto (reemplaza FORMATO_MEX-.xlsm): a
+# diferencia de Repatriados/Recibidos (solo estado, adultos/menores), aqui
+# se guarda por punto especifico y con Hombres/Mujeres/Ninos/Ninas real.
+class RegistroMexExtPunto(models.Model):
+    CATEGORIA_CHOICES = [('MEX', 'Mexicano'), ('EXT', 'Extranjero')]
+    ESTADO_CHOICES = [(e, e.title()) for e in CATALOGO_PUNTOS_MEX_EXT]
+    PUNTO_CHOICES = [(p, p.title()) for lista in CATALOGO_PUNTOS_MEX_EXT.values() for p in lista]
+
+    fecha = models.DateField(db_index=True)
+    estado = models.CharField(max_length=50, choices=ESTADO_CHOICES, db_index=True)
+    punto = models.CharField(max_length=50, choices=PUNTO_CHOICES)
+    categoria = models.CharField(max_length=3, choices=CATEGORIA_CHOICES)
+    nacionalidad = models.ForeignKey(Nacionalidad, on_delete=models.CASCADE, null=True, blank=True,
+                                      help_text="Solo aplica si categoria=Extranjero")
+    hombres = models.IntegerField(default=0)
+    mujeres = models.IntegerField(default=0)
+    ninos = models.IntegerField(default=0)
+    ninas = models.IntegerField(default=0)
+
+    def __str__(self):
+        return f"{self.punto} ({self.estado}) - {self.get_categoria_display()} - {self.fecha}"
+
+    class Meta:
+        verbose_name = "Registro Mex/Ext por Punto"
+        verbose_name_plural = "Registros Mex/Ext por Punto"
+        # @FADAR -- evita captura duplicada. Nacionalidad es NULL en todos
+        # los MEX (NULL != NULL en SQL, un unique_together simple no lo
+        # cubriria), por eso van 2 constraints condicionadas en vez de una.
+        constraints = [
+            models.UniqueConstraint(
+                fields=['fecha', 'punto', 'categoria'],
+                condition=models.Q(categoria='MEX'),
+                name='unico_mex_por_punto_fecha',
+            ),
+            models.UniqueConstraint(
+                fields=['fecha', 'punto', 'categoria', 'nacionalidad'],
+                condition=models.Q(categoria='EXT'),
+                name='unico_ext_por_punto_fecha_nacionalidad',
+            ),
+        ]
+
+
 class ExtRescatados(models.Model):
     fecha = models.DateField(db_index=True)
     estado = models.ForeignKey(Estado, on_delete=models.CASCADE, db_index=True)

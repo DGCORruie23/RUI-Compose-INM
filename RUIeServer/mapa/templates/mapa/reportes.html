@@ -193,6 +193,12 @@
             <a href="?rubro=Recibidos" class="rubro-btn {% if rubro == 'Recibidos' %}active{% endif %}">Recibidos</a>
             <a href="?rubro=Rescatados" class="rubro-btn {% if rubro == 'Rescatados' %}active{% endif %}">Rescatados</a>
         </div>
+
+        {# @FADAR #}
+        <a href="{% url 'reporte_mex_extranjeros' %}" target="_blank"
+           class="inline-flex items-center gap-2 bg-gray-800 hover:bg-gray-900 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition">
+            📄 Reporte descargable — Mexicanos y Extranjeros
+        </a>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-10">

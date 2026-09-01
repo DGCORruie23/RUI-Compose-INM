@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Informe Diario de Rescatados {{ fecha_actual }}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        @page { size: A4 landscape; margin: 8mm; }
+        body { font-family: 'Montserrat', sans-serif; padding: 0; margin: 0; }
+        h5 { text-align: center; margin: 6px 0; font-size: 13pt; }
+        h6 { text-align: center; margin: 4px 0; font-size: 11pt; }
+        .fecha { text-align: right; font-size: 10pt; margin-top: 10px; }
+        .titulo-inm { text-align: center; font-size: 9pt; margin: 0 0 6px; }
+
+        table { border-collapse: collapse; margin-top: 6px; }
+        table, th, td { border: 1px solid black; }
+        th, td { text-align: center; padding: 2px 3px; }
+
+        .colorFondo { background-color: #4E1224; text-align: center; color: #f2f2f2; padding: 4px 0; }
+        .letraT0 { color: rgb(233, 232, 232); background-color: rgb(179, 142, 93); }
+        .letraT1 { color: #ffffff; background-color: #761B36; }
+        .letraT2 { color: rgb(0, 0, 0); background-color: #d9d9d9; }
+        .letraT3 { color: rgb(0, 0, 0); background-color: rgb(75, 172, 198); }
+        .letraT4 { color: rgb(237, 237, 237); background-color: rgb(19, 50, 43); }
+        .letraT6 { color: rgb(234, 234, 234); background-color: rgb(112, 48, 160); }
+
+        /* Salto de pagina real -- WeasyPrint si respeta esta propiedad,
+           a diferencia de una simple <div> sin regla asociada. */
+        .salto-pagina { page-break-before: always; }
+
+        /* Tabla ancha (32 entidades + Rubro) -- fuente muy chica para que
+           quepan las 33 columnas sin encimarse ni cortarse. Encabezado
+           horizontal con salto de linea (NO texto rotado): la combinacion
+           writing-mode + transform:rotate no se renderiza de forma
+           confiable en WeasyPrint y el texto salia al reves/ilegible. */
+        .tabla-oficinas { width: 100%; table-layout: fixed; }
+        .tabla-oficinas th, .tabla-oficinas td { font-size: 6pt; padding: 2px 1px; overflow-wrap: break-word; }
+        .tabla-oficinas th:first-child, .tabla-oficinas td:first-child { width: 70px; font-size: 6.5pt; }
+        .tabla-oficinas thead th { height: 40px; font-size: 5.5pt; line-height: 1.15; vertical-align: middle; }
+
+        /* Tablas de nacionalidad -- una debajo de otra, no una al lado de
+           otra (10 columnas cada una, no caben 3 juntas sin encimarse). */
+        .tabla-nacionalidad { width: 100%; }
+        .tabla-nacionalidad th, .tabla-nacionalidad td { font-size: 7.5pt; }
+        .tabla-nacionalidad td:first-child, .tabla-nacionalidad th:first-child { text-align: left; width: 22%; }
+
+        .tabla-inadmitidos { width: 60%; }
+        .tabla-inadmitidos th, .tabla-inadmitidos td { font-size: 8pt; }
+        .tabla-inadmitidos td:first-child, .tabla-inadmitidos th:first-child { text-align: left; }
+
+        .tabla-retornados { width: 320px; margin: 12px auto; }
+        .tabla-retornados th, .tabla-retornados td { font-size: 10pt; padding: 6px; }
+
+        /* @FADAR -- Retornados: apartado independiente, azul celeste */
+        .caja-retornados-detalle {
+            margin-top: 16px;
+            background-color: #F0F9FF;
+            border: 1px solid #BAE6FD;
+            border-radius: 8px;
+            padding: 10px 14px;
+        }
+        .caja-retornados-detalle h6 { color: rgb(3,105,161); margin: 0 0 6px; }
+        .total-retornados-voluntarios { text-align: center; margin-bottom: 6px; }
+        .total-retornados-voluntarios .valor { font-size: 16pt; font-weight: bold; color: rgb(14,165,233); }
+        .total-retornados-voluntarios .etiqueta { font-size: 8pt; font-weight: bold; color: rgb(3,105,161); text-transform: uppercase; }
+        .tabla-retornados-detalle { width: 60%; margin: 0 auto; }
+        .tabla-retornados-detalle th, .tabla-retornados-detalle td { font-size: 9pt; padding: 4px 8px; }
+        .tabla-retornados-detalle td:first-child, .tabla-retornados-detalle th:first-child { text-align: left; }
+        .tabla-retornados-detalle thead th { color: rgb(3,105,161); background-color: #fff; }
+        .tabla-retornados-detalle tbody tr:last-child td { font-weight: bold; background-color: rgb(14,165,233); color: #fff; }
+    </style>
+</head>
+<body>
+
+    <!-- Pagina 1: encabezado + tabla por oficina (medio de rescate) -->
+    <p class="titulo-inm">INSTITUTO NACIONAL DE MIGRACIÓN<br>DIRECCIÓN GENERAL DE COORDINACIÓN DE OFICINAS DE REPRESENTACION</p>
+    <div class="colorFondo">
+        <h6>Informe Diario de Rescatados<br>{{ fecha_actual }}</h6>
+    </div>
+
+    <h5>Reporte de Rescates por Oficina</h5>
+    <table class="tabla-oficinas">
+        <thead>
+            <tr>
+                <th class="letraT1">Rubro</th>
+                {% for oficina in rescates %}<th class="letraT1">{{ oficina }}</th>{% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td class="letraT2"><strong>Aeropuertos</strong></td>{% for oficina, d in rescates.items %}<td class="letraT2">{{ d.total_aereos }}</td>{% endfor %}</tr>
+            <tr><td class="letraT2"><strong>Carreteros</strong></td>{% for oficina, d in rescates.items %}<td class="letraT2">{{ d.total_carreteros }}</td>{% endfor %}</tr>
+            <tr><td class="letraT2"><strong>Central de Autobús</strong></td>{% for oficina, d in rescates.items %}<td class="letraT2">{{ d.total_central }}</td>{% endfor %}</tr>
+            <tr><td class="letraT2"><strong>Ferroviarios</strong></td>{% for oficina, d in rescates.items %}<td class="letraT2">{{ d.total_ferro }}</td>{% endfor %}</tr>
+            <tr><td class="letraT2"><strong>Puestos a Disposición</strong></td>{% for oficina, d in rescates.items %}<td class="letraT2">{{ d.total_puestos }}</td>{% endfor %}</tr>
+            <tr><td class="letraT2"><strong>Otros</strong></td>{% for oficina, d in rescates.items %}<td class="letraT2">{{ d.total_otros }}</td>{% endfor %}</tr>
+            <tr><td class="letraT1"><strong>TOTAL</strong></td>{% for oficina, d in rescates.items %}<td class="letraT1">{{ d.total }}</td>{% endfor %}</tr>
+        </tbody>
+    </table>
+
+    <!-- Misma pagina si cabe: tabla por oficina (reincidentes / nuevos) -->
+    <h5>Reincidentes y Registros Nuevos por Oficina</h5>
+    <table class="tabla-oficinas">
+        <thead>
+            <tr>
+                <th class="letraT4">Rubro</th>
+                {% for oficina in reincidentes %}<th class="letraT4">{{ oficina }}</th>{% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td class="letraT2"><strong>Reincidentes</strong></td>{% for oficina, d in reincidentes.items %}<td class="letraT2">{{ d.total_reincidentes }}</td>{% endfor %}</tr>
+            <tr><td class="letraT2"><strong>Registros Nuevos</strong></td>{% for oficina, d in reincidentes.items %}<td class="letraT2">{{ d.total_nuevos }}</td>{% endfor %}</tr>
+            <tr><td class="letraT0"><strong>TOTAL</strong></td>{% for oficina, d in reincidentes.items %}<td class="letraT0">{{ d.total }}</td>{% endfor %}</tr>
+        </tbody>
+    </table>
+
+    <!-- Nueva pagina para la seccion de nacionalidad -- de ahi en
+    adelante se deja que fluya solo (sin saltos forzados entre cada
+    tabla), así WeasyPrint acomoda lo que quepa en cada pagina en vez de
+    forzar una tabla por hoja completa. -->
+    <div class="salto-pagina"></div>
+    <h5>Reporte de Rescates por Nacionalidad</h5>
+    <h6>Nacionalidades de Rescates Nuevos</h6>
+    <table class="tabla-nacionalidad">
+        <thead>
+            <tr>
+                <th class="letraT1">Nacionalidad</th>
+                {% for clave, etiqueta in categorias %}<th class="letraT2">{{ etiqueta }}</th>{% endfor %}
+                <th class="letraT0">Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for nacio, d in nacionalidades.items %}
+            <tr>
+                <td class="letraT1">{{ nacio }}</td>
+                <td>{{ d.H_AS }}</td><td>{{ d.M_AS }}</td>
+                <td>{{ d.H_AA }}</td><td>{{ d.M_AA }}</td>
+                <td>{{ d.H_mA }}</td><td>{{ d.M_mA }}</td>
+                <td>{{ d.H_mS }}</td><td>{{ d.M_mS }}</td>
+                <td class="letraT0">{{ d.total }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="10">No hay datos disponibles.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <table class="tabla-retornados">
+        <thead><tr><th class="letraT6">TOTAL DE RETORNADOS A SU PAÍS DE ORIGEN</th><th class="letraT6">{{ dato }}</th></tr></thead>
+    </table>
+
+    <h6 style="margin-top:16px;">Nacionalidades de Reincidentes</h6>
+    <table class="tabla-nacionalidad">
+        <thead>
+            <tr>
+                <th class="letraT1">Nacionalidad</th>
+                {% for clave, etiqueta in categorias %}<th class="letraT2">{{ etiqueta }}</th>{% endfor %}
+                <th class="letraT0">Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for nacio, d in nacionalidades_re.items %}
+            <tr>
+                <td class="letraT1">{{ nacio }}</td>
+                <td>{{ d.H_AS }}</td><td>{{ d.M_AS }}</td>
+                <td>{{ d.H_AA }}</td><td>{{ d.M_AA }}</td>
+                <td>{{ d.H_mA }}</td><td>{{ d.M_mA }}</td>
+                <td>{{ d.H_mS }}</td><td>{{ d.M_mS }}</td>
+                <td class="letraT0">{{ d.total }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="10">No hay datos disponibles.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h6 style="margin-top:16px;">Nacionalidades de Inadmitidos</h6>
+    <table class="tabla-inadmitidos">
+        <thead>
+            <tr>
+                <th class="letraT1">Nacionalidad</th>
+                <th class="letraT3">Adultos Hombres</th>
+                <th class="letraT3">Adultos Mujeres</th>
+                <th class="letraT3">Menores Hombres</th>
+                <th class="letraT3">Menores Mujeres</th>
+                <th class="letraT0">Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for nacio, d in nacionalidades_inadm.items %}
+            <tr>
+                <td class="letraT1">{{ nacio }}</td>
+                <td>{{ d.H_A }}</td><td>{{ d.M_A }}</td><td>{{ d.H_m }}</td><td>{{ d.M_m }}</td>
+                <td class="letraT0">{{ d.total }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6">No hay datos disponibles.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="caja-retornados-detalle">
+        <div class="total-retornados-voluntarios">
+            <div class="valor">{{ retornados_detalle.total_retornado }}</div>
+            <div class="etiqueta">Retornados</div>
+        </div>
+        <h6>Retornados — detalle por {{ retornados_detalle.columna }}</h6>
+        <table class="tabla-retornados-detalle">
+            <thead>
+                <tr><th>{{ retornados_detalle.columna }}</th><th>Deportados</th><th>Retornados</th><th>Total</th></tr>
+            </thead>
+            <tbody>
+                {% for f in retornados_detalle.filas %}
+                <tr><td>{{ f.nombre }}</td><td>{{ f.deportado }}</td><td>{{ f.retornado }}</td><td>{{ f.total }}</td></tr>
+                {% empty %}
+                <tr><td colspan="4">Sin retornados en esta fecha.</td></tr>
+                {% endfor %}
+                <tr><td>TOTAL</td><td>{{ retornados_detalle.total_deportado }}</td><td>{{ retornados_detalle.total_retornado }}</td><td>{{ retornados_detalle.total_general }}</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <p class="fecha">Fecha: {{ fecha_actual }}</p>
+
+</body>
+</html>
