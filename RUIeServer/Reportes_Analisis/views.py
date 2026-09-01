@@ -28,7 +28,8 @@ from django.template.loader import get_template
 from weasyprint import HTML
 
 from usuario.models import RescatePunto
-from mapa.models import CATALOGO_PUNTOS_MEX_EXT, Recibidos, RegistroMexExtPunto, Repatriados  # @FADAR
+from mapa.models import Recibidos, Repatriados
+from Reportes_Analisis.models import CATALOGO_PUNTOS_MEX_EXT, RegistroMexExtPunto
 
 
 def normalizar_nombre(texto):
@@ -2622,7 +2623,7 @@ def _top10_mex_ext(start, end):
 
 # @FADAR -- entidades tal como aparecen en FORMATO_MEX-.xlsm ("REPORTE
 # GENERAL"), no las 32. Los puntos (12 ciudades fijas) ya no se duplican
-# aqui -- vienen de CATALOGO_PUNTOS_MEX_EXT (mapa/models.py), unica fuente
+# aqui -- vienen de CATALOGO_PUNTOS_MEX_EXT (models.py), unica fuente
 # compartida con RegistroMexExtPunto.
 RESCATES_ESTADOS_MEX_EXT = list(CATALOGO_PUNTOS_MEX_EXT.keys())
 
