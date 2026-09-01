@@ -1,8 +1,3 @@
-# @FADAR -- Fase 1 del traslado del modulo de rescates: dashboard.
-# Codigo copiado TAL CUAL desde mapa/views.py (misma logica, mismas reglas,
-# misma estructura) -- mapa/views.py se deja intacto por ahora, el
-# descarte de esa copia y del boton que la enlaza queda para una fase
-# posterior, a peticion explicita.
 from bokeh.plotting import figure
 from bokeh.models import ColumnDataSource, HoverTool, DatetimeTickFormatter, LabelSet, NumeralTickFormatter, RangeTool
 from bokeh.layouts import column
@@ -1776,15 +1771,12 @@ def rescates_reporte_informe_excel(request):
     wb.save(response)
     return response
 
-# @FADAR -- Fase 2 del traslado: CECO 2, CECO V1/V2 y Reporte Personalizado.
-# Codigo copiado TAL CUAL desde mapa/views.py (misma logica, mismas reglas,
-# misma estructura) -- mapa/views.py se deja intacto por ahora, el
-# descarte de esa copia queda para una fase posterior. Las constantes y
-# helpers que ya trajo la Fase 1 (RESCATES_OFICINAS, RESCATES_ZONA_*,
+# @FADAR -- CECO 2, CECO V1/V2 y Reporte Personalizado. Reusan las
+# constantes/helpers ya definidos arriba (RESCATES_OFICINAS, RESCATES_ZONA_*,
 # RESCATES_ISO3_*, _rescates_es_extracontinental, RESCATES_MV_REINCIDENCIA,
 # RESCATES_LETRA_T0-T2, RESCATES_COLOR_FONDO, RESCATES_BORDE_DELGADO,
 # _rescates_excel_celda/_fila, RESCATES_ETIQUETAS_CATEGORIA,
-# _rescates_clasificar_categoria, RESCATES_MESES_ES) no se duplican aqui.
+# _rescates_clasificar_categoria, RESCATES_MESES_ES) -- no se duplican aqui.
 
 # =============================================================================
 # Reporte Personalizado -- filtros libres (calendario + menus desplegables)
@@ -2027,8 +2019,8 @@ def rescates_reporte_personalizado_excel(request):
 
 
 # @FADAR -- nombre completo del mes, para los nombres de archivo descargables
-# (REPORTE CECO DIA-MES-AÑO(PRHs).xlsx). RESCATES_MESES_ES (corto) ya viene
-# de la Fase 1.
+# (REPORTE CECO DIA-MES-AÑO(PRHs).xlsx). RESCATES_MESES_ES (corto) ya esta
+# definido arriba.
 RESCATES_MESES_ES_LARGO = {
     1: "ENERO", 2: "FEBRERO", 3: "MARZO", 4: "ABRIL", 5: "MAYO", 6: "JUNIO",
     7: "JULIO", 8: "AGOSTO", 9: "SEPTIEMBRE", 10: "OCTUBRE", 11: "NOVIEMBRE", 12: "DICIEMBRE",
@@ -2577,9 +2569,6 @@ def rescates_reporte_cecov2_excel(request):
     return response
 
 
-# @FADAR -- Fase 3 del traslado: Mexicanos vs Extranjeros. Nunca vivio en
-# esta ubicacion (ni en mapa) -- traido completo desde el clon Desarrollo.
-# Codigo copiado TAL CUAL (misma logica, mismas reglas, misma estructura).
 def get_global_update_date():
     """Calcula el mínimo de los máximos para determinar la fecha de integridad total."""
     from mapa.models import Repatriados, Recibidos, ExtRescatados, Ingresos, Tramites, Retornados, Inadmitidos

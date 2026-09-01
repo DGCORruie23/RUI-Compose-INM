@@ -1,6 +1,3 @@
-# @FADAR -- namespaced ('Reportes_Analisis:') para no chocar con los
-# mismos nombres de url que aun viven en mapa/urls.py mientras dura el
-# traslado por fases.
 from django.urls import path
 from Reportes_Analisis import views
 
@@ -43,7 +40,7 @@ urlpatterns = [
     path('rescates/reportes/personalizado/pdf', views.rescates_reporte_personalizado_pdf, name="rescates_reporte_personalizado_pdf"),
     path('rescates/reportes/personalizado/excel', views.rescates_reporte_personalizado_excel, name="rescates_reporte_personalizado_excel"),
 
-    # @FADAR -- Mexicanos vs Extranjeros (nunca vivio en esta ubicacion, traido de Desarrollo)
+    # @FADAR -- Mexicanos vs Extranjeros
     path('rescates/reportes/mexicanos-extranjeros', views.reporte_mex_extranjeros, name="reporte_mex_extranjeros"),
     path('rescates/reportes/mexicanos-extranjeros/pdf', views.reporte_mex_extranjeros_pdf, name="reporte_mex_extranjeros_pdf"),
     path('rescates/reportes/mexicanos-extranjeros/excel', views.reporte_mex_extranjeros_excel, name="reporte_mex_extranjeros_excel"),
