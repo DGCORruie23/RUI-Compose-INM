@@ -54,6 +54,7 @@
         </button>
         <a href="{{ request.path }}" class="inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition">Limpiar filtros</a>
         <div class="flex-1"></div>
+        {% if not sin_filtro %}
         <a href="{% url 'Reportes_Analisis:rescates_reporte_ferrocarril_pdf' %}?fecha_inicio={{ fecha_inicio }}&fecha_fin={{ fecha_fin }}"
            class="inline-flex items-center gap-2 bg-gray-700 hover:bg-gray-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
             ⬇ Descargar PDF
@@ -62,8 +63,14 @@
            class="inline-flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
             ⬇ Descargar Excel
         </a>
+        {% endif %}
     </form>
 
+    {% if sin_filtro %}
+    <div class="rescates-tarjeta text-center py-10 text-gray-500">
+        Selecciona un rango de fechas y da clic en <strong>Generar</strong> para cargar el reporte.
+    </div>
+    {% else %}
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
         <div class="rescates-tarjeta ferro-stat"><div class="n">{{ total_ferro }}</div><div class="l">Vía ferrocarril</div></div>
         <div class="rescates-tarjeta ferro-stat"><div class="n">{{ porcentaje }}%</div><div class="l">Del rango ({{ total_rango }})</div></div>
@@ -179,9 +186,11 @@
         </div>
         <svg id="chartsvg" viewBox="0 0 900 360" preserveAspectRatio="xMidYMid meet"></svg>
     </div>
+    {% endif %}
 
 </main>
 
+{% if not sin_filtro %}
 <script>
     const SERIE = {{ serie_diaria_json|safe }};
     (function () {
@@ -261,4 +270,5 @@
         draw(fullMin, fullMax);
     })();
 </script>
+{% endif %}
 {% endblock content %}

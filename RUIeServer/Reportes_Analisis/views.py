@@ -514,6 +514,12 @@ RESCATES_FERROCARRIL_FECHA_MIN = '2023-10-09'
 def rescates_reporte_ferrocarril(request):
     if not request.user.is_authenticated:
         return redirect('/log-in/?next=%s' % request.path)
+    # @FADAR -- sin fecha_inicio/fecha_fin explicitos en la URL, no se corre
+    # la consulta (el rango completo tarda ~70s) -- se le pide al usuario
+    # elegir un rango primero. "Limpiar filtros" regresa aqui mismo, sin
+    # disparar la consulta de nuevo.
+    if 'fecha_inicio' not in request.GET or 'fecha_fin' not in request.GET:
+        return render(request, "Reportes_Analisis/rescates_reporte_ferrocarril.html", {"sin_filtro": True})
     fecha_inicio = request.GET.get('fecha_inicio', RESCATES_FERROCARRIL_FECHA_MIN)
     fecha_fin = request.GET.get('fecha_fin', date.today().isoformat())
     datos = _rescates_ferrocarril_detalle(fecha_inicio, fecha_fin)
@@ -523,6 +529,8 @@ def rescates_reporte_ferrocarril(request):
 def rescates_reporte_ferrocarril_pdf(request):
     if not request.user.is_authenticated:
         return redirect('/log-in/?next=%s' % request.path)
+    if 'fecha_inicio' not in request.GET or 'fecha_fin' not in request.GET:
+        return redirect('Reportes_Analisis:rescates_reporte_ferrocarril')
     fecha_inicio = request.GET.get('fecha_inicio', RESCATES_FERROCARRIL_FECHA_MIN)
     fecha_fin = request.GET.get('fecha_fin', date.today().isoformat())
     datos = _rescates_ferrocarril_detalle(fecha_inicio, fecha_fin)
@@ -538,6 +546,8 @@ def rescates_reporte_ferrocarril_pdf(request):
 def rescates_reporte_ferrocarril_excel(request):
     if not request.user.is_authenticated:
         return redirect('/log-in/?next=%s' % request.path)
+    if 'fecha_inicio' not in request.GET or 'fecha_fin' not in request.GET:
+        return redirect('Reportes_Analisis:rescates_reporte_ferrocarril')
     fecha_inicio = request.GET.get('fecha_inicio', RESCATES_FERROCARRIL_FECHA_MIN)
     fecha_fin = request.GET.get('fecha_fin', date.today().isoformat())
     datos = _rescates_ferrocarril_detalle(fecha_inicio, fecha_fin)
@@ -753,12 +763,16 @@ def rescates_dashboard(request):
             )
             total_reincidentes_local, total_primera_vez_local = cur.fetchone()
 
+            # @FADAR -- ambas categorias por dia (antes solo reincidentes),
+            # para poder apilar reincidentes + primera vez en la misma barra.
             cur.execute(
-                f"SELECT TO_DATE(r.fecha,'DD-MM-YY') AS dia, COUNT(*) FROM usuario_rescatepunto r "
+                f"SELECT TO_DATE(r.fecha,'DD-MM-YY') AS dia, "
+                f"  COUNT(*) FILTER (WHERE {RESCATES_SQL_ES_REINCIDENTE}) AS reinc, "
+                f"  COUNT(*) FILTER (WHERE {RESCATES_SQL_ES_PRIMERA_VEZ}) AS primera "
+                f"FROM usuario_rescatepunto r "
                 f"JOIN {RESCATES_MV_REINCIDENCIA} v "
                 f"  ON r.nombre = v.nombre AND r.apellidos = v.apellidos AND r.nacionalidad = v.nacionalidad "
-                f"WHERE {RESCATES_SQL_ES_REINCIDENTE} "
-                f"AND r.fecha = ANY(%s){filtro_estado_sql} "
+                f"WHERE r.fecha = ANY(%s){filtro_estado_sql} "
                 f"GROUP BY dia ORDER BY dia",
                 params_reinc,
             )
@@ -979,6 +993,22 @@ def rescates_dashboard(request):
     detalle_atipicas.sort(key=lambda d: d["total"], reverse=True)
     total_atipicas = sum(atipicas_por_region.values())
 
+    # @FADAR -- mismo detalle, pero agrupado por region (Europa / Medio
+    # Oriente / Otras) para la tabla del dashboard, en vez de una lista
+    # plana mezclada y ordenada solo por total.
+    detalle_atipicas_agrupado = [
+        {
+            "region": region,
+            "etiqueta": "Otras" if region == "Otras / poco conocidas" else region,
+            "total": atipicas_por_region[region],
+            "filas": sorted(
+                (d for d in detalle_atipicas if d["region"] == region),
+                key=lambda d: d["total"], reverse=True,
+            ),
+        }
+        for region in ("Europa", "Medio Oriente", "Otras / poco conocidas")
+    ]
+
     # --- Desglose (solo números) de hombres/mujeres/niños/niñas y núcleos
     # familiares, pero limitado a las nacionalidades atípicas -- para la
     # sección de detalle, no para el dashboard general. ---
@@ -1151,27 +1181,38 @@ def rescates_dashboard(request):
         p_entidad.add_tools(HoverTool(tooltips=[("Entidad", "@entidad"), ("Rescates", "@total{0,0}")]))
         figuras["entidad"] = p_entidad
 
-    # --- Gráfica 6: reincidentes por día (dentro del rango filtrado) ---
-    x_reinc = [datetime.combine(d, datetime.min.time()) for d, _ in reincidentes_por_dia]
-    y_reinc = [int(v or 0) for _, v in reincidentes_por_dia]
-    etiquetas_reinc = [f"{v:,}" for v in y_reinc]
-    source_reinc = ColumnDataSource(data=dict(x=x_reinc, y=y_reinc, label=etiquetas_reinc))
+    # --- Gráfica 6: reincidencia por día (dentro del rango filtrado) ---
+    # @FADAR -- una sola barra por dia, apilada (reincidentes + primera vez)
+    # en vez de una barra nueva al lado -- mismos colores que las tarjetas
+    # de arriba (#DC2626 reincidentes, #15803D primera vez).
+    x_reinc = [datetime.combine(d, datetime.min.time()) for d, _, _ in reincidentes_por_dia]
+    y_reinc = [int(v or 0) for _, v, _ in reincidentes_por_dia]
+    y_primera = [int(v or 0) for _, _, v in reincidentes_por_dia]
+    source_reinc = ColumnDataSource(data=dict(x=x_reinc, reinc=y_reinc, primera=y_primera))
     p_reinc = figure(
-        height=280, sizing_mode="stretch_width", x_axis_type="datetime",
+        height=360, sizing_mode="stretch_width", x_axis_type="datetime",
         toolbar_location="right", tools="pan,box_zoom,reset",
         background_fill_color="#f7f7f7", border_fill_color=None, outline_line_color="#666666",
-        title="Reincidentes por día (dentro del rango filtrado)",
+        title="Reincidencia por día (dentro del rango filtrado)",
     )
-    p_reinc.vbar(x='x', top='y', width=1000 * 60 * 60 * 20, color="#DC2626", source=source_reinc)
+    p_reinc.vbar_stack(
+        ['reinc', 'primera'], x='x', width=1000 * 60 * 60 * 20, source=source_reinc,
+        color=["#991B1B", "#2f5f7d"], legend_label=["Reincidentes", "Primera vez"],
+    )
     p_reinc.y_range.start = 0
-    p_reinc.add_layout(LabelSet(
-        x='x', y='y', text='label', source=source_reinc,
-        x_offset=0, y_offset=4, text_font_size="9px", text_color="#DC2626", text_align="center",
-    ))
+    # @FADAR -- margen arriba (15%) para que la leyenda no se encime con las
+    # barras mas altas.
+    max_apilado = max((r + p for r, p in zip(y_reinc, y_primera)), default=0)
+    p_reinc.y_range.end = max_apilado * 1.15 if max_apilado else 1
     p_reinc.xaxis.formatter = DatetimeTickFormatter(days="%d %b", months="%b %Y", years="%Y")
     p_reinc.xgrid.grid_line_color = "#ffffff"
     p_reinc.ygrid.grid_line_color = "#ffffff"
-    p_reinc.add_tools(HoverTool(tooltips=[("Día", "@x{%d/%b/%y}"), ("Reincidentes", "@y{0,0}")], formatters={'@x': 'datetime'}))
+    p_reinc.legend.location = "top_left"
+    p_reinc.legend.background_fill_alpha = 0.6
+    p_reinc.legend.border_line_color = None
+    p_reinc.add_tools(HoverTool(tooltips=[
+        ("Día", "@x{%d/%b/%y}"), ("Reincidentes", "@reinc{0,0}"), ("Primera vez", "@primera{0,0}"),
+    ], formatters={'@x': 'datetime'}))
     figuras["reincidentes_dia"] = p_reinc
 
     nombres = list(figuras.keys())
@@ -1197,6 +1238,7 @@ def rescates_dashboard(request):
         "total_atipicas": total_atipicas,
         "atipicas_por_region": atipicas_por_region,
         "detalle_atipicas": detalle_atipicas[:20],
+        "detalle_atipicas_agrupado": detalle_atipicas_agrupado,
         "atip_hombres": atip_hombres,
         "atip_mujeres": atip_mujeres,
         "atip_ninos": atip_ninos,

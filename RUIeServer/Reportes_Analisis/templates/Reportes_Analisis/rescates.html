@@ -403,20 +403,29 @@
                     <thead class="text-gray-500 uppercase tracking-wide sticky top-0 bg-white">
                         <tr>
                             <th class="text-left py-1">Nacionalidad</th>
-                            <th class="text-left py-1">Región</th>
                             <th class="text-right py-1">Total</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for fila in detalle_atipicas %}
-                        <tr class="border-t border-gray-100">
-                            <td class="py-1">{{ fila.nombre }}</td>
-                            <td class="py-1 text-gray-500">{{ fila.region }}</td>
-                            <td class="py-1 text-right font-semibold">{{ fila.total }}</td>
-                        </tr>
-                        {% empty %}
-                        <tr><td colspan="3" class="py-3 text-center text-gray-400">Sin nacionalidades atípicas en este rango.</td></tr>
+                        {% if total_atipicas %}
+                        {% for grupo in detalle_atipicas_agrupado %}
+                            {% if grupo.filas %}
+                            <tr class="border-t border-gray-200">
+                                <td colspan="2" class="py-1 font-bold uppercase text-[#9A0A38]" style="font-size:0.65rem;letter-spacing:0.03em;">
+                                    {{ grupo.etiqueta }} — {{ grupo.total }}
+                                </td>
+                            </tr>
+                            {% for fila in grupo.filas %}
+                            <tr class="border-t border-gray-100">
+                                <td class="py-1">{{ fila.nombre }}</td>
+                                <td class="py-1 text-right font-semibold">{{ fila.total }}</td>
+                            </tr>
+                            {% endfor %}
+                            {% endif %}
                         {% endfor %}
+                        {% else %}
+                        <tr><td colspan="2" class="py-3 text-center text-gray-400">Sin nacionalidades atípicas en este rango.</td></tr>
+                        {% endif %}
                     </tbody>
                 </table>
             </div>
