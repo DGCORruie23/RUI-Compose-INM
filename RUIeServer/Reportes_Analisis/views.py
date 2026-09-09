@@ -18,12 +18,13 @@ from openpyxl.utils import get_column_letter
 
 from django.conf import settings
 from django.core.cache import cache  # @FADAR
-from django.db import connection
-from django.db.models import Count, Max, Q, Sum
+from django.db import connection, transaction
+from django.db.models import CharField, Count, F, Func, Max, Q, Sum, Value
 from django.db.models.functions import TruncDay, TruncWeek
 from django.http import HttpResponse
 from django.shortcuts import render, redirect
 from django.template.loader import get_template
+from django.views.decorators.cache import never_cache
 
 from weasyprint import HTML
 
@@ -127,22 +128,78 @@ def _rescates_region_atipica(iso3):
 
 RESCATES_MV_REINCIDENCIA = "mapa_mv_reincidencia_rescates"
 
+# @FADAR -- cache del historico de reincidencia del dashboard: la regla de
+# Chiapas es por registro (no por persona), asi que ya no se puede sacar
+# gratis de la vista pre-agregada (SUM(veces)) -- ahora necesita un JOIN
+# completo contra usuario_rescatepunto (1.5M filas, sin filtro de fecha),
+# que solo por si solo mide ~35s. Como este numero NO depende del filtro
+# de fecha/entidad del dashboard (es "todos los registros, siempre"),
+# cachearlo evita pagar ese costo en cada carga de pagina. TTL igual al
+# ciclo de refresco de la vista materializada (cron-reincidencia, cada
+# 600s) -- nunca sirve un dato mas viejo que la vista misma.
+RESCATES_CACHE_KEY_REINCIDENCIA_HISTORICO = "rescates_reincidencia_historico"
+RESCATES_CACHE_TTL_REINCIDENCIA_HISTORICO = 600
+
+# @FADAR -- mismo criterio que el cache de arriba: _rescates_set_duplicados_historicos
+# trae ~285,000 personas de toda la vista materializada, sin filtro de
+# fecha (~6.2s), y se llama en 4 lugares (dashboard, Regiones, Cuadro de
+# Datos, Informe Diario) -- cada uno pagando esos 6.2s por separado en
+# cada carga. Mismo TTL (600s, ciclo de refresco de la vista).
+RESCATES_CACHE_KEY_DUPLICADOS_HISTORICOS = "rescates_duplicados_historicos"
+RESCATES_CACHE_TTL_DUPLICADOS_HISTORICOS = 600
+
+
+def _rescates_array_fechas(fecha_inicio, fecha_fin):
+    """Lista de fechas 'DD-MM-YY' (una por cada dia del rango) -- para
+    filtrar con "fecha = ANY(%s)" y aprovechar el indice normal que ya
+    existe sobre la columna fecha (texto), en vez de
+    TO_DATE(fecha,'DD-MM-YY') BETWEEN %s AND %s, que Postgres no puede
+    resolver con indice porque el filtro pasa por una funcion. Verificado
+    con EXPLAIN ANALYZE: ~700x mas rapido en un solo dia (14.7s -> 20ms),
+    sin crear ni tocar ningun indice."""
+    fecha_ini_obj = datetime.strptime(fecha_inicio, "%Y-%m-%d")
+    fecha_fin_obj = datetime.strptime(fecha_fin, "%Y-%m-%d")
+    dias_rango = (fecha_fin_obj - fecha_ini_obj).days
+    return [(fecha_ini_obj + timedelta(days=d)).strftime("%d-%m-%y") for d in range(max(dias_rango, 0) + 1)]
+
 
 def _rescates_set_duplicados_historicos():
     """Set de (nombre, apellidos, nacionalidad) clasificados 'Reincidente'
-    en mapa_mv_reincidencia_rescates -- usada en los 3 lugares que la
-    necesitan (dashboard -> seccion "Regiones", reporte Cuadro de Datos,
-    reporte Informe Diario). Misma interfaz que antes, ahora respaldada por
-    la vista materializada en vez de recalcularse en Python."""
-    with connection.cursor() as cur:
-        cur.execute(
-            f"SELECT nombre, apellidos, nacionalidad FROM {RESCATES_MV_REINCIDENCIA} "
-            f"WHERE clasificacion = 'Reincidente'"
-        )
-        return set(cur.fetchall())
+    en mapa_mv_reincidencia_rescates -- usada en 4 lugares (dashboard ->
+    seccion "Regiones", reporte Regiones, reporte Cuadro de Datos, reporte
+    Informe Diario). Misma interfaz que antes, ahora respaldada por la
+    vista materializada en vez de recalcularse en Python.
+
+    Cacheada (ver RESCATES_CACHE_TTL_DUPLICADOS_HISTORICOS): no depende de
+    ningun filtro de fecha/entidad, y sin cache media ~6.2s cada vez que
+    se llama -- pagado por separado en cada uno de los 4 lugares."""
+    resultado = cache.get(RESCATES_CACHE_KEY_DUPLICADOS_HISTORICOS)
+    if resultado is None:
+        with connection.cursor() as cur:
+            cur.execute(
+                f"SELECT nombre, apellidos, nacionalidad FROM {RESCATES_MV_REINCIDENCIA} "
+                f"WHERE clasificacion = 'Reincidente'"
+            )
+            resultado = set(cur.fetchall())
+        cache.set(RESCATES_CACHE_KEY_DUPLICADOS_HISTORICOS, resultado, RESCATES_CACHE_TTL_DUPLICADOS_HISTORICOS)
+    return resultado
 
 
-def _rescates_regiones(fecha_inicio, fecha_fin, oficina=None):
+# @FADAR -- regla de Chiapas centralizada (100% reincidente, sin comparar
+# contra el historico), homologada en los 7 lugares que la necesitan
+# (Regiones, CECO 2, CECO 2.1, Informe Diario, CECO V1/V2, Cuadro de Datos,
+# dashboard).
+RESCATES_SQL_ES_REINCIDENTE = "(r.\"oficinaRepre\" = 'CHIAPAS' OR v.clasificacion = 'Reincidente')"
+RESCATES_SQL_ES_PRIMERA_VEZ = "(r.\"oficinaRepre\" != 'CHIAPAS' AND v.clasificacion = 'Rescate primera vez')"
+
+
+def _rescates_es_reincidente(oficina, en_set_duplicados):
+    """Equivalente en Python de RESCATES_SQL_ES_REINCIDENTE, para los
+    reportes que clasifican registro por registro en vez de SQL puro."""
+    return oficina == "CHIAPAS" or en_set_duplicados
+
+
+def _rescates_regiones(fecha_inicio, fecha_fin, oficina=None, hora_inicio=None, hora_fin=None):
     """Reutiliza TAL CUAL la logica de generar_pdfT (estadistica/views.py,
     seccion "Cuadro de Registros" / CECO 2) -- 3 zonas migratorias (Rio
     Bravo/Centro/Suchiate) que cubren las 32 oficinas. Ninguna regla de
@@ -179,35 +236,30 @@ def _rescates_regiones(fecha_inicio, fecha_fin, oficina=None):
         ferrocarril=False, hotel=False, puestosADispo=False, voluntarios=True, otro=True,
     )
 
-    oficinas_sin_chiapas = [o for o in RESCATES_OFICINAS if o != "CHIAPAS"]
+    oficinas_incluidas = RESCATES_OFICINAS
     if oficina:
-        oficinas_sin_chiapas = [oficina] if oficina in oficinas_sin_chiapas else []
-    datos_no_chiapas = list(
-        RescatePunto.objects.filter(fecha__in=array_fechas, oficinaRepre__in=oficinas_sin_chiapas)
-        .exclude(**exclude_original)
+        oficinas_incluidas = [oficina] if oficina in RESCATES_OFICINAS else []
+    qs_rango = RescatePunto.objects.filter(fecha__in=array_fechas, oficinaRepre__in=oficinas_incluidas)
+    if hora_inicio and hora_fin:
+        qs_rango = qs_rango.annotate(
+            hora_norm=Func(F("hora"), Value(5), Value("0"), function="LPAD", output_field=CharField())
+        ).filter(hora_norm__range=(hora_inicio, hora_fin))
+    datos_rango_local = list(
+        qs_rango.exclude(**exclude_original)
         .values(*campos_valores)
         .annotate(total=Count('idRescate'))
-    ) if oficinas_sin_chiapas else []
-
-    incluir_chiapas = (not oficina) or (oficina == "CHIAPAS")
-    datos_chiapas = list(
-        RescatePunto.objects.filter(fecha__in=array_fechas, oficinaRepre="CHIAPAS")
-        .exclude(**exclude_original)
-        .values(*campos_valores)
-        .annotate(total=Count('idRescate'))
-    ) if incluir_chiapas else []
+    ) if oficinas_incluidas else []
 
     set_duplicados_local = _rescates_set_duplicados_historicos()
 
+    # @FADAR -- regla de Chiapas centralizada, ver _rescates_es_reincidente.
     nuevos_local, reincidentes_local = [], []
-    for dato in datos_no_chiapas:
+    for dato in datos_rango_local:
         clave = (dato['nombre'], dato['apellidos'], dato['nacionalidad'])
-        if clave in set_duplicados_local:
+        if _rescates_es_reincidente(dato['oficinaRepre'], clave in set_duplicados_local):
             reincidentes_local.append(dato)
         else:
             nuevos_local.append(dato)
-    # Chiapas: 100% reincidente, sin excepcion (regla oficial).
-    reincidentes_local.extend(datos_chiapas)
 
     zona_por_oficina_local = {}
     zona_rio_bravo_local = {o: {"nuevos": 0, "reincidentes": 0, "total": 0} for o in RESCATES_ZONA_RIO_BRAVO}
@@ -296,6 +348,247 @@ RESCATES_ZONA_COLOR = {
 }
 
 
+def _rescates_zona_de_oficina(oficina):
+    if oficina in RESCATES_ZONA_RIO_BRAVO:
+        return "Río Bravo"
+    if oficina in RESCATES_ZONA_CENTRO:
+        return "Centro"
+    return "Suchiate"
+
+
+def _rescates_color_frecuencia(ratio):
+    """Rampa de un solo color (claro -> oscuro, tono INM #9A0A38) segun
+    'ratio' (0 a 1) -- para que el color de una barra tambien comunique
+    la magnitud, no solo el ancho."""
+    claro = (0xF3, 0xD6, 0xDF)
+    oscuro = (0x9A, 0x0A, 0x38)
+    r = round(claro[0] + (oscuro[0] - claro[0]) * ratio)
+    g = round(claro[1] + (oscuro[1] - claro[1]) * ratio)
+    b = round(claro[2] + (oscuro[2] - claro[2]) * ratio)
+    return f"#{r:02X}{g:02X}{b:02X}"
+
+
+# @FADAR -- Rescates vía ferrocarril: analisis de ruta (La Bestia/Ferromex),
+# no un reporte operativo diario. Rango de fechas libre, igual que
+# Personalizado -- el % es siempre respecto al total de TODAS las vias
+# dentro del mismo rango seleccionado, no un dato fijo.
+def _rescates_ferrocarril_detalle(fecha_inicio, fecha_fin):
+    array_fechas = _rescates_array_fechas(fecha_inicio, fecha_fin)
+
+    with connection.cursor() as cur:
+        cur.execute(
+            "SELECT COUNT(*) FILTER (WHERE sexo=true AND edad>=18), "
+            "  COUNT(*) FILTER (WHERE sexo=false AND edad>=18), "
+            "  COUNT(*) FILTER (WHERE sexo=true AND edad<18), "
+            "  COUNT(*) FILTER (WHERE sexo=false AND edad<18) "
+            "FROM usuario_rescatepunto WHERE fecha = ANY(%s) AND ferrocarril = true",
+            [array_fechas],
+        )
+        hombres, mujeres, ninos, ninas = cur.fetchone()
+        total_ferro = hombres + mujeres + ninos + ninas
+
+        cur.execute("SELECT COUNT(*) FROM usuario_rescatepunto WHERE fecha = ANY(%s)", [array_fechas])
+        total_rango = cur.fetchone()[0]
+
+        cur.execute(
+            "SELECT nacionalidad, COUNT(*) FROM usuario_rescatepunto "
+            "WHERE fecha = ANY(%s) AND ferrocarril = true "
+            "GROUP BY nacionalidad ORDER BY COUNT(*) DESC LIMIT 10",
+            [array_fechas],
+        )
+        top_nacionalidades = cur.fetchall()
+
+        cur.execute(
+            'SELECT "oficinaRepre", "puntoEstra", COUNT(*) FROM usuario_rescatepunto '
+            "WHERE fecha = ANY(%s) AND ferrocarril = true "
+            "AND \"puntoEstra\" IS NOT NULL AND \"puntoEstra\" != '' "
+            'GROUP BY "oficinaRepre", "puntoEstra"',
+            [array_fechas],
+        )
+        puntos_crudos = cur.fetchall()
+
+    # @FADAR -- las 3 consultas de reincidencia hacen JOIN contra
+    # mapa_mv_reincidencia_rescates (909K filas); con work_mem por
+    # default (4MB) esa tabla hash se derrama a disco -- verificado con
+    # EXPLAIN ANALYZE, ~3x mas lento. Se sube work_mem SOLO para esta
+    # transaccion (SET LOCAL, dentro de transaction.atomic()) -- al
+    # terminar el bloque, la conexion regresa sola a 4MB para cualquier
+    # otra consulta de este u otro modulo que la reutilice despues.
+    with transaction.atomic():
+        with connection.cursor() as cur:
+            cur.execute("SET LOCAL work_mem = '128MB'")
+
+            cur.execute(
+                f"SELECT COUNT(*) FILTER (WHERE {RESCATES_SQL_ES_REINCIDENTE}), "
+                f"  COUNT(*) FILTER (WHERE {RESCATES_SQL_ES_PRIMERA_VEZ}) "
+                f"FROM usuario_rescatepunto r "
+                f"JOIN {RESCATES_MV_REINCIDENCIA} v "
+                f"  ON r.nombre = v.nombre AND r.apellidos = v.apellidos AND r.nacionalidad = v.nacionalidad "
+                f"WHERE r.fecha = ANY(%s) AND r.ferrocarril = true",
+                [array_fechas],
+            )
+            ferro_reinc, ferro_primera = cur.fetchone()
+
+            cur.execute(
+                f"SELECT COUNT(*) FILTER (WHERE {RESCATES_SQL_ES_REINCIDENTE}), "
+                f"  COUNT(*) FILTER (WHERE {RESCATES_SQL_ES_PRIMERA_VEZ}) "
+                f"FROM usuario_rescatepunto r "
+                f"JOIN {RESCATES_MV_REINCIDENCIA} v "
+                f"  ON r.nombre = v.nombre AND r.apellidos = v.apellidos AND r.nacionalidad = v.nacionalidad "
+                f"WHERE r.fecha = ANY(%s) AND r.ferrocarril = false",
+                [array_fechas],
+            )
+            resto_reinc, resto_primera = cur.fetchone()
+
+            cur.execute(
+                f"SELECT r.fecha, "
+                f"  COUNT(*) FILTER (WHERE {RESCATES_SQL_ES_REINCIDENTE}), "
+                f"  COUNT(*) FILTER (WHERE {RESCATES_SQL_ES_PRIMERA_VEZ}) "
+                f"FROM usuario_rescatepunto r "
+                f"JOIN {RESCATES_MV_REINCIDENCIA} v "
+                f"  ON r.nombre = v.nombre AND r.apellidos = v.apellidos AND r.nacionalidad = v.nacionalidad "
+                f"WHERE r.fecha = ANY(%s) AND r.ferrocarril = true "
+                f"GROUP BY r.fecha",
+                [array_fechas],
+            )
+            serie_cruda = cur.fetchall()
+
+    # --- clasificar oficinas/puntos por zona (mismas 3 zonas de Regiones/CECO) ---
+    zonas = {"Río Bravo": 0, "Centro": 0, "Suchiate": 0}
+    puntos_por_zona = {"Río Bravo": {}, "Centro": {}, "Suchiate": {}}
+    for of, punto, cantidad in puntos_crudos:
+        zona = _rescates_zona_de_oficina(of)
+        zonas[zona] += cantidad
+        puntos_por_zona[zona][punto] = puntos_por_zona[zona].get(punto, 0) + cantidad
+
+    regiones = []
+    for nombre_zona in ("Suchiate", "Río Bravo", "Centro"):
+        top_puntos = sorted(puntos_por_zona[nombre_zona].items(), key=lambda x: x[1], reverse=True)[:3]
+        regiones.append({
+            "nombre": nombre_zona,
+            "color": RESCATES_ZONA_COLOR[nombre_zona],
+            "total": zonas[nombre_zona],
+            "puntos": top_puntos,
+        })
+
+    # --- serie diaria ordenada por fecha real (el campo es texto DD-MM-YY) ---
+    serie_diaria = sorted(
+        ((datetime.strptime(f, "%d-%m-%y").date(), r, p) for f, r, p in serie_cruda),
+        key=lambda x: x[0],
+    )
+
+    # @FADAR -- color de cada barra segun su propia frecuencia relativa al
+    # maximo de la lista (rampa de un solo tono, no colores al azar).
+    max_nac = max((t for _, t in top_nacionalidades), default=1)
+    top_nacionalidades_color = [
+        {"nombre": nac, "total": total, "color": _rescates_color_frecuencia(total / max_nac if max_nac else 0)}
+        for nac, total in top_nacionalidades
+    ]
+
+    return {
+        "fecha_inicio": fecha_inicio,
+        "fecha_fin": fecha_fin,
+        "total_ferro": total_ferro,
+        "total_rango": total_rango,
+        "porcentaje": round(total_ferro / total_rango * 100, 2) if total_rango else 0,
+        "hombres": hombres, "mujeres": mujeres, "ninos": ninos, "ninas": ninas,
+        "total_menores": ninos + ninas,
+        "total_mayores": hombres + mujeres,
+        "top_nacionalidades": top_nacionalidades_color,
+        "regiones": regiones,
+        "ferro_reinc": ferro_reinc, "ferro_primera": ferro_primera,
+        "resto_reinc": resto_reinc, "resto_primera": resto_primera,
+        "serie_diaria": serie_diaria,
+        "serie_diaria_json": json.dumps([[d.isoformat(), r, p] for d, r, p in serie_diaria]),
+    }
+
+
+# @FADAR -- el historico real de usuario_rescatepunto empieza el 2023-10-09,
+# no el 2023-01-01. Usar la fecha real evita generar ~280 dias de arreglo
+# (para el filtro fecha = ANY(...)) que nunca van a coincidir con ninguna
+# fila -- ~27% menos elementos en el arreglo por defecto.
+RESCATES_FERROCARRIL_FECHA_MIN = '2023-10-09'
+
+
+@never_cache
+def rescates_reporte_ferrocarril(request):
+    if not request.user.is_authenticated:
+        return redirect('/log-in/?next=%s' % request.path)
+    fecha_inicio = request.GET.get('fecha_inicio', RESCATES_FERROCARRIL_FECHA_MIN)
+    fecha_fin = request.GET.get('fecha_fin', date.today().isoformat())
+    datos = _rescates_ferrocarril_detalle(fecha_inicio, fecha_fin)
+    return render(request, "Reportes_Analisis/rescates_reporte_ferrocarril.html", datos)
+
+
+def rescates_reporte_ferrocarril_pdf(request):
+    if not request.user.is_authenticated:
+        return redirect('/log-in/?next=%s' % request.path)
+    fecha_inicio = request.GET.get('fecha_inicio', RESCATES_FERROCARRIL_FECHA_MIN)
+    fecha_fin = request.GET.get('fecha_fin', date.today().isoformat())
+    datos = _rescates_ferrocarril_detalle(fecha_inicio, fecha_fin)
+    template = get_template("Reportes_Analisis/_rescates_ferrocarril_pdf.html")
+    html_string = template.render(datos)
+    pdf_file = HTML(string=html_string, base_url=request.build_absolute_uri()).write_pdf()
+    nombre_archivo = f"Rescates via ferrocarril {fecha_inicio} a {fecha_fin}.pdf"
+    response = HttpResponse(pdf_file, content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="{nombre_archivo}"'
+    return response
+
+
+def rescates_reporte_ferrocarril_excel(request):
+    if not request.user.is_authenticated:
+        return redirect('/log-in/?next=%s' % request.path)
+    fecha_inicio = request.GET.get('fecha_inicio', RESCATES_FERROCARRIL_FECHA_MIN)
+    fecha_fin = request.GET.get('fecha_fin', date.today().isoformat())
+    datos = _rescates_ferrocarril_detalle(fecha_inicio, fecha_fin)
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Rescates via ferrocarril"
+    ws.column_dimensions["A"].width = 42
+    ws.column_dimensions["B"].width = 16
+
+    ws.merge_cells("A1:B1")
+    _rescates_excel_celda(ws, 1, 1, "INSTITUTO NACIONAL DE MIGRACIÓN — DIRECCIÓN GENERAL DE COORDINACIÓN DE OFICINAS DE REPRESENTACION", negrita=True, tam=10)
+    ws.merge_cells("A2:B2")
+    _rescates_excel_celda(ws, 2, 1, f"Rescates vía ferrocarril — {datos['fecha_inicio']} a {datos['fecha_fin']}", bg=RESCATES_COLOR_FONDO[0], color_texto=RESCATES_COLOR_FONDO[1], negrita=True, tam=12)
+
+    fila = 4
+    _rescates_excel_fila(ws, fila, ["Indicador", "Valor"], RESCATES_LETRA_T1, negrita=True)
+    fila += 1
+    resumen = [
+        ("Total vía ferrocarril", datos["total_ferro"]),
+        ("Total del rango (todas las vías)", datos["total_rango"]),
+        ("Porcentaje", f"{datos['porcentaje']}%"),
+        ("Hombres", datos["hombres"]), ("Mujeres", datos["mujeres"]),
+        ("Niños", datos["ninos"]), ("Niñas", datos["ninas"]),
+        ("Total menores", datos["total_menores"]), ("Total mayores", datos["total_mayores"]),
+    ]
+    for etiqueta, valor in resumen:
+        _rescates_excel_fila(ws, fila, [etiqueta, valor], RESCATES_LETRA_T2)
+        fila += 1
+
+    fila += 1
+    _rescates_excel_fila(ws, fila, ["Región", "Total"], RESCATES_LETRA_T4, negrita=True)
+    fila += 1
+    for r in datos["regiones"]:
+        _rescates_excel_fila(ws, fila, [r["nombre"], r["total"]], RESCATES_LETRA_T2)
+        fila += 1
+
+    fila += 1
+    _rescates_excel_fila(ws, fila, ["Nacionalidad", "Total"], RESCATES_LETRA_T0, negrita=True)
+    fila += 1
+    for nac in datos["top_nacionalidades"]:
+        _rescates_excel_fila(ws, fila, [nac["nombre"], nac["total"]], RESCATES_LETRA_T2)
+        fila += 1
+
+    nombre_archivo = f"Rescates via ferrocarril {fecha_inicio} a {fecha_fin}.xlsx"
+    response = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    response["Content-Disposition"] = f'attachment; filename="{nombre_archivo}"'
+    wb.save(response)
+    return response
+
+
 def _rescates_geojson_regiones(zona_rio_bravo, zona_centro, zona_suchiate):
     """Reutiliza el mismo geojson de estados que ya usa mapa_interactivo/
     mapa_informacion (mapa/static/mapa/data/inegi_latlon_mexico.geojson) --
@@ -343,6 +636,7 @@ def _rescates_geojson_regiones(zona_rio_bravo, zona_centro, zona_suchiate):
     return geo_data
 
 
+@never_cache
 def rescates_dashboard(request):
     """Tablero de Rescates/Operación: diagrama de dispersión de rescates por
     día, barras por hora del día, desglose hombres/mujeres/niños/niñas
@@ -363,12 +657,22 @@ def rescates_dashboard(request):
         filtro_oficina_sql = ' AND "oficinaRepre" = %s'
         params_base = params_base + [oficina]
 
-    # Optimización (sin tocar el esquema/índices, a petición explícita):
+    # @FADAR -- fecha = ANY(%s) en vez de TO_DATE(fecha) BETWEEN %s AND %s:
+    # usa el indice normal que ya existe sobre "fecha" (texto), ~700x mas
+    # rapido que el escaneo completo que forzaba TO_DATE(). Se va aplicando
+    # consulta por consulta (pedido explicito), por eso conviven ambos
+    # params_base (TO_DATE, las que aun no se tocan) y params_indexado
+    # (fecha = ANY, las ya optimizadas).
+    array_fechas_dashboard = _rescates_array_fechas(fecha_inicio, fecha_fin)
+    params_indexado = [array_fechas_dashboard]
+    if oficina:
+        params_indexado = params_indexado + [oficina]
+
+    # Optimización (sin tocar el esquema/índices)
     # de ~7 consultas secuenciales, cada una escaneando toda la tabla por
     # separado, se pasa a 3 -- usando GROUPING SETS para calcular varias
     # agregaciones en una sola pasada -- corriendo en paralelo (cada una en
-    # su propia conexión), en vez de una tras otra. El tiempo total pasa de
-    # ser la suma de las 7 a ser el de la más lenta de las 3.
+    # su propia conexión).
 
     def _consulta_sexo_edad():
         with connection.cursor() as cur:
@@ -379,27 +683,25 @@ def rescates_dashboard(request):
                 f"  COUNT(*) FILTER (WHERE sexo=true  AND edad<18)  AS ninos, "
                 f"  COUNT(*) FILTER (WHERE sexo=false AND edad<18)  AS ninas "
                 f"FROM usuario_rescatepunto "
-                f"WHERE TO_DATE(fecha,'DD-MM-YY') BETWEEN %s AND %s{filtro_oficina_sql}",
-                params_base,
+                f"WHERE fecha = ANY(%s){filtro_oficina_sql}",
+                params_indexado,
             )
             resultado = cur.fetchone()
         connection.close()
         return resultado
 
     def _consulta_dia_hora():
-        # "hora" es texto libre y no siempre viene como HH:MM (hay valores
-        # sueltos como "06") -- se descarta al formato inválido dentro del
-        # CASE, para no tronar el cast a time por un registro mal capturado.
+        # "hora"
         with connection.cursor() as cur:
             cur.execute(
                 f"SELECT GROUPING(dia) AS g_dia, dia, hr, COUNT(*) FROM ( "
                 f"  SELECT TO_DATE(fecha,'DD-MM-YY') AS dia, "
                 f"         CASE WHEN hora ~ '^[0-2][0-9]:[0-5][0-9]$' THEN EXTRACT(HOUR FROM hora::time)::int END AS hr "
                 f"  FROM usuario_rescatepunto "
-                f"  WHERE TO_DATE(fecha,'DD-MM-YY') BETWEEN %s AND %s{filtro_oficina_sql} "
+                f"  WHERE fecha = ANY(%s){filtro_oficina_sql} "
                 f") sub "
                 f"GROUP BY GROUPING SETS ((dia), (hr))",
-                params_base,
+                params_indexado,
             )
             filas = cur.fetchall()
         connection.close()
@@ -414,16 +716,13 @@ def rescates_dashboard(request):
 
     def _consulta_nacionalidad():
         # Nacionalidad por iso3 (nombre en mayúsculas, reduce duplicados de
-        # capitalización). (Parentesco y Punto Estratégico "crudos" se
-        # quitaron del dashboard a petición explícita -- era vista de
-        # análisis interno, no algo para usuario final. numFamilia ahora
-        # se resume como conteo de familias, no como distribución cruda.)
+        # capitalización). (Parentesco y Punto Estratégico "crudos" o "raw"
         with connection.cursor() as cur:
             cur.execute(
                 f"SELECT iso3, UPPER(MAX(nacionalidad)), COUNT(*) FROM usuario_rescatepunto "
-                f"WHERE TO_DATE(fecha,'DD-MM-YY') BETWEEN %s AND %s{filtro_oficina_sql} "
+                f"WHERE fecha = ANY(%s){filtro_oficina_sql} "
                 f"GROUP BY iso3",
-                params_base,
+                params_indexado,
             )
             iso_rows_local = cur.fetchall()
         connection.close()
@@ -431,31 +730,25 @@ def rescates_dashboard(request):
 
     def _consulta_reincidentes():
         # Reincidente = coincide (nombre, apellidos, nacionalidad) con otro
-        # registro en TODO el historico de usuario_rescatepunto (>=2
-        # apariciones), vista mapa_mv_reincidencia_rescates -- reemplaza el
-        # conteo que antes venia de mapa_extrescatados.reincidente.
-        #
-        # Dos apartados pedidos explícitamente:
-        #  1. Por día, respetando el filtro de fecha/entidad actual.
-        #  2. General histórico: TODOS los registros, sin importar el
-        #     filtro de fecha/entidad seleccionado.
+        # registro en todo el historico de usuario_rescatepunto (>=2
+        # apariciones).
+        
         filtro_estado_sql = ""
-        params_reinc = [fecha_inicio, fecha_fin]
+        params_reinc = [array_fechas_dashboard]
         if oficina:
             filtro_estado_sql = ' AND r."oficinaRepre" = %s'
             params_reinc = params_reinc + [oficina]
         with connection.cursor() as cur:
             # Reincidentes y primera vez del rango filtrado en UNA sola
-            # pasada sobre el JOIN (antes eran 2 consultas identicas salvo
-            # por el filtro de clasificacion -- redundante).
+            # pasada sobre el JOIN.
             cur.execute(
                 f"SELECT "
-                f"  COUNT(*) FILTER (WHERE v.clasificacion = 'Reincidente'), "
-                f"  COUNT(*) FILTER (WHERE v.clasificacion = 'Rescate primera vez') "
+                f"  COUNT(*) FILTER (WHERE {RESCATES_SQL_ES_REINCIDENTE}), "
+                f"  COUNT(*) FILTER (WHERE {RESCATES_SQL_ES_PRIMERA_VEZ}) "
                 f"FROM usuario_rescatepunto r "
                 f"JOIN {RESCATES_MV_REINCIDENCIA} v "
                 f"  ON r.nombre = v.nombre AND r.apellidos = v.apellidos AND r.nacionalidad = v.nacionalidad "
-                f"WHERE TO_DATE(r.fecha,'DD-MM-YY') BETWEEN %s AND %s{filtro_estado_sql}",
+                f"WHERE r.fecha = ANY(%s){filtro_estado_sql}",
                 params_reinc,
             )
             total_reincidentes_local, total_primera_vez_local = cur.fetchone()
@@ -464,23 +757,29 @@ def rescates_dashboard(request):
                 f"SELECT TO_DATE(r.fecha,'DD-MM-YY') AS dia, COUNT(*) FROM usuario_rescatepunto r "
                 f"JOIN {RESCATES_MV_REINCIDENCIA} v "
                 f"  ON r.nombre = v.nombre AND r.apellidos = v.apellidos AND r.nacionalidad = v.nacionalidad "
-                f"WHERE v.clasificacion = 'Reincidente' "
-                f"AND TO_DATE(r.fecha,'DD-MM-YY') BETWEEN %s AND %s{filtro_estado_sql} "
+                f"WHERE {RESCATES_SQL_ES_REINCIDENTE} "
+                f"AND r.fecha = ANY(%s){filtro_estado_sql} "
                 f"GROUP BY dia ORDER BY dia",
                 params_reinc,
             )
             reincidentes_por_dia_local = cur.fetchall()
 
-            # Misma logica (>=2 vs =1) para el historico, tambien en una
-            # sola pasada -- la vista ya trae "veces" pre-agregado por
-            # persona, asi que ni siquiera toca usuario_rescatepunto.
-            cur.execute(
-                f"SELECT "
-                f"  COALESCE(SUM(veces) FILTER (WHERE clasificacion = 'Reincidente'), 0), "
-                f"  COALESCE(SUM(veces) FILTER (WHERE clasificacion = 'Rescate primera vez'), 0) "
-                f"FROM {RESCATES_MV_REINCIDENCIA}"
-            )
-            total_reincidentes_historico_local, total_primera_vez_historico_local = cur.fetchone()
+            # @FADAR -- historico: antes sumaba "veces" directo de la vista
+            # (sin tocar usuario_rescatepunto, porque no necesitaba saber
+            # la oficina de cada aparicion). 
+            historico_cacheado = cache.get(RESCATES_CACHE_KEY_REINCIDENCIA_HISTORICO)
+            if historico_cacheado is None:
+                cur.execute(
+                    f"SELECT "
+                    f"  COUNT(*) FILTER (WHERE {RESCATES_SQL_ES_REINCIDENTE}), "
+                    f"  COUNT(*) FILTER (WHERE {RESCATES_SQL_ES_PRIMERA_VEZ}) "
+                    f"FROM usuario_rescatepunto r "
+                    f"JOIN {RESCATES_MV_REINCIDENCIA} v "
+                    f"  ON r.nombre = v.nombre AND r.apellidos = v.apellidos AND r.nacionalidad = v.nacionalidad"
+                )
+                historico_cacheado = cur.fetchone()
+                cache.set(RESCATES_CACHE_KEY_REINCIDENCIA_HISTORICO, historico_cacheado, RESCATES_CACHE_TTL_REINCIDENCIA_HISTORICO)
+            total_reincidentes_historico_local, total_primera_vez_historico_local = historico_cacheado
         connection.close()
         return (
             total_reincidentes_local, reincidentes_por_dia_local,
@@ -489,16 +788,13 @@ def rescates_dashboard(request):
         )
 
     def _consulta_por_entidad():
-        # Solo tiene sentido comparar entidades cuando NO hay una entidad ya
-        # seleccionada -- si se filtró por "TABASCO", no hay nada que
-        # comparar. Se calcula aparte (no usa filtro_oficina_sql/params_base
-        # porque esos ya vienen con el filtro de oficina fijo).
+        
         with connection.cursor() as cur:
             cur.execute(
                 'SELECT "oficinaRepre", COUNT(*) FROM usuario_rescatepunto '
-                "WHERE TO_DATE(fecha,'DD-MM-YY') BETWEEN %s AND %s "
+                "WHERE fecha = ANY(%s) "
                 'GROUP BY "oficinaRepre" ORDER BY 2 DESC',
-                [fecha_inicio, fecha_fin],
+                [array_fechas_dashboard],
             )
             filas = cur.fetchall()
         connection.close()
@@ -517,12 +813,12 @@ def rescates_dashboard(request):
                 f"         UPPER(nacionalidad) AS nacionalidad, "
                 f'         COUNT(*) OVER (PARTITION BY "oficinaRepre", fecha, hora, "puntoEstra", "numFamilia") AS integrantes '
                 f"  FROM usuario_rescatepunto "
-                f"  WHERE TO_DATE(fecha,'DD-MM-YY') BETWEEN %s AND %s{filtro_oficina_sql} "
+                f"  WHERE fecha = ANY(%s){filtro_oficina_sql} "
                 f'    AND "numFamilia" > 0 '
                 f") sub "
                 f"WHERE integrantes >= 2 "
                 f"ORDER BY integrantes DESC, oficina, fecha, hora, punto, nf, edad DESC",
-                params_base,
+                params_indexado,
             )
             filas = cur.fetchall()
         connection.close()
@@ -568,8 +864,8 @@ def rescates_dashboard(request):
                 f"  COUNT(*) FILTER (WHERE hotel) AS hotel, "
                 f"  COUNT(*) FILTER (WHERE reclusorio) AS reclusorio "
                 f"FROM usuario_rescatepunto "
-                f"WHERE TO_DATE(fecha,'DD-MM-YY') BETWEEN %s AND %s{filtro_oficina_sql}",
-                params_base,
+                f"WHERE fecha = ANY(%s){filtro_oficina_sql}",
+                params_indexado,
             )
             resultado = cur.fetchone()
         connection.close()
@@ -597,6 +893,37 @@ def rescates_dashboard(request):
         connection.close()
         return total_local, deportado_local, retornado_local, total_historico_local
 
+    def _consulta_apoyo_operativo():
+        # @FADAR -- Puestos a Disposicion / DIF / Voluntarios por entidad,
+        # mismo formato que _rescates_apoyo_operativo_detalle (informe/CECO)
+        # pero para el rango de fechas del dashboard en vez de un solo dia.
+        with connection.cursor() as cur:
+            cur.execute(
+                f'SELECT "oficinaRepre", '
+                f'  COUNT(*) FILTER (WHERE "puestosADispo") AS puestos, '
+                f'  COUNT(*) FILTER (WHERE dif) AS dif, '
+                f'  COUNT(*) FILTER (WHERE voluntarios) AS voluntarios '
+                f'FROM usuario_rescatepunto '
+                f'WHERE fecha = ANY(%s){filtro_oficina_sql} '
+                f'GROUP BY "oficinaRepre" '
+                f'HAVING COUNT(*) FILTER (WHERE "puestosADispo" OR dif OR voluntarios) > 0 '
+                f'ORDER BY "oficinaRepre"',
+                params_indexado,
+            )
+            filas_local = [
+                {"nombre": of, "puestos": p, "dif": d, "voluntarios": v, "total": p + d + v}
+                for of, p, d, v in cur.fetchall()
+            ]
+        connection.close()
+        return {
+            "columna": "Entidad",
+            "filas": filas_local,
+            "total_puestos": sum(f["puestos"] for f in filas_local),
+            "total_dif": sum(f["dif"] for f in filas_local),
+            "total_voluntarios": sum(f["voluntarios"] for f in filas_local),
+            "total_general": sum(f["total"] for f in filas_local),
+        }
+
     with ThreadPoolExecutor(max_workers=8) as executor:
         futuro_sexo = executor.submit(_consulta_sexo_edad)
         futuro_dia_hora = executor.submit(_consulta_dia_hora)
@@ -606,6 +933,7 @@ def rescates_dashboard(request):
         futuro_familias = executor.submit(_consulta_familias)
         futuro_tipo_rescate = executor.submit(_consulta_tipo_rescate)
         futuro_retornados = executor.submit(_consulta_retornados)
+        futuro_apoyo_operativo = executor.submit(_consulta_apoyo_operativo)
         # Regiones (Rio Bravo/Centro/Suchiate) -- se calcula tambien aqui
         # para el mini-mapa embebido en el dashboard (la parte mas cara,
         # la deteccion de reincidentes historica, ya vive en la vista
@@ -627,6 +955,7 @@ def rescates_dashboard(request):
         familias_detectadas, total_familias = futuro_familias.result()
         carretero, aereo, ferroviario, central_autobus, casa_seguridad, hotel, reclusorio = futuro_tipo_rescate.result()
         total_retornados, retornados_deportado, retornados_retornado, total_retornados_historico = futuro_retornados.result()
+        apoyo_operativo_detalle = futuro_apoyo_operativo.result()
         (
             zona_rio_bravo, zona_centro, zona_suchiate,
             subtotal_rio_bravo, subtotal_centro, subtotal_suchiate,
@@ -664,18 +993,18 @@ def rescates_dashboard(request):
                 f"  COUNT(*) FILTER (WHERE sexo=true  AND edad<18)  AS ninos, "
                 f"  COUNT(*) FILTER (WHERE sexo=false AND edad<18)  AS ninas "
                 f"FROM usuario_rescatepunto "
-                f"WHERE TO_DATE(fecha,'DD-MM-YY') BETWEEN %s AND %s{filtro_oficina_sql} "
+                f"WHERE fecha = ANY(%s){filtro_oficina_sql} "
                 f"  AND iso3 IN ({placeholders_iso})",
-                params_base + iso3_atipicas,
+                params_indexado + iso3_atipicas,
             )
             atip_hombres, atip_mujeres, atip_ninos, atip_ninas = cur.fetchone()
 
             cur.execute(
                 f"SELECT COUNT(DISTINCT (\"oficinaRepre\", fecha, hora, \"puntoEstra\", \"numFamilia\")) "
                 f"FROM usuario_rescatepunto "
-                f"WHERE TO_DATE(fecha,'DD-MM-YY') BETWEEN %s AND %s{filtro_oficina_sql} "
+                f"WHERE fecha = ANY(%s){filtro_oficina_sql} "
                 f"  AND iso3 IN ({placeholders_iso}) AND \"numFamilia\" > 0",
-                params_base + iso3_atipicas,
+                params_indexado + iso3_atipicas,
             )
             atip_nucleos = cur.fetchone()[0]
     else:
@@ -896,6 +1225,7 @@ def rescates_dashboard(request):
         "retornados_deportado": retornados_deportado,
         "retornados_retornado": retornados_retornado,
         "total_retornados_historico": total_retornados_historico,
+        "apoyo_operativo_detalle": apoyo_operativo_detalle,
         # Regiones -- mini-mapa embebido; el detalle completo (tablas) vive
         # en su propia pagina (rescates_regiones).
         "subtotal_rio_bravo": subtotal_rio_bravo,
@@ -915,6 +1245,7 @@ def rescates_dashboard(request):
     return render(request, "Reportes_Analisis/rescates.html", context)
 
 
+@never_cache
 def rescates_regiones(request):
     """Pagina dedicada a "Regiones" (Rio Bravo/Centro/Suchiate), separada
     del dashboard principal -- mismo filtro de fecha/entidad, con mapa
@@ -962,8 +1293,14 @@ RESCATES_MESES_ES = {
     7: "jul", 8: "ago", 9: "sep", 10: "oct", 11: "nov", 12: "dic",
 }
 
+# @FADAR -- solo para los nombres de archivo de CECO V1/V2.
+RESCATES_MESES_ES_ARCHIVO = {
+    1: "ene", 2: "feb", 3: "mar", 4: "abr", 5: "may", 6: "jun",
+    7: "jul", 8: "ago", 9: "sept", 10: "oct", 11: "nov", 12: "dic",
+}
 
-def _rescates_regiones_reporte(fecha_str, oficina=None):
+
+def _rescates_regiones_reporte(fecha_str, oficina=None, hora_inicio=None, hora_fin=None):
     """Version 'reporte' (una sola fecha) de _rescates_regiones -- mismo
     patron que _rescates_cuadro_datos / _rescates_informe_diario: regresa
     un dict ya listo para el template/PDF/Excel."""
@@ -973,11 +1310,13 @@ def _rescates_regiones_reporte(fecha_str, oficina=None):
         subtotal_rio_bravo, subtotal_centro, subtotal_suchiate,
         total_regiones, nac_1_reinc, total_nac_1_reinc,
         nacionalidades_extracontinentales,
-    ) = _rescates_regiones(fecha_str, fecha_str, oficina)
+    ) = _rescates_regiones(fecha_str, fecha_str, oficina, hora_inicio, hora_fin)
     return {
         "fecha_actual": f"{fecha_obj.day:02d} {RESCATES_MESES_ES[fecha_obj.month]} {fecha_obj.year}",
         "fecha_iso": fecha_str,
         "oficina": oficina or "Nacional",
+        "hora_inicio": hora_inicio or "",
+        "hora_fin": hora_fin or "",
         "zona_rio_bravo": zona_rio_bravo,
         "zona_centro": zona_centro,
         "zona_suchiate": zona_suchiate,
@@ -1022,12 +1361,15 @@ def _rescates_excel_fila(ws, fila, valores, estilo, negrita=False, col_inicial=1
         _rescates_excel_celda(ws, fila, col_inicial + i, valor, bg=bg, color_texto=color_txt, negrita=negrita)
 
 
+@never_cache
 def rescates_reporte_regiones(request):
     if not request.user.is_authenticated:
         return redirect('/log-in/?next=%s' % request.path)
     fecha_str = request.GET.get("fecha", date.today().isoformat())
     oficina = request.GET.get("oficina", "").strip()
-    datos = _rescates_regiones_reporte(fecha_str, oficina or None)
+    hora_inicio = request.GET.get("hora_inicio", "").strip()
+    hora_fin = request.GET.get("hora_fin", "").strip()
+    datos = _rescates_regiones_reporte(fecha_str, oficina or None, hora_inicio or None, hora_fin or None)
     datos["oficinas"] = RESCATES_OFICINAS
     datos["oficina_seleccionada"] = oficina
     return render(request, "Reportes_Analisis/rescates_reporte_regiones.html", datos)
@@ -1038,7 +1380,9 @@ def rescates_reporte_regiones_pdf(request):
         return redirect('/log-in/?next=%s' % request.path)
     fecha_str = request.GET.get("fecha", date.today().isoformat())
     oficina = request.GET.get("oficina", "").strip()
-    datos = _rescates_regiones_reporte(fecha_str, oficina or None)
+    hora_inicio = request.GET.get("hora_inicio", "").strip()
+    hora_fin = request.GET.get("hora_fin", "").strip()
+    datos = _rescates_regiones_reporte(fecha_str, oficina or None, hora_inicio or None, hora_fin or None)
 
     template = get_template("Reportes_Analisis/_rescates_regiones_pdf.html")
     html_string = template.render(datos)
@@ -1054,7 +1398,9 @@ def rescates_reporte_regiones_excel(request):
         return redirect('/log-in/?next=%s' % request.path)
     fecha_str = request.GET.get("fecha", date.today().isoformat())
     oficina = request.GET.get("oficina", "").strip()
-    datos = _rescates_regiones_reporte(fecha_str, oficina or None)
+    hora_inicio = request.GET.get("hora_inicio", "").strip()
+    hora_fin = request.GET.get("hora_fin", "").strip()
+    datos = _rescates_regiones_reporte(fecha_str, oficina or None, hora_inicio or None, hora_fin or None)
 
     wb = openpyxl.Workbook()
 
@@ -1064,6 +1410,9 @@ def rescates_reporte_regiones_excel(request):
     _rescates_excel_celda(ws1, 1, 1, "INSTITUTO NACIONAL DE MIGRACIÓN — DIRECCIÓN GENERAL DE COORDINACIÓN DE OFICINAS DE REPRESENTACION", negrita=True, tam=10)
     ws1.merge_cells("A2:E2")
     _rescates_excel_celda(ws1, 2, 1, f"Regiones (CECO) — {datos['fecha_actual']} — {datos['oficina']}", bg=RESCATES_COLOR_FONDO[0], color_texto=RESCATES_COLOR_FONDO[1], negrita=True, tam=12)
+    if hora_inicio and hora_fin:
+        ws1.merge_cells("A3:E3")
+        _rescates_excel_celda(ws1, 3, 1, f"Horario filtrado: {hora_inicio} a {hora_fin}", tam=9)
 
     fila = 4
     _rescates_excel_fila(ws1, fila, ["CECO", "Oficina de representación", "Rescates primera vez", "Reincidentes", "Total CECO"], RESCATES_LETRA_T1, negrita=True)
@@ -1139,7 +1488,7 @@ def rescates_reporte_regiones_excel(request):
 #    autobuses/ferroviario/hotel/puestos a disposicion/voluntarios/otro)
 #    esta en True.
 #  - "Reincidente" = coincide (nombre, apellidos, nacionalidad) con otro
-#    registro en TODO el historico de RescatePunto (no solo el dia
+#    registro en el historico de RescatePunto (no solo el dia
 #    seleccionado) -- vive en la vista materializada
 #    mapa_mv_reincidencia_rescates (ver _rescates_set_duplicados_historicos),
 #    refrescada cada 20 min, asi que el costo pesado del GROUP BY ya no se
@@ -1148,13 +1497,7 @@ def rescates_reporte_regiones_excel(request):
 #    DIF/Albergue" (numFamilia>0, viene en familia), solo sobre los
 #    rescates NUEVOS (no reincidentes) del dia.
 #
-# Nota: el reporte oficial (estadistica.generar_cuadro_diario) trata a
-# CHIAPAS aparte y ahi TODOS sus registros del dia caen en "reincidentes"
-# sin comparar contra el historico -- no se replico esa parte porque no
-# hay ninguna nota que explique si es una regla real o un descuido del
-# reporte original; aqui CHIAPAS se evalua igual que cualquier otra
-# entidad. Si el criterio oficial es a proposito, avisar para ajustarlo.
-# =============================================================================
+
 
 RESCATES_BANDERAS_MEDIO = dict(
     aeropuerto=False, carretero=False, casaSeguridad=False, centralAutobus=False,
@@ -1201,6 +1544,46 @@ def _rescates_retornados_detalle(fecha_str, oficina=None):
     }
 
 
+def _rescates_apoyo_operativo_detalle(fecha_str, oficina=None):
+    """Puestos a Disposicion / DIF / Voluntarios, por entidad -- mismo
+    formato que _rescates_retornados_detalle, tabla independiente al lado.
+    Igual que Retornados: solo entidades con algun dato ese dia, nada de
+    filas en 0 para completar las 32."""
+    fecha_fmt = datetime.strptime(fecha_str, "%Y-%m-%d").strftime("%d-%m-%y")
+    filtro = ""
+    params = [fecha_fmt]
+    if oficina:
+        filtro = ' AND "oficinaRepre" = %s'
+        params.append(oficina)
+
+    with connection.cursor() as cur:
+        cur.execute(
+            f'SELECT "oficinaRepre", '
+            f'  COUNT(*) FILTER (WHERE "puestosADispo") AS puestos, '
+            f'  COUNT(*) FILTER (WHERE dif) AS dif, '
+            f'  COUNT(*) FILTER (WHERE voluntarios) AS voluntarios '
+            f'FROM usuario_rescatepunto '
+            f'WHERE fecha = %s{filtro} '
+            f'GROUP BY "oficinaRepre" '
+            f'HAVING COUNT(*) FILTER (WHERE "puestosADispo" OR dif OR voluntarios) > 0 '
+            f'ORDER BY "oficinaRepre"',
+            params,
+        )
+        filas_tabla = [
+            {"nombre": of, "puestos": p, "dif": d, "voluntarios": v, "total": p + d + v}
+            for of, p, d, v in cur.fetchall()
+        ]
+
+    return {
+        "columna": "Entidad",
+        "filas": filas_tabla,
+        "total_puestos": sum(f["puestos"] for f in filas_tabla),
+        "total_dif": sum(f["dif"] for f in filas_tabla),
+        "total_voluntarios": sum(f["voluntarios"] for f in filas_tabla),
+        "total_general": sum(f["total"] for f in filas_tabla),
+    }
+
+
 def _rescates_cuadro_datos(fecha_str, oficina=None):
     """fecha_str: 'YYYY-MM-DD'. Devuelve el dict con todos los datos del
     Cuadro de Datos para esa fecha (y opcionalmente una sola entidad)."""
@@ -1215,23 +1598,21 @@ def _rescates_cuadro_datos(fecha_str, oficina=None):
 
     datos_dia = list(
         qs_dia.exclude(**RESCATES_BANDERAS_MEDIO)
-        .values("nombre", "apellidos", "nacionalidad", "sexo", "edad", "numFamilia")
+        .values("nombre", "apellidos", "nacionalidad", "sexo", "edad", "numFamilia", "oficinaRepre")
     )
     total_rescatados = len(datos_dia) + total_inadmitidos
 
     # Reincidencia: coincidencia de (nombre, apellidos, nacionalidad) en
-    # TODO el historico de RescatePunto (consulta pesada, cacheada -- ver
+    # el historico de RescatePunto (consulta pesada, cacheada -- ver
     # _rescates_set_duplicados_historicos).
     set_duplicados = _rescates_set_duplicados_historicos()
 
+    # @FADAR -- regla de Chiapas centralizada, ver _rescates_es_reincidente.
     reincidentes = []
     nuevos = []
     for d in datos_dia:
         clave = (d["nombre"], d["apellidos"], d["nacionalidad"])
-        if clave in set_duplicados:
-            reincidentes.append(d)
-        else:
-            nuevos.append(d)
+        (reincidentes if _rescates_es_reincidente(d["oficinaRepre"], clave in set_duplicados) else nuevos).append(d)
 
     conteo_reincidentes = len(reincidentes)
     conteo_nuevos = len(nuevos)
@@ -1298,6 +1679,7 @@ def _rescates_cuadro_datos(fecha_str, oficina=None):
     }
 
 
+@never_cache
 def rescates_reporte_cuadro(request):
     """Vista previa en pantalla del Cuadro de Datos, con selector de fecha
     y entidad (menus desplegables) -- sin nada manual."""
@@ -1494,14 +1876,22 @@ def _rescates_clasificar_categoria(sexo, edad, num_familia):
     return "M_mS" if solo else "M_mA"
 
 
-def _rescates_informe_diario(fecha_str):
+def _rescates_informe_diario(fecha_str, hora_inicio=None, hora_fin=None):
     """fecha_str: 'YYYY-MM-DD'. Reporte nacional (las 32 entidades, sin
     tratamiento especial para ninguna -- ver nota de Chiapas en el Cuadro
-    de Datos)."""
+    de Datos).
+
+    hora_inicio/hora_fin: 'HH:MM' o None -- igual que en Reporte
+    Personalizado, si falta cualquiera de los dos no se filtra por hora.
+    No afecta a Retornados (mapa_retornados no tiene hora por registro)."""
     fecha_obj = datetime.strptime(fecha_str, "%Y-%m-%d")
     fecha_rescate_fmt = fecha_obj.strftime("%d-%m-%y")
 
     qs_dia = RescatePunto.objects.filter(fecha=fecha_rescate_fmt)
+    if hora_inicio and hora_fin:
+        qs_dia = qs_dia.annotate(
+            hora_norm=Func(F("hora"), Value(5), Value("0"), function="LPAD", output_field=CharField())
+        ).filter(hora_norm__range=(hora_inicio, hora_fin))
 
     # --- Tabla 1: rescates validos por oficina y medio de rescate ---
     por_oficina_qs = (
@@ -1541,10 +1931,11 @@ def _rescates_informe_diario(fecha_str):
 
     set_duplicados = _rescates_set_duplicados_historicos()
 
+    # @FADAR -- regla de Chiapas centralizada, ver _rescates_es_reincidente.
     reincidentes, nuevos = [], []
     for d in datos_dia:
         clave = (d["nombre"], d["apellidos"], d["nacionalidad"])
-        (reincidentes if clave in set_duplicados else nuevos).append(d)
+        (reincidentes if _rescates_es_reincidente(d["oficinaRepre"], clave in set_duplicados) else nuevos).append(d)
 
     # --- Tabla 2: reincidentes / nuevos por oficina ---
     reincidentes_por_oficina_ct = Counter(d["oficinaRepre"] for d in reincidentes)
@@ -1573,6 +1964,21 @@ def _rescates_informe_diario(fecha_str):
 
     nacionalidades_nuevos = _tabla_nacionalidad_categorias(nuevos)
     nacionalidades_reincidentes = _tabla_nacionalidad_categorias(reincidentes)
+
+    # @FADAR -- fila TOTAL pedida para ambas tablas (ya traian el subtotal
+    # por nacionalidad en la ultima columna, pero no la suma general).
+    def _fila_total_categorias(tabla):
+        claves = [clave for clave, _ in RESCATES_ETIQUETAS_CATEGORIA]
+        total = {clave: 0 for clave in claves}
+        total["total"] = 0
+        for d in tabla.values():
+            for clave in claves:
+                total[clave] += d[clave]
+            total["total"] += d["total"]
+        return total
+
+    total_nacionalidades_nuevos = _fila_total_categorias(nacionalidades_nuevos)
+    total_nacionalidades_reincidentes = _fila_total_categorias(nacionalidades_reincidentes)
 
     # --- Inadmitidos: nacionalidad x 4 categorias (sexo x adulto/menor) ---
     datos_inadmitidos = list(
@@ -1619,19 +2025,27 @@ def _rescates_informe_diario(fecha_str):
         "reincidentes": reincidentes_por_oficina,
         "nacionalidades": nacionalidades_nuevos,
         "nacionalidades_re": nacionalidades_reincidentes,
+        "total_nacionalidades_nuevos": total_nacionalidades_nuevos,
+        "total_nacionalidades_reincidentes": total_nacionalidades_reincidentes,
         "nacionalidades_inadm": nacionalidades_inadmitidos,
         "nacionalidades_extracontinentales": nacionalidades_extracontinentales,
         "dato": total_retornados,
         "categorias": RESCATES_ETIQUETAS_CATEGORIA,
         "retornados_detalle": _rescates_retornados_detalle(fecha_str),
+        "apoyo_operativo_detalle": _rescates_apoyo_operativo_detalle(fecha_str),
     }
 
 
+@never_cache
 def rescates_reporte_informe(request):
     if not request.user.is_authenticated:
         return redirect('/log-in/?next=%s' % request.path)
     fecha_str = request.GET.get("fecha", date.today().isoformat())
-    datos = _rescates_informe_diario(fecha_str)
+    hora_inicio = request.GET.get("hora_inicio", "").strip()
+    hora_fin = request.GET.get("hora_fin", "").strip()
+    datos = _rescates_informe_diario(fecha_str, hora_inicio or None, hora_fin or None)
+    datos["hora_inicio"] = hora_inicio
+    datos["hora_fin"] = hora_fin
     return render(request, "Reportes_Analisis/rescates_reporte_informe.html", datos)
 
 
@@ -1639,14 +2053,21 @@ def rescates_reporte_informe_pdf(request):
     if not request.user.is_authenticated:
         return redirect('/log-in/?next=%s' % request.path)
     fecha_str = request.GET.get("fecha", date.today().isoformat())
-    datos = _rescates_informe_diario(fecha_str)
+    hora_inicio = request.GET.get("hora_inicio", "").strip()
+    hora_fin = request.GET.get("hora_fin", "").strip()
+    datos = _rescates_informe_diario(fecha_str, hora_inicio or None, hora_fin or None)
+    datos["hora_inicio"] = hora_inicio
+    datos["hora_fin"] = hora_fin
 
     template = get_template("Reportes_Analisis/_rescates_informe_pdf.html")
     html_string = template.render(datos)
     pdf_file = HTML(string=html_string, base_url=request.build_absolute_uri()).write_pdf()
 
+    # @FADAR -- nombre pedido: INFORME DIARIO DE OPERACIONES DIA DE MES AÑO.pdf
+    fecha_obj = datetime.strptime(fecha_str, "%Y-%m-%d")
+    nombre_archivo = f"INFORME DIARIO DE OPERACIONES {fecha_obj.day:02d} DE {RESCATES_MESES_ES_LARGO[fecha_obj.month]} {fecha_obj.year}.pdf"
     response = HttpResponse(pdf_file, content_type="application/pdf")
-    response["Content-Disposition"] = f'attachment; filename="informe_diario_{fecha_str}.pdf"'
+    response["Content-Disposition"] = f'attachment; filename="{nombre_archivo}"'
     return response
 
 
@@ -1662,7 +2083,9 @@ def rescates_reporte_informe_excel(request):
     if not request.user.is_authenticated:
         return redirect('/log-in/?next=%s' % request.path)
     fecha_str = request.GET.get("fecha", date.today().isoformat())
-    datos = _rescates_informe_diario(fecha_str)
+    hora_inicio = request.GET.get("hora_inicio", "").strip()
+    hora_fin = request.GET.get("hora_fin", "").strip()
+    datos = _rescates_informe_diario(fecha_str, hora_inicio or None, hora_fin or None)
 
     wb = openpyxl.Workbook()
 
@@ -1673,6 +2096,9 @@ def rescates_reporte_informe_excel(request):
     _rescates_excel_celda(ws1, 1, 1, "INSTITUTO NACIONAL DE MIGRACIÓN — DIRECCIÓN GENERAL DE COORDINACIÓN DE OFICINAS DE REPRESENTACION", negrita=True, tam=10)
     ws1.merge_cells(start_row=2, start_column=1, end_row=2, end_column=len(oficinas_cols) + 1)
     _rescates_excel_celda(ws1, 2, 1, f"Informe diario de operaciones — {datos['fecha_actual']}", bg=RESCATES_COLOR_FONDO[0], color_texto=RESCATES_COLOR_FONDO[1], negrita=True, tam=12)
+    if hora_inicio and hora_fin:
+        ws1.merge_cells(start_row=3, start_column=1, end_row=3, end_column=len(oficinas_cols) + 1)
+        _rescates_excel_celda(ws1, 3, 1, f"Horario filtrado: {hora_inicio} a {hora_fin}", tam=9)
 
     fila = 4
     _rescates_excel_fila(ws1, fila, ["Rubro"] + oficinas_cols, RESCATES_LETRA_T1, negrita=True)
@@ -1715,6 +2141,18 @@ def rescates_reporte_informe_excel(request):
                 _rescates_excel_celda(ws, f, 2 + i, datos_nac[c], bg=RESCATES_LETRA_T2[0], color_texto=RESCATES_LETRA_T2[1])
             _rescates_excel_celda(ws, f, 2 + len(RESCATES_ETIQUETAS_CATEGORIA), datos_nac["total"], bg=RESCATES_LETRA_T0[0], color_texto=RESCATES_LETRA_T0[1], negrita=True)
             f += 1
+        # @FADAR -- fila TOTAL pedida (ya traia el subtotal por nacionalidad
+        # en la ultima columna, pero no la suma general de la hoja).
+        if tabla:
+            _rescates_excel_celda(ws, f, 1, "TOTAL", bg=RESCATES_LETRA_T6[0], color_texto=RESCATES_LETRA_T6[1], negrita=True, centrado=False)
+            total_col = {clave: 0 for clave, _ in RESCATES_ETIQUETAS_CATEGORIA}
+            total_col["total"] = 0
+            for datos_nac in tabla.values():
+                for clave in total_col:
+                    total_col[clave] += datos_nac[clave]
+            for i, (c, _) in enumerate(RESCATES_ETIQUETAS_CATEGORIA):
+                _rescates_excel_celda(ws, f, 2 + i, total_col[c], bg=RESCATES_LETRA_T6[0], color_texto=RESCATES_LETRA_T6[1], negrita=True)
+            _rescates_excel_celda(ws, f, 2 + len(RESCATES_ETIQUETAS_CATEGORIA), total_col["total"], bg=RESCATES_LETRA_T6[0], color_texto=RESCATES_LETRA_T6[1], negrita=True)
         ws.column_dimensions["A"].width = 28
         return ws
 
@@ -1765,10 +2203,43 @@ def rescates_reporte_informe_excel(request):
     _rescates_excel_celda(ws5, f5, 3, rd["total_retornado"], bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True)
     _rescates_excel_celda(ws5, f5, 4, rd["total_general"], bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True)
 
+    # @FADAR -- Apoyo Operativo: hoja aparte, mismo formato que "Retornados (detalle)".
+    ws6 = wb.create_sheet("Apoyo Operativo (detalle)")
+    ws6.column_dimensions["A"].width = 28
+    for col in "BCDE":
+        ws6.column_dimensions[col].width = 16
+    ao = datos["apoyo_operativo_detalle"]
+    _rescates_excel_celda(ws6, 1, 1, f"Puestos a Disposición / DIF / Voluntarios — detalle por {ao['columna']}", bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True, centrado=False)
+    ws6.merge_cells(start_row=1, start_column=1, end_row=1, end_column=5)
+    _rescates_excel_celda(ws6, 2, 1, "Apoyo Operativo:", bg="FFFFFF", negrita=True, centrado=False)
+    _rescates_excel_celda(ws6, 2, 2, ao["total_general"], bg="FFFFFF", color_texto=RESCATES_COLOR_CELESTE, negrita=True)
+    fila_hdr6 = 4
+    _rescates_excel_celda(ws6, fila_hdr6, 1, ao["columna"].upper(), bg="FFFFFF", negrita=True, centrado=False)
+    _rescates_excel_celda(ws6, fila_hdr6, 2, "PUESTOS A DISP.", bg="FFFFFF", negrita=True)
+    _rescates_excel_celda(ws6, fila_hdr6, 3, "DIF", bg="FFFFFF", negrita=True)
+    _rescates_excel_celda(ws6, fila_hdr6, 4, "VOLUNTARIOS", bg="FFFFFF", negrita=True)
+    _rescates_excel_celda(ws6, fila_hdr6, 5, "TOTAL", bg="FFFFFF", negrita=True)
+    f6 = fila_hdr6 + 1
+    for fila_a in ao["filas"]:
+        _rescates_excel_celda(ws6, f6, 1, fila_a["nombre"], centrado=False)
+        _rescates_excel_celda(ws6, f6, 2, fila_a["puestos"])
+        _rescates_excel_celda(ws6, f6, 3, fila_a["dif"])
+        _rescates_excel_celda(ws6, f6, 4, fila_a["voluntarios"])
+        _rescates_excel_celda(ws6, f6, 5, fila_a["total"])
+        f6 += 1
+    _rescates_excel_celda(ws6, f6, 1, "TOTAL", bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True, centrado=False)
+    _rescates_excel_celda(ws6, f6, 2, ao["total_puestos"], bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True)
+    _rescates_excel_celda(ws6, f6, 3, ao["total_dif"], bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True)
+    _rescates_excel_celda(ws6, f6, 4, ao["total_voluntarios"], bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True)
+    _rescates_excel_celda(ws6, f6, 5, ao["total_general"], bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True)
+
+    # @FADAR -- nombre pedido: INFORME DIARIO DE OPERACIONES DIA DE MES AÑO.xlsx
+    fecha_obj = datetime.strptime(fecha_str, "%Y-%m-%d")
+    nombre_archivo = f"INFORME DIARIO DE OPERACIONES {fecha_obj.day:02d} DE {RESCATES_MESES_ES_LARGO[fecha_obj.month]} {fecha_obj.year}.xlsx"
     response = HttpResponse(
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
-    response["Content-Disposition"] = f'attachment; filename="informe_diario_{fecha_str}.xlsx"'
+    response["Content-Disposition"] = f'attachment; filename="{nombre_archivo}"'
     wb.save(response)
     return response
 
@@ -1826,13 +2297,20 @@ def _rescates_nacionalidades_disponibles():
     return resultado
 
 
-def _rescates_personalizado(fecha_inicio, fecha_fin, oficina=None, zona=None, tipo_rescate=None, categoria=None, nacionalidad=None):
+def _rescates_personalizado(fecha_inicio, fecha_fin, oficina=None, zona=None, tipo_rescate=None, categoria=None, nacionalidad=None, hora_inicio=None, hora_fin=None):
     """Reporte con filtros libres: rango de fechas (obligatorio) + entidad,
-    zona, tipo de rescate, categoria (sexo/edad) y nacionalidad (todos
-    opcionales). Agrupa por oficina + nacionalidad con el mismo desglose
-    hombres/mujeres/ninos/ninas que ya se usa en el resto del dashboard."""
+    zona, tipo de rescate, categoria (sexo/edad), nacionalidad y rango de
+    hora (todos opcionales). Agrupa por oficina + nacionalidad con el mismo
+    desglose hombres/mujeres/ninos/ninas que ya se usa en el resto del
+    dashboard.
+
+    hora_inicio/hora_fin: 'HH:MM' o None -- si CUALQUIERA de los dos falta,
+    no se filtra por hora (comportamiento identico al de antes, sin este
+    filtro). "hora" es texto y ~7% de los registros no trae cero inicial
+    ("9:54" en vez de "09:54") -- se normaliza con LPAD antes de comparar,
+    sin tocar el dato guardado."""
     filtros_sql = []
-    params = [fecha_inicio, fecha_fin]
+    params = [_rescates_array_fechas(fecha_inicio, fecha_fin)]
 
     if oficina:
         filtros_sql.append('"oficinaRepre" = %s')
@@ -1853,6 +2331,10 @@ def _rescates_personalizado(fecha_inicio, fecha_fin, oficina=None, zona=None, ti
         filtros_sql.append("UPPER(nacionalidad) = %s")
         params.append(nacionalidad)
 
+    if hora_inicio and hora_fin:
+        filtros_sql.append("LPAD(hora, 5, '0') BETWEEN %s AND %s")
+        params.extend([hora_inicio, hora_fin])
+
     filtro_extra = "".join(f" AND {f}" for f in filtros_sql)
 
     with connection.cursor() as cur:
@@ -1864,7 +2346,7 @@ def _rescates_personalizado(fecha_inicio, fecha_fin, oficina=None, zona=None, ti
             f"  COUNT(*) FILTER (WHERE sexo=false AND edad<18)  AS ninas, "
             f"  COUNT(*) AS total, MAX(iso3) AS iso3 "
             f"FROM usuario_rescatepunto "
-            f"WHERE TO_DATE(fecha,'DD-MM-YY') BETWEEN %s AND %s{filtro_extra} "
+            f"WHERE fecha = ANY(%s){filtro_extra} "
             f'GROUP BY "oficinaRepre", UPPER(nacionalidad) '
             f"ORDER BY total DESC",
             params,
@@ -1887,6 +2369,75 @@ def _rescates_personalizado(fecha_inicio, fecha_fin, oficina=None, zona=None, ti
     return filas_tabla, total_general, nacionalidades_extracontinentales
 
 
+# @FADAR -- distribucion de "veces reincidente" (2, 3, 4, 5, 6-9, 10+) entre
+# las personas que aparecen en el rango/filtros seleccionados. Sin nombres
+# ni datos individuales -- mismo criterio de agrupacion que el resto del
+# reporte. "veces" es historico (toda la tabla), no acotado al rango; el
+# filtro solo decide QUIENES entran a la distribucion, no cuantas veces se
+# cuentan.
+def _rescates_distribucion_reincidencia(fecha_inicio, fecha_fin, oficina=None, zona=None, tipo_rescate=None, categoria=None, nacionalidad=None, hora_inicio=None, hora_fin=None):
+    filtros_sql = []
+    params = [_rescates_array_fechas(fecha_inicio, fecha_fin)]
+
+    if oficina:
+        filtros_sql.append('"oficinaRepre" = %s')
+        params.append(oficina)
+    elif zona and zona in RESCATES_ZONAS_POR_NOMBRE:
+        oficinas_zona = RESCATES_ZONAS_POR_NOMBRE[zona]
+        placeholders = ",".join(["%s"] * len(oficinas_zona))
+        filtros_sql.append(f'"oficinaRepre" IN ({placeholders})')
+        params.extend(oficinas_zona)
+
+    if tipo_rescate and tipo_rescate in dict(RESCATES_TIPO_RESCATE_CAMPOS):
+        filtros_sql.append(f'"{tipo_rescate}" = true')
+
+    if categoria and categoria in RESCATES_CATEGORIA_SQL:
+        filtros_sql.append(RESCATES_CATEGORIA_SQL[categoria])
+
+    if nacionalidad:
+        filtros_sql.append("UPPER(nacionalidad) = %s")
+        params.append(nacionalidad)
+
+    if hora_inicio and hora_fin:
+        filtros_sql.append("LPAD(hora, 5, '0') BETWEEN %s AND %s")
+        params.extend([hora_inicio, hora_fin])
+
+    filtro_extra = "".join(f" AND {f}" for f in filtros_sql)
+
+    with connection.cursor() as cur:
+        cur.execute(
+            f"SELECT bucket, COUNT(*) FROM ( "
+            f"  SELECT DISTINCT r.nombre, r.apellidos, r.nacionalidad, "
+            f"    CASE "
+            f"      WHEN v.veces = 2 THEN '2 veces' "
+            f"      WHEN v.veces = 3 THEN '3 veces' "
+            f"      WHEN v.veces = 4 THEN '4 veces' "
+            f"      WHEN v.veces = 5 THEN '5 veces' "
+            f"      WHEN v.veces BETWEEN 6 AND 9 THEN '6 a 9 veces' "
+            f"      ELSE '10 o mas veces' "
+            f"    END AS bucket "
+            f"  FROM usuario_rescatepunto r "
+            f"  JOIN {RESCATES_MV_REINCIDENCIA} v "
+            f"    ON r.nombre = v.nombre AND r.apellidos = v.apellidos AND r.nacionalidad = v.nacionalidad "
+            f"  WHERE r.fecha = ANY(%s){filtro_extra} AND v.veces >= 2 "
+            f") sub "
+            f"GROUP BY bucket",
+            params,
+        )
+        conteo_por_bucket = dict(cur.fetchall())
+
+    orden_buckets = ["2 veces", "3 veces", "4 veces", "5 veces", "6 a 9 veces", "10 o mas veces"]
+    filas = [{"bucket": b, "personas": conteo_por_bucket.get(b, 0)} for b in orden_buckets]
+    total_personas = sum(f["personas"] for f in filas)
+    for f in filas:
+        f["pct"] = round(f["personas"] / total_personas * 100, 1) if total_personas else 0
+    return {
+        "filas": filas,
+        "total_personas": total_personas,
+    }
+
+
+@never_cache
 def rescates_reporte_personalizado(request):
     """Vista previa en pantalla del reporte personalizado (filtros libres)."""
     if not request.user.is_authenticated:
@@ -1900,10 +2451,18 @@ def rescates_reporte_personalizado(request):
     tipo_rescate = request.GET.get('tipo_rescate', '').strip()
     categoria = request.GET.get('categoria', '').strip()
     nacionalidad = request.GET.get('nacionalidad', '').strip()
+    hora_inicio = request.GET.get('hora_inicio', '').strip()
+    hora_fin = request.GET.get('hora_fin', '').strip()
 
     filas_tabla, total_general, nacionalidades_extracontinentales = _rescates_personalizado(
         fecha_inicio, fecha_fin, oficina or None, zona or None,
         tipo_rescate or None, categoria or None, nacionalidad or None,
+        hora_inicio or None, hora_fin or None,
+    )
+    distribucion_reincidencia = _rescates_distribucion_reincidencia(
+        fecha_inicio, fecha_fin, oficina or None, zona or None,
+        tipo_rescate or None, categoria or None, nacionalidad or None,
+        hora_inicio or None, hora_fin or None,
     )
 
     context = {
@@ -1914,6 +2473,8 @@ def rescates_reporte_personalizado(request):
         "tipo_rescate_seleccionado": tipo_rescate,
         "categoria_seleccionada": categoria,
         "nacionalidad_seleccionada": nacionalidad,
+        "hora_inicio": hora_inicio,
+        "hora_fin": hora_fin,
         "oficinas": RESCATES_OFICINAS,
         "zonas": list(RESCATES_ZONAS_POR_NOMBRE.keys()),
         "tipos_rescate": RESCATES_TIPO_RESCATE_CAMPOS,
@@ -1922,6 +2483,7 @@ def rescates_reporte_personalizado(request):
         "total_filas": len(filas_tabla),
         "total_general": total_general,
         "nacionalidades_extracontinentales": nacionalidades_extracontinentales,
+        "distribucion_reincidencia": distribucion_reincidencia,
     }
     return render(request, "Reportes_Analisis/rescates_reporte_personalizado.html", context)
 
@@ -1937,10 +2499,13 @@ def rescates_reporte_personalizado_pdf(request):
     tipo_rescate = request.GET.get('tipo_rescate', '').strip()
     categoria = request.GET.get('categoria', '').strip()
     nacionalidad = request.GET.get('nacionalidad', '').strip()
+    hora_inicio = request.GET.get('hora_inicio', '').strip()
+    hora_fin = request.GET.get('hora_fin', '').strip()
 
     filas_tabla, total_general, nacionalidades_extracontinentales = _rescates_personalizado(
         fecha_inicio, fecha_fin, oficina or None, zona or None,
         tipo_rescate or None, categoria or None, nacionalidad or None,
+        hora_inicio or None, hora_fin or None,
     )
     etiquetas_tipo = dict(RESCATES_TIPO_RESCATE_CAMPOS)
     context = {
@@ -1951,6 +2516,7 @@ def rescates_reporte_personalizado_pdf(request):
         "tipo_rescate": etiquetas_tipo.get(tipo_rescate, "Todos"),
         "categoria": categoria or "Todas",
         "nacionalidad": nacionalidad or "Todas",
+        "hora": f"{hora_inicio} a {hora_fin}" if (hora_inicio and hora_fin) else "Todas",
         "filas_tabla": filas_tabla,
         "total_general": total_general,
         "nacionalidades_extracontinentales": nacionalidades_extracontinentales,
@@ -1975,10 +2541,13 @@ def rescates_reporte_personalizado_excel(request):
     tipo_rescate = request.GET.get('tipo_rescate', '').strip()
     categoria = request.GET.get('categoria', '').strip()
     nacionalidad = request.GET.get('nacionalidad', '').strip()
+    hora_inicio = request.GET.get('hora_inicio', '').strip()
+    hora_fin = request.GET.get('hora_fin', '').strip()
 
     filas_tabla, total_general, nacionalidades_extracontinentales = _rescates_personalizado(
         fecha_inicio, fecha_fin, oficina or None, zona or None,
         tipo_rescate or None, categoria or None, nacionalidad or None,
+        hora_inicio or None, hora_fin or None,
     )
 
     wb = openpyxl.Workbook()
@@ -1986,13 +2555,14 @@ def rescates_reporte_personalizado_excel(request):
     ws.title = "Reporte Personalizado"
     etiquetas_tipo = dict(RESCATES_TIPO_RESCATE_CAMPOS)
 
+    hora_resumen = f"{hora_inicio} a {hora_fin}" if (hora_inicio and hora_fin) else "Todas"
     ws.merge_cells("A1:G1")
     _rescates_excel_celda(
         ws, 1, 1,
         f"Reporte Personalizado — {fecha_inicio} a {fecha_fin} — "
         f"Entidad: {oficina or 'Todas'} · Zona: {zona or 'Todas'} · "
         f"Tipo: {etiquetas_tipo.get(tipo_rescate, 'Todos')} · "
-        f"Categoría: {categoria or 'Todas'} · Nacionalidad: {nacionalidad or 'Todas'}",
+        f"Categoría: {categoria or 'Todas'} · Nacionalidad: {nacionalidad or 'Todas'} · Hora: {hora_resumen}",
         negrita=True, tam=11, centrado=False,
     )
 
@@ -2054,27 +2624,34 @@ RESCATES_TIPO_CASE_SQL = """CASE
     END"""
 
 
-def _rescates_ceco2_detalle(fecha_str, oficina=None):
+def _rescates_ceco2_detalle(fecha_str, oficina=None, hora_inicio=None, hora_fin=None):
     """fecha_str: 'YYYY-MM-DD'. Un solo dia (igual que Cuadro de
     Datos/Informe Diario/CECO). Filas = (oficina, punto, tipo, rescates,
     primera_vez, reincidencias) -- primera_vez/reincidencias vienen de la
     misma vista materializada de reincidencia (>=2 apariciones historicas)
     ya usada en el resto del modulo, unida por identidad (nombre+apellidos+
-    nacionalidad)."""
+    nacionalidad).
+
+    Regla de Chiapas (100% reincidente) centralizada en
+    RESCATES_SQL_ES_REINCIDENTE / RESCATES_SQL_ES_PRIMERA_VEZ, homologada
+    con Regiones/CECO 2.1/Informe Diario/CECO V1-V2/Cuadro de Datos/dashboard."""
     fecha_obj = datetime.strptime(fecha_str, "%Y-%m-%d")
     fecha_fmt = fecha_obj.strftime("%d-%m-%y")
 
     filtro = ""
     params = [fecha_fmt]
     if oficina:
-        filtro = ' AND r."oficinaRepre" = %s'
+        filtro += ' AND r."oficinaRepre" = %s'
         params.append(oficina)
+    if hora_inicio and hora_fin:
+        filtro += " AND LPAD(r.hora, 5, '0') BETWEEN %s AND %s"
+        params.extend([hora_inicio, hora_fin])
 
     with connection.cursor() as cur:
         cur.execute(
             f'SELECT r."oficinaRepre", r."puntoEstra", {RESCATES_TIPO_CASE_SQL} AS tipo, COUNT(*), '
-            f"  COUNT(*) FILTER (WHERE v.clasificacion = 'Rescate primera vez'), "
-            f"  COUNT(*) FILTER (WHERE v.clasificacion = 'Reincidente') "
+            f"  COUNT(*) FILTER (WHERE {RESCATES_SQL_ES_PRIMERA_VEZ}), "
+            f"  COUNT(*) FILTER (WHERE {RESCATES_SQL_ES_REINCIDENTE}) "
             f'FROM usuario_rescatepunto r '
             f'JOIN {RESCATES_MV_REINCIDENCIA} v '
             f'  ON r.nombre = v.nombre AND r.apellidos = v.apellidos AND r.nacionalidad = v.nacionalidad '
@@ -2093,6 +2670,8 @@ def _rescates_ceco2_detalle(fecha_str, oficina=None):
         "fecha_actual": f"{fecha_obj.day:02d}/{fecha_obj.month:02d}/{fecha_obj.year}",
         "fecha_iso": fecha_str,
         "oficina": oficina or "Nacional",
+        "hora_inicio": hora_inicio or "",
+        "hora_fin": hora_fin or "",
         "filas": filas_tabla,
         "total": sum(f["rescates"] for f in filas_tabla),
         "total_primera_vez": sum(f["primera_vez"] for f in filas_tabla),
@@ -2100,12 +2679,15 @@ def _rescates_ceco2_detalle(fecha_str, oficina=None):
     }
 
 
+@never_cache
 def rescates_reporte_ceco2(request):
     if not request.user.is_authenticated:
         return redirect('/log-in/?next=%s' % request.path)
     fecha_str = request.GET.get("fecha", date.today().isoformat())
     oficina = request.GET.get("oficina", "").strip()
-    datos = _rescates_ceco2_detalle(fecha_str, oficina or None)
+    hora_inicio = request.GET.get("hora_inicio", "").strip()
+    hora_fin = request.GET.get("hora_fin", "").strip()
+    datos = _rescates_ceco2_detalle(fecha_str, oficina or None, hora_inicio or None, hora_fin or None)
     datos["oficinas"] = RESCATES_OFICINAS
     datos["oficina_seleccionada"] = oficina
     return render(request, "Reportes_Analisis/rescates_reporte_ceco2.html", datos)
@@ -2116,14 +2698,19 @@ def rescates_reporte_ceco2_pdf(request):
         return redirect('/log-in/?next=%s' % request.path)
     fecha_str = request.GET.get("fecha", date.today().isoformat())
     oficina = request.GET.get("oficina", "").strip()
-    datos = _rescates_ceco2_detalle(fecha_str, oficina or None)
+    hora_inicio = request.GET.get("hora_inicio", "").strip()
+    hora_fin = request.GET.get("hora_fin", "").strip()
+    datos = _rescates_ceco2_detalle(fecha_str, oficina or None, hora_inicio or None, hora_fin or None)
 
     template = get_template("Reportes_Analisis/_rescates_ceco2_pdf.html")
     html_string = template.render(datos)
     pdf_file = HTML(string=html_string, base_url=request.build_absolute_uri()).write_pdf()
 
+    # @FADAR -- nombre pedido: REPORTE CECO DIA-MES-AÑO (PRHs).pdf
+    fecha_obj = datetime.strptime(fecha_str, "%Y-%m-%d")
+    nombre_archivo = f"REPORTE CECO {fecha_obj.day:02d}-{RESCATES_MESES_ES_LARGO[fecha_obj.month]}-{fecha_obj.year} (PRHs).pdf"
     response = HttpResponse(pdf_file, content_type="application/pdf")
-    response["Content-Disposition"] = f'attachment; filename="ceco2_{fecha_str}.pdf"'
+    response["Content-Disposition"] = f'attachment; filename="{nombre_archivo}"'
     return response
 
 
@@ -2132,7 +2719,9 @@ def rescates_reporte_ceco2_excel(request):
         return redirect('/log-in/?next=%s' % request.path)
     fecha_str = request.GET.get("fecha", date.today().isoformat())
     oficina = request.GET.get("oficina", "").strip()
-    datos = _rescates_ceco2_detalle(fecha_str, oficina or None)
+    hora_inicio = request.GET.get("hora_inicio", "").strip()
+    hora_fin = request.GET.get("hora_fin", "").strip()
+    datos = _rescates_ceco2_detalle(fecha_str, oficina or None, hora_inicio or None, hora_fin or None)
 
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -2154,6 +2743,9 @@ def rescates_reporte_ceco2_excel(request):
     _rescates_excel_celda(ws, 1, 4, "TOTAL", bg=RESCATES_COLOR_FONDO[0], color_texto="FFFFFF", negrita=True)
     ws.merge_cells("D2:E2")
     _rescates_excel_celda(ws, 2, 4, datos["total"], bg="FFFFFF", negrita=True, tam=14)
+    if hora_inicio and hora_fin:
+        ws.merge_cells("A4:G4")
+        _rescates_excel_celda(ws, 4, 1, f"Horario filtrado: {hora_inicio} a {hora_fin}", tam=9)
 
     fila = 5
     _rescates_excel_fila(ws, fila, ["FECHA", "OR", "PRH", "RESCATES TOTAL", "PRIMERA VEZ/RESCATES REALES", "REINCIDENCIAS", "TIPO"], RESCATES_LETRA_T1, negrita=True)
@@ -2175,9 +2767,159 @@ def rescates_reporte_ceco2_excel(request):
     _rescates_excel_celda(ws, fila, 6, datos["total_reincidencias"], bg="1F3864", color_texto="FFFFFF", negrita=True)
     _rescates_excel_celda(ws, fila, 7, "", bg="1F3864")
 
-    # @FADAR -- nombre de archivo pedido: REPORTE CECO DIA-MES-AÑO(PRHs).xlsx
+    # @FADAR -- nombre de archivo pedido: REPORTE CECO DIA-MES-AÑO (PRHs).xlsx
     fecha_obj = datetime.strptime(fecha_str, "%Y-%m-%d")
-    nombre_archivo = f"REPORTE CECO {fecha_obj.day:02d}-{RESCATES_MESES_ES_LARGO[fecha_obj.month]}-{fecha_obj.year}(PRHs).xlsx"
+    nombre_archivo = f"REPORTE CECO {fecha_obj.day:02d}-{RESCATES_MESES_ES_LARGO[fecha_obj.month]}-{fecha_obj.year} (PRHs).xlsx"
+
+    response = HttpResponse(
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response["Content-Disposition"] = f'attachment; filename="{nombre_archivo}"'
+    wb.save(response)
+    return response
+
+
+# =============================================================================
+# Reporte "CECO 2.1" -- copia exacta de CECO 2 (misma estructura, mismo
+# diseño), pero unicamente con rescates de primera vez -- se excluyen
+# reincidentes desde la consulta misma (no solo se ocultan en pantalla).
+# =============================================================================
+
+def _rescates_ceco21_detalle(fecha_str, oficina=None, hora_inicio=None, hora_fin=None):
+    """Identica a _rescates_ceco2_detalle, salvo el filtro adicional de
+    'Rescate primera vez' en el JOIN con la vista de reincidencia.
+
+    Regla de Chiapas centralizada, ver RESCATES_SQL_ES_PRIMERA_VEZ --
+    Chiapas queda excluido por completo, ninguno de sus registros califica."""
+    fecha_obj = datetime.strptime(fecha_str, "%Y-%m-%d")
+    fecha_fmt = fecha_obj.strftime("%d-%m-%y")
+
+    filtro = ""
+    params = [fecha_fmt]
+    if oficina:
+        filtro += ' AND r."oficinaRepre" = %s'
+        params.append(oficina)
+    if hora_inicio and hora_fin:
+        filtro += " AND LPAD(r.hora, 5, '0') BETWEEN %s AND %s"
+        params.extend([hora_inicio, hora_fin])
+
+    with connection.cursor() as cur:
+        cur.execute(
+            f'SELECT r."oficinaRepre", r."puntoEstra", {RESCATES_TIPO_CASE_SQL} AS tipo, COUNT(*) '
+            f'FROM usuario_rescatepunto r '
+            f'JOIN {RESCATES_MV_REINCIDENCIA} v '
+            f'  ON r.nombre = v.nombre AND r.apellidos = v.apellidos AND r.nacionalidad = v.nacionalidad '
+            f"WHERE r.fecha = %s AND {RESCATES_SQL_ES_PRIMERA_VEZ}{filtro} "
+            f'GROUP BY r."oficinaRepre", r."puntoEstra", {RESCATES_TIPO_CASE_SQL} '
+            f'ORDER BY r."oficinaRepre", r."puntoEstra"',
+            params,
+        )
+        filas = cur.fetchall()
+
+    filas_tabla = [
+        {"oficina": of, "prh": prh, "tipo": tipo, "rescates": r}
+        for of, prh, tipo, r in filas
+    ]
+    return {
+        "fecha_actual": f"{fecha_obj.day:02d}/{fecha_obj.month:02d}/{fecha_obj.year}",
+        "fecha_iso": fecha_str,
+        "oficina": oficina or "Nacional",
+        "hora_inicio": hora_inicio or "",
+        "hora_fin": hora_fin or "",
+        "filas": filas_tabla,
+        "total": sum(f["rescates"] for f in filas_tabla),
+    }
+
+
+@never_cache
+def rescates_reporte_ceco21(request):
+    if not request.user.is_authenticated:
+        return redirect('/log-in/?next=%s' % request.path)
+    fecha_str = request.GET.get("fecha", date.today().isoformat())
+    oficina = request.GET.get("oficina", "").strip()
+    hora_inicio = request.GET.get("hora_inicio", "").strip()
+    hora_fin = request.GET.get("hora_fin", "").strip()
+    datos = _rescates_ceco21_detalle(fecha_str, oficina or None, hora_inicio or None, hora_fin or None)
+    datos["oficinas"] = RESCATES_OFICINAS
+    datos["oficina_seleccionada"] = oficina
+    return render(request, "Reportes_Analisis/rescates_reporte_ceco21.html", datos)
+
+
+def rescates_reporte_ceco21_pdf(request):
+    if not request.user.is_authenticated:
+        return redirect('/log-in/?next=%s' % request.path)
+    fecha_str = request.GET.get("fecha", date.today().isoformat())
+    oficina = request.GET.get("oficina", "").strip()
+    hora_inicio = request.GET.get("hora_inicio", "").strip()
+    hora_fin = request.GET.get("hora_fin", "").strip()
+    datos = _rescates_ceco21_detalle(fecha_str, oficina or None, hora_inicio or None, hora_fin or None)
+
+    template = get_template("Reportes_Analisis/_rescates_ceco21_pdf.html")
+    html_string = template.render(datos)
+    pdf_file = HTML(string=html_string, base_url=request.build_absolute_uri()).write_pdf()
+
+    # @FADAR -- nombre pedido: REPORTE CECO DIA-MES-AÑO (PRHs Resc1ra).pdf
+    fecha_obj = datetime.strptime(fecha_str, "%Y-%m-%d")
+    nombre_archivo = f"REPORTE CECO {fecha_obj.day:02d}-{RESCATES_MESES_ES_LARGO[fecha_obj.month]}-{fecha_obj.year} (PRHs Resc1ra).pdf"
+
+    response = HttpResponse(pdf_file, content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="{nombre_archivo}"'
+    return response
+
+
+def rescates_reporte_ceco21_excel(request):
+    if not request.user.is_authenticated:
+        return redirect('/log-in/?next=%s' % request.path)
+    fecha_str = request.GET.get("fecha", date.today().isoformat())
+    oficina = request.GET.get("oficina", "").strip()
+    hora_inicio = request.GET.get("hora_inicio", "").strip()
+    hora_fin = request.GET.get("hora_fin", "").strip()
+    datos = _rescates_ceco21_detalle(fecha_str, oficina or None, hora_inicio or None, hora_fin or None)
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "CECO 2.1"
+    ws.column_dimensions["A"].width = 13
+    ws.column_dimensions["B"].width = 20
+    ws.column_dimensions["C"].width = 46
+    ws.column_dimensions["D"].width = 14
+    ws.column_dimensions["E"].width = 18
+    ws.column_dimensions["F"].width = 20
+
+    ws.merge_cells("A1:B2")
+    _rescates_excel_celda(ws, 1, 1, "Fecha:", bg=RESCATES_COLOR_FONDO[0], color_texto="FFFFFF", negrita=True)
+    ws.merge_cells("A3:B3")
+    _rescates_excel_celda(ws, 3, 1, datos["fecha_actual"], bg="FFFFFF", negrita=True)
+
+    ws.merge_cells("D1:E1")
+    _rescates_excel_celda(ws, 1, 4, "TOTAL", bg=RESCATES_COLOR_FONDO[0], color_texto="FFFFFF", negrita=True)
+    ws.merge_cells("D2:E2")
+    _rescates_excel_celda(ws, 2, 4, datos["total"], bg="FFFFFF", negrita=True, tam=14)
+    if hora_inicio and hora_fin:
+        ws.merge_cells("A4:F4")
+        _rescates_excel_celda(ws, 4, 1, f"Horario filtrado: {hora_inicio} a {hora_fin}", tam=9)
+
+    fila = 5
+    _rescates_excel_fila(ws, fila, ["FECHA", "OR", "PRH", "RESCATES TOTAL", "PRIMERA VEZ/RESCATES REALES", "TIPO"], RESCATES_LETRA_T1, negrita=True)
+    fila += 1
+    for f in datos["filas"]:
+        _rescates_excel_celda(ws, fila, 1, datos["fecha_actual"], centrado=True)
+        _rescates_excel_celda(ws, fila, 2, f["oficina"], centrado=False)
+        _rescates_excel_celda(ws, fila, 3, f["prh"] or "OTRA AUTORIDAD", centrado=False)
+        _rescates_excel_celda(ws, fila, 4, f["rescates"])
+        _rescates_excel_celda(ws, fila, 5, f["rescates"])
+        _rescates_excel_celda(ws, fila, 6, f["tipo"], centrado=False)
+        fila += 1
+
+    _rescates_excel_celda(ws, fila, 1, "TOTAL", bg="1F3864", color_texto="FFFFFF", negrita=True, centrado=False)
+    ws.merge_cells(start_row=fila, start_column=1, end_row=fila, end_column=3)
+    _rescates_excel_celda(ws, fila, 4, datos["total"], bg="1F3864", color_texto="FFFFFF", negrita=True)
+    _rescates_excel_celda(ws, fila, 5, datos["total"], bg="1F3864", color_texto="FFFFFF", negrita=True)
+    _rescates_excel_celda(ws, fila, 6, "", bg="1F3864")
+
+    # @FADAR -- nombre pedido: REPORTE CECO DIA-MES-AÑO (PRHs Resc1ra).xlsx
+    fecha_obj = datetime.strptime(fecha_str, "%Y-%m-%d")
+    nombre_archivo = f"REPORTE CECO {fecha_obj.day:02d}-{RESCATES_MESES_ES_LARGO[fecha_obj.month]}-{fecha_obj.year} (PRHs Resc1ra).xlsx"
 
     response = HttpResponse(
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -2205,28 +2947,38 @@ def rescates_reporte_ceco2_excel(request):
 #    explicitamente ("no importa si sale cortado o segmentado").
 # =============================================================================
 
-def _rescates_ceco_v_detalle(fecha_str, solo_primera_vez=False):
+def _rescates_ceco_v_detalle(fecha_str, solo_primera_vez=False, hora_inicio=None, hora_fin=None):
     fecha_obj = datetime.strptime(fecha_str, "%Y-%m-%d")
     fecha_fmt = fecha_obj.strftime("%d-%m-%y")
 
     if solo_primera_vez:
+        # @FADAR -- regla de Chiapas centralizada, ver RESCATES_SQL_ES_PRIMERA_VEZ.
+        filtro_hora = ""
+        params_dia = [fecha_fmt]
+        if hora_inicio and hora_fin:
+            filtro_hora = " AND LPAD(r.hora, 5, '0') BETWEEN %s AND %s"
+            params_dia.extend([hora_inicio, hora_fin])
         with connection.cursor() as cur:
             cur.execute(
                 f'SELECT r."oficinaRepre", r.nacionalidad, r.sexo, r.edad, r."numFamilia", r.iso3 '
                 f'FROM usuario_rescatepunto r '
                 f'JOIN {RESCATES_MV_REINCIDENCIA} v '
                 f'  ON r.nombre = v.nombre AND r.apellidos = v.apellidos AND r.nacionalidad = v.nacionalidad '
-                f"WHERE r.fecha = %s AND v.clasificacion = 'Rescate primera vez'",
-                [fecha_fmt],
+                f"WHERE r.fecha = %s AND {RESCATES_SQL_ES_PRIMERA_VEZ}{filtro_hora}",
+                params_dia,
             )
             datos_dia = [
                 {"oficinaRepre": of, "nacionalidad": nac, "sexo": sexo, "edad": edad, "numFamilia": nf, "iso3": iso3}
                 for of, nac, sexo, edad, nf, iso3 in cur.fetchall()
             ]
     else:
+        qs_dia = RescatePunto.objects.filter(fecha=fecha_fmt)
+        if hora_inicio and hora_fin:
+            qs_dia = qs_dia.annotate(
+                hora_norm=Func(F("hora"), Value(5), Value("0"), function="LPAD", output_field=CharField())
+            ).filter(hora_norm__range=(hora_inicio, hora_fin))
         datos_dia = list(
-            RescatePunto.objects.filter(fecha=fecha_fmt)
-            .values("oficinaRepre", "nacionalidad", "sexo", "edad", "numFamilia", "iso3")
+            qs_dia.values("oficinaRepre", "nacionalidad", "sexo", "edad", "numFamilia", "iso3")
         )
 
     # Nacionalidades a nivel nacional (las 32 entidades juntas), ordenadas
@@ -2282,6 +3034,10 @@ def _rescates_ceco_v_detalle(fecha_str, solo_primera_vez=False):
             f'  ON r.nombre = v.nombre AND r.apellidos = v.apellidos AND r.nacionalidad = v.nacionalidad '
         )
         filtro_reinc_where = " AND v.clasificacion = 'Rescate primera vez'"
+    params_nucleos = [fecha_fmt]
+    if hora_inicio and hora_fin:
+        filtro_reinc_where += " AND LPAD(r.hora, 5, '0') BETWEEN %s AND %s"
+        params_nucleos.extend([hora_inicio, hora_fin])
     with connection.cursor() as cur:
         cur.execute(
             f'SELECT oficina, nacionalidad, COUNT(*) FROM ( '
@@ -2296,7 +3052,7 @@ def _rescates_ceco_v_detalle(fecha_str, solo_primera_vez=False):
             f'  GROUP BY oficina, r.nacionalidad, r.hora, punto, nf '
             f') grupos '
             f'GROUP BY oficina, nacionalidad',
-            [fecha_fmt],
+            params_nucleos,
         )
         for of, nac, n in cur.fetchall():
             if of not in bloques or nac not in bloques[of]:
@@ -2346,6 +3102,8 @@ def _rescates_ceco_v_detalle(fecha_str, solo_primera_vez=False):
         "resumen_zonas": resumen_zonas,
         "fecha_actual": f"{fecha_obj.day:02d}/{fecha_obj.month:02d}/{fecha_obj.year}",
         "fecha_iso": fecha_str,
+        "hora_inicio": hora_inicio or "",
+        "hora_fin": hora_fin or "",
         "filas_horizontal": filas_horizontal,
         "fila_total_horizontal": fila_total_horizontal,
         "nacionalidades": nacionalidades,
@@ -2495,27 +3253,103 @@ def _rescates_ceco_v_excel(datos, titulo, hoja_nombre="Hoja1"):
     # mitad (una celda fija, la otra no).
     ws.freeze_panes = "C1"
 
+    # @FADAR -- Retornados / Apoyo Operativo: hojas aparte, mismo formato
+    # que en el Excel del Informe diario de operaciones.
+    ws5 = wb.create_sheet("Retornados (detalle)")
+    ws5.column_dimensions["A"].width = 28
+    for c in "BCD":
+        ws5.column_dimensions[c].width = 14
+    rd = datos["retornados_detalle"]
+    _rescates_excel_celda(ws5, 1, 1, f"Retornados — detalle por {rd['columna']}", bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True, centrado=False)
+    ws5.merge_cells(start_row=1, start_column=1, end_row=1, end_column=4)
+    _rescates_excel_celda(ws5, 2, 1, "Retornados:", bg="FFFFFF", negrita=True, centrado=False)
+    _rescates_excel_celda(ws5, 2, 2, rd["total_retornado"], bg="FFFFFF", color_texto=RESCATES_COLOR_CELESTE, negrita=True)
+    fila_hdr5 = 4
+    _rescates_excel_celda(ws5, fila_hdr5, 1, rd["columna"].upper(), bg="FFFFFF", negrita=True, centrado=False)
+    _rescates_excel_celda(ws5, fila_hdr5, 2, "DEPORTADOS", bg="FFFFFF", negrita=True)
+    _rescates_excel_celda(ws5, fila_hdr5, 3, "RETORNADOS", bg="FFFFFF", negrita=True)
+    _rescates_excel_celda(ws5, fila_hdr5, 4, "TOTAL", bg="FFFFFF", negrita=True)
+    f5 = fila_hdr5 + 1
+    for fila_r in rd["filas"]:
+        _rescates_excel_celda(ws5, f5, 1, fila_r["nombre"], centrado=False)
+        _rescates_excel_celda(ws5, f5, 2, fila_r["deportado"])
+        _rescates_excel_celda(ws5, f5, 3, fila_r["retornado"])
+        _rescates_excel_celda(ws5, f5, 4, fila_r["total"])
+        f5 += 1
+    _rescates_excel_celda(ws5, f5, 1, "TOTAL", bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True, centrado=False)
+    _rescates_excel_celda(ws5, f5, 2, rd["total_deportado"], bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True)
+    _rescates_excel_celda(ws5, f5, 3, rd["total_retornado"], bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True)
+    _rescates_excel_celda(ws5, f5, 4, rd["total_general"], bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True)
+
+    ws6 = wb.create_sheet("Apoyo Operativo (detalle)")
+    ws6.column_dimensions["A"].width = 28
+    for c in "BCDE":
+        ws6.column_dimensions[c].width = 16
+    ao = datos["apoyo_operativo_detalle"]
+    _rescates_excel_celda(ws6, 1, 1, f"Puestos a Disposición / DIF / Voluntarios — detalle por {ao['columna']}", bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True, centrado=False)
+    ws6.merge_cells(start_row=1, start_column=1, end_row=1, end_column=5)
+    _rescates_excel_celda(ws6, 2, 1, "Apoyo Operativo:", bg="FFFFFF", negrita=True, centrado=False)
+    _rescates_excel_celda(ws6, 2, 2, ao["total_general"], bg="FFFFFF", color_texto=RESCATES_COLOR_CELESTE, negrita=True)
+    fila_hdr6 = 4
+    _rescates_excel_celda(ws6, fila_hdr6, 1, ao["columna"].upper(), bg="FFFFFF", negrita=True, centrado=False)
+    _rescates_excel_celda(ws6, fila_hdr6, 2, "PUESTOS A DISP.", bg="FFFFFF", negrita=True)
+    _rescates_excel_celda(ws6, fila_hdr6, 3, "DIF", bg="FFFFFF", negrita=True)
+    _rescates_excel_celda(ws6, fila_hdr6, 4, "VOLUNTARIOS", bg="FFFFFF", negrita=True)
+    _rescates_excel_celda(ws6, fila_hdr6, 5, "TOTAL", bg="FFFFFF", negrita=True)
+    f6 = fila_hdr6 + 1
+    for fila_a in ao["filas"]:
+        _rescates_excel_celda(ws6, f6, 1, fila_a["nombre"], centrado=False)
+        _rescates_excel_celda(ws6, f6, 2, fila_a["puestos"])
+        _rescates_excel_celda(ws6, f6, 3, fila_a["dif"])
+        _rescates_excel_celda(ws6, f6, 4, fila_a["voluntarios"])
+        _rescates_excel_celda(ws6, f6, 5, fila_a["total"])
+        f6 += 1
+    _rescates_excel_celda(ws6, f6, 1, "TOTAL", bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True, centrado=False)
+    _rescates_excel_celda(ws6, f6, 2, ao["total_puestos"], bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True)
+    _rescates_excel_celda(ws6, f6, 3, ao["total_dif"], bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True)
+    _rescates_excel_celda(ws6, f6, 4, ao["total_voluntarios"], bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True)
+    _rescates_excel_celda(ws6, f6, 5, ao["total_general"], bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True)
+
+    # @FADAR -- hoja aparte, solo si se filtro por hora: la hoja principal
+    # tiene su encabezado verificado celda por celda contra el archivo de
+    # referencia, sin fila libre para anotarlo ahi sin correr todo.
+    if datos.get("hora_inicio") and datos.get("hora_fin"):
+        ws_hora = wb.create_sheet("Horario filtrado")
+        _rescates_excel_celda(ws_hora, 1, 1, f"Horario filtrado: {datos['hora_inicio']} a {datos['hora_fin']}", negrita=True, tam=12)
+
     return wb
 
 
+@never_cache
 def rescates_reporte_cecov1(request):
     if not request.user.is_authenticated:
         return redirect('/log-in/?next=%s' % request.path)
     fecha_str = request.GET.get("fecha", date.today().isoformat())
-    datos = _rescates_ceco_v_detalle(fecha_str, solo_primera_vez=False)
-    return render(request, "Reportes_Analisis/rescates_reporte_cecov.html", {**datos, "titulo": "CECO V1", "url_pdf": "Reportes_Analisis:rescates_reporte_cecov1_pdf", "url_excel": "Reportes_Analisis:rescates_reporte_cecov1_excel"})
+    hora_inicio = request.GET.get("hora_inicio", "").strip()
+    hora_fin = request.GET.get("hora_fin", "").strip()
+    datos = _rescates_ceco_v_detalle(fecha_str, solo_primera_vez=False, hora_inicio=hora_inicio or None, hora_fin=hora_fin or None)
+    datos["retornados_detalle"] = _rescates_retornados_detalle(fecha_str)
+    datos["apoyo_operativo_detalle"] = _rescates_apoyo_operativo_detalle(fecha_str)
+    return render(request, "Reportes_Analisis/rescates_reporte_cecov.html", {**datos, "titulo": "CECO rescates + reincidentes", "url_pdf": "Reportes_Analisis:rescates_reporte_cecov1_pdf", "url_excel": "Reportes_Analisis:rescates_reporte_cecov1_excel"})
 
 
 def rescates_reporte_cecov1_pdf(request):
     if not request.user.is_authenticated:
         return redirect('/log-in/?next=%s' % request.path)
     fecha_str = request.GET.get("fecha", date.today().isoformat())
-    datos = _rescates_ceco_v_detalle(fecha_str, solo_primera_vez=False)
+    hora_inicio = request.GET.get("hora_inicio", "").strip()
+    hora_fin = request.GET.get("hora_fin", "").strip()
+    datos = _rescates_ceco_v_detalle(fecha_str, solo_primera_vez=False, hora_inicio=hora_inicio or None, hora_fin=hora_fin or None)
+    datos["retornados_detalle"] = _rescates_retornados_detalle(fecha_str)
+    datos["apoyo_operativo_detalle"] = _rescates_apoyo_operativo_detalle(fecha_str)
     template = get_template("Reportes_Analisis/_rescates_cecov_pdf.html")
-    html_string = template.render({**datos, "titulo": "CECO V1 — Rescates + Reincidentes"})
+    html_string = template.render({**datos, "titulo": "CECO rescates + reincidentes"})
     pdf_file = HTML(string=html_string, base_url=request.build_absolute_uri()).write_pdf()
+    # @FADAR -- nombre pedido: Rescatados_DIAMESAÑO-CECO(rescates+reincidentes).pdf
+    fecha_obj = datetime.strptime(fecha_str, "%Y-%m-%d")
+    nombre_archivo = f"Rescatados_{fecha_obj.day:02d}{RESCATES_MESES_ES_ARCHIVO[fecha_obj.month].upper()}{fecha_obj.year}-CECO(rescates+reincidentes).pdf"
     response = HttpResponse(pdf_file, content_type="application/pdf")
-    response["Content-Disposition"] = f'attachment; filename="ceco_v1_{fecha_str}.pdf"'
+    response["Content-Disposition"] = f'attachment; filename="{nombre_archivo}"'
     return response
 
 
@@ -2523,35 +3357,51 @@ def rescates_reporte_cecov1_excel(request):
     if not request.user.is_authenticated:
         return redirect('/log-in/?next=%s' % request.path)
     fecha_str = request.GET.get("fecha", date.today().isoformat())
-    datos = _rescates_ceco_v_detalle(fecha_str, solo_primera_vez=False)
-    wb = _rescates_ceco_v_excel(datos, "CECO V1 — Rescates + Reincidentes", "CECO V1")
+    hora_inicio = request.GET.get("hora_inicio", "").strip()
+    hora_fin = request.GET.get("hora_fin", "").strip()
+    datos = _rescates_ceco_v_detalle(fecha_str, solo_primera_vez=False, hora_inicio=hora_inicio or None, hora_fin=hora_fin or None)
+    datos["retornados_detalle"] = _rescates_retornados_detalle(fecha_str)
+    datos["apoyo_operativo_detalle"] = _rescates_apoyo_operativo_detalle(fecha_str)
+    wb = _rescates_ceco_v_excel(datos, "CECO rescates + reincidentes", "CECO rescates + reincidentes")
     # @FADAR -- nombre pedido: Rescatados_DIAMESAÑO-CECO(rescates+reincidentes).xlsx
     fecha_obj = datetime.strptime(fecha_str, "%Y-%m-%d")
-    nombre_archivo = f"Rescatados_{fecha_obj.day:02d}{RESCATES_MESES_ES[fecha_obj.month].upper()}{fecha_obj.year}-CECO(rescates+reincidentes).xlsx"
+    nombre_archivo = f"Rescatados_{fecha_obj.day:02d}{RESCATES_MESES_ES_ARCHIVO[fecha_obj.month].upper()}{fecha_obj.year}-CECO(rescates+reincidentes).xlsx"
     response = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     response["Content-Disposition"] = f'attachment; filename="{nombre_archivo}"'
     wb.save(response)
     return response
 
 
+@never_cache
 def rescates_reporte_cecov2(request):
     if not request.user.is_authenticated:
         return redirect('/log-in/?next=%s' % request.path)
     fecha_str = request.GET.get("fecha", date.today().isoformat())
-    datos = _rescates_ceco_v_detalle(fecha_str, solo_primera_vez=True)
-    return render(request, "Reportes_Analisis/rescates_reporte_cecov.html", {**datos, "titulo": "CECO V2", "url_pdf": "Reportes_Analisis:rescates_reporte_cecov2_pdf", "url_excel": "Reportes_Analisis:rescates_reporte_cecov2_excel"})
+    hora_inicio = request.GET.get("hora_inicio", "").strip()
+    hora_fin = request.GET.get("hora_fin", "").strip()
+    datos = _rescates_ceco_v_detalle(fecha_str, solo_primera_vez=True, hora_inicio=hora_inicio or None, hora_fin=hora_fin or None)
+    datos["retornados_detalle"] = _rescates_retornados_detalle(fecha_str)
+    datos["apoyo_operativo_detalle"] = _rescates_apoyo_operativo_detalle(fecha_str)
+    return render(request, "Reportes_Analisis/rescates_reporte_cecov.html", {**datos, "titulo": "CECO RESCATES PRIMERA VEZ", "url_pdf": "Reportes_Analisis:rescates_reporte_cecov2_pdf", "url_excel": "Reportes_Analisis:rescates_reporte_cecov2_excel"})
 
 
 def rescates_reporte_cecov2_pdf(request):
     if not request.user.is_authenticated:
         return redirect('/log-in/?next=%s' % request.path)
     fecha_str = request.GET.get("fecha", date.today().isoformat())
-    datos = _rescates_ceco_v_detalle(fecha_str, solo_primera_vez=True)
+    hora_inicio = request.GET.get("hora_inicio", "").strip()
+    hora_fin = request.GET.get("hora_fin", "").strip()
+    datos = _rescates_ceco_v_detalle(fecha_str, solo_primera_vez=True, hora_inicio=hora_inicio or None, hora_fin=hora_fin or None)
+    datos["retornados_detalle"] = _rescates_retornados_detalle(fecha_str)
+    datos["apoyo_operativo_detalle"] = _rescates_apoyo_operativo_detalle(fecha_str)
     template = get_template("Reportes_Analisis/_rescates_cecov_pdf.html")
-    html_string = template.render({**datos, "titulo": "CECO V2 — Rescates Reales (primera vez)"})
+    html_string = template.render({**datos, "titulo": "CECO RESCATES PRIMERA VEZ"})
     pdf_file = HTML(string=html_string, base_url=request.build_absolute_uri()).write_pdf()
+    # @FADAR -- nombre pedido: Resc1ra DIAMESAÑO-CECO2.pdf
+    fecha_obj = datetime.strptime(fecha_str, "%Y-%m-%d")
+    nombre_archivo = f"Resc1ra {fecha_obj.day:02d}{RESCATES_MESES_ES_ARCHIVO[fecha_obj.month].capitalize()}{fecha_obj.year}-CECO2.pdf"
     response = HttpResponse(pdf_file, content_type="application/pdf")
-    response["Content-Disposition"] = f'attachment; filename="ceco_v2_{fecha_str}.pdf"'
+    response["Content-Disposition"] = f'attachment; filename="{nombre_archivo}"'
     return response
 
 
@@ -2559,11 +3409,619 @@ def rescates_reporte_cecov2_excel(request):
     if not request.user.is_authenticated:
         return redirect('/log-in/?next=%s' % request.path)
     fecha_str = request.GET.get("fecha", date.today().isoformat())
-    datos = _rescates_ceco_v_detalle(fecha_str, solo_primera_vez=True)
-    wb = _rescates_ceco_v_excel(datos, "CECO V2 — Rescates Reales (primera vez)", "CECO V2")
-    # @FADAR -- nombre pedido: Rescatados_DIAMESAÑO-CECO2(rescates_reales).xlsx
+    hora_inicio = request.GET.get("hora_inicio", "").strip()
+    hora_fin = request.GET.get("hora_fin", "").strip()
+    datos = _rescates_ceco_v_detalle(fecha_str, solo_primera_vez=True, hora_inicio=hora_inicio or None, hora_fin=hora_fin or None)
+    datos["retornados_detalle"] = _rescates_retornados_detalle(fecha_str)
+    datos["apoyo_operativo_detalle"] = _rescates_apoyo_operativo_detalle(fecha_str)
+    wb = _rescates_ceco_v_excel(datos, "CECO RESCATES PRIMERA VEZ", "CECO RESCATES PRIMERA VEZ")
+    # @FADAR -- nombre pedido: Resc1ra DIAMESAÑO-CECO2.xlsx
     fecha_obj = datetime.strptime(fecha_str, "%Y-%m-%d")
-    nombre_archivo = f"Rescatados_{fecha_obj.day:02d}{RESCATES_MESES_ES[fecha_obj.month].upper()}{fecha_obj.year}-CECO2(rescates_reales).xlsx"
+    nombre_archivo = f"Resc1ra {fecha_obj.day:02d}{RESCATES_MESES_ES_ARCHIVO[fecha_obj.month].capitalize()}{fecha_obj.year}-CECO2.xlsx"
+    response = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    response["Content-Disposition"] = f'attachment; filename="{nombre_archivo}"'
+    wb.save(response)
+    return response
+
+
+# =============================================================================
+# Reporte especial de nacionalidades -- lista fija y corta de 4
+# nacionalidades con situacion especial y distinta al resto (pedido
+# explicito, no es lo mismo que "extracontinental"). Nacional, un solo dia,
+# mismas 8 categorias/colores que CECO V1/V2 -- formato de referencia
+# ("REPORTE ESPECIAL DE NACIONALIDADES 31 AGOSTO 2026.xlsx") analizado
+# celda por celda: colores del tema de Office (accent1/2, dk2, lt2, accent6)
+# resueltos a RGB real, misma distribucion de columnas.
+# =============================================================================
+
+RESCATES_NACIONALIDADES_ESPECIALES = [
+    "Libia", "República Árabe de Siria", "República Islámica del Irán", "Yemen",
+]
+
+
+def _rescates_nacionalidades_especiales_detalle(fecha_inicio, fecha_fin):
+    """fecha_inicio/fecha_fin: 'YYYY-MM-DD'. Rango de fechas -- se pidio
+    explicitamente aunque en la practica casi siempre sea un solo dia
+    (fecha_inicio == fecha_fin)."""
+    fecha_ini_obj = datetime.strptime(fecha_inicio, "%Y-%m-%d")
+    fecha_fin_obj = datetime.strptime(fecha_fin, "%Y-%m-%d")
+
+    # @FADAR -- coincidencia sin distinguir mayusculas/minusculas: la
+    # captura tiene inconsistencias de mayusculas para "Iran" (confirmado
+    # contra la BD, 1 registro en minusculas entre 1440 en mayusculas).
+    with connection.cursor() as cur:
+        cur.execute(
+            'SELECT nacionalidad, sexo, edad, "numFamilia", "oficinaRepre" '
+            "FROM usuario_rescatepunto "
+            "WHERE fecha = ANY(%s) "
+            "AND UPPER(nacionalidad) = ANY(%s)",
+            [_rescates_array_fechas(fecha_inicio, fecha_fin), [n.upper() for n in RESCATES_NACIONALIDADES_ESPECIALES]],
+        )
+        datos_rango = cur.fetchall()
+
+    canon_por_mayuscula = {nac.upper(): nac for nac in RESCATES_NACIONALIDADES_ESPECIALES}
+
+    def _fila_vacia():
+        fila = {clave: 0 for clave, _ in RESCATES_ETIQUETAS_CATEGORIA}
+        fila["total"] = 0
+        return fila
+
+    por_nacionalidad = {nac: _fila_vacia() for nac in RESCATES_NACIONALIDADES_ESPECIALES}
+    fila_total = _fila_vacia()
+    # @FADAR -- OFICINAS: sin desglosar por entidad (se pidio no rebuscar
+    # tanto), solo la lista de oficinas involucradas por nacionalidad.
+    oficinas_por_nacionalidad = {nac: set() for nac in RESCATES_NACIONALIDADES_ESPECIALES}
+
+    for nacionalidad, sexo, edad, num_familia, oficina in datos_rango:
+        nac = canon_por_mayuscula.get(str(nacionalidad).upper())
+        if nac is None:
+            continue
+        cat = _rescates_clasificar_categoria(sexo, edad, num_familia)
+        por_nacionalidad[nac][cat] += 1
+        por_nacionalidad[nac]["total"] += 1
+        fila_total[cat] += 1
+        fila_total["total"] += 1
+        if oficina:
+            oficinas_por_nacionalidad[nac].add(oficina)
+
+    filas = [
+        {"nacionalidad": nac, **por_nacionalidad[nac], "oficinas": ", ".join(sorted(oficinas_por_nacionalidad[nac]))}
+        for nac in RESCATES_NACIONALIDADES_ESPECIALES
+    ]
+
+    # @FADAR -- un solo dia: "DD mes AAAA". Rango: las dos fechas con "–"
+    # de por medio -- confirmado explicitamente asi con el usuario.
+    fecha_actual = f"{fecha_ini_obj.day:02d} {RESCATES_MESES_ES[fecha_ini_obj.month]} {fecha_ini_obj.year}"
+    if fecha_ini_obj != fecha_fin_obj:
+        fecha_actual += f" – {fecha_fin_obj.day:02d} {RESCATES_MESES_ES[fecha_fin_obj.month]} {fecha_fin_obj.year}"
+
+    return {
+        "fecha_actual": fecha_actual,
+        "fecha_inicio": fecha_inicio,
+        "fecha_fin": fecha_fin,
+        "filas": filas,
+        "fila_total": fila_total,
+        "categorias": RESCATES_ETIQUETAS_CATEGORIA,
+    }
+
+
+def _rescates_nacionalidades_especiales_nombre_archivo(fecha_inicio, fecha_fin, extension):
+    """REPORTE ESPECIAL DE NACIONALIDADES DIA MES AÑO.ext -- para un rango
+    se agrega ' A DIA MES AÑO' con la fecha final, tal como se pidio."""
+    fi = datetime.strptime(fecha_inicio, "%Y-%m-%d")
+    ff = datetime.strptime(fecha_fin, "%Y-%m-%d")
+    nombre = f"REPORTE ESPECIAL DE NACIONALIDADES {fi.day:02d} {RESCATES_MESES_ES_LARGO[fi.month]} {fi.year}"
+    if fi != ff:
+        nombre += f" A {ff.day:02d} {RESCATES_MESES_ES_LARGO[ff.month]} {ff.year}"
+    return f"{nombre}.{extension}"
+
+
+@never_cache
+def rescates_reporte_nacionalidades_especiales(request):
+    if not request.user.is_authenticated:
+        return redirect('/log-in/?next=%s' % request.path)
+    hoy = date.today().isoformat()
+    fecha_inicio = request.GET.get("fecha_inicio", hoy)
+    fecha_fin = request.GET.get("fecha_fin", hoy)
+    datos = _rescates_nacionalidades_especiales_detalle(fecha_inicio, fecha_fin)
+    return render(request, "Reportes_Analisis/rescates_reporte_nacionalidades_especiales.html", datos)
+
+
+def rescates_reporte_nacionalidades_especiales_pdf(request):
+    if not request.user.is_authenticated:
+        return redirect('/log-in/?next=%s' % request.path)
+    hoy = date.today().isoformat()
+    fecha_inicio = request.GET.get("fecha_inicio", hoy)
+    fecha_fin = request.GET.get("fecha_fin", hoy)
+    datos = _rescates_nacionalidades_especiales_detalle(fecha_inicio, fecha_fin)
+    template = get_template("Reportes_Analisis/_rescates_nacionalidades_especiales_pdf.html")
+    html_string = template.render(datos)
+    pdf_file = HTML(string=html_string, base_url=request.build_absolute_uri()).write_pdf()
+    nombre_archivo = _rescates_nacionalidades_especiales_nombre_archivo(fecha_inicio, fecha_fin, "pdf")
+    response = HttpResponse(pdf_file, content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="{nombre_archivo}"'
+    return response
+
+
+def rescates_reporte_nacionalidades_especiales_excel(request):
+    if not request.user.is_authenticated:
+        return redirect('/log-in/?next=%s' % request.path)
+    hoy = date.today().isoformat()
+    fecha_inicio = request.GET.get("fecha_inicio", hoy)
+    fecha_fin = request.GET.get("fecha_fin", hoy)
+    datos = _rescates_nacionalidades_especiales_detalle(fecha_inicio, fecha_fin)
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "RESC"
+    ws.column_dimensions["A"].width = 32
+    ws.column_dimensions["B"].width = 12
+    ws.column_dimensions["C"].width = 12
+    ws.column_dimensions["D"].width = 14
+    ws.column_dimensions["E"].width = 14
+    ws.column_dimensions["F"].width = 14
+    ws.column_dimensions["G"].width = 14
+    ws.column_dimensions["H"].width = 14
+    ws.column_dimensions["I"].width = 14
+    ws.column_dimensions["J"].width = 20
+    ws.column_dimensions["K"].width = 14
+
+    # @FADAR -- colores exactos resueltos desde el tema de Office del
+    # archivo de referencia (accent1=4472C4, accent2=ED7D31, dk2=44546A,
+    # lt2=E7E6E6, accent6=70AD47); "MENORES DE EDAD" usa un verde oscuro
+    # explicito (13322B), no de tema -- igual que en CECO V1/V2.
+    AZUL = "4472C4"
+    NARANJA = "ED7D31"
+    AZULGRIS = "44546A"
+    VERDEOSC = "13322B"
+    VERDE = "70AD47"
+    GRISCLARO = "E7E6E6"
+
+    ws.merge_cells("A1:A1")
+    _rescates_excel_celda(ws, 1, 1, "TOTAL\nRESCATADOS", bg=AZUL, color_texto="FFFFFF", negrita=True, fuente="Montserrat")
+    ws.merge_cells("B1:C2")
+    _rescates_excel_celda(ws, 1, 2, "MAYORES DE EDAD SOLOS", bg=NARANJA, color_texto="FFFFFF", negrita=True, fuente="Montserrat")
+    ws.merge_cells("D1:E2")
+    _rescates_excel_celda(ws, 1, 4, "MAYORES DE EDAD QUE ACOMPAÑAN A NNA'S", bg=AZULGRIS, color_texto="FFFFFF", negrita=True, fuente="Montserrat")
+    ws.merge_cells("F1:I1")
+    _rescates_excel_celda(ws, 1, 6, "MENORES DE EDAD", bg=VERDEOSC, color_texto="FFFFFF", negrita=True, fuente="Montserrat")
+    _rescates_excel_celda(ws, 1, 10, None, bg=VERDEOSC)
+    ws.merge_cells("K1:K3")
+    _rescates_excel_celda(ws, 1, 11, "TOTAL", bg=VERDE, color_texto="FFFFFF", negrita=True, fuente="Montserrat")
+
+    _rescates_excel_celda(ws, 2, 1, datos["fecha_actual"], bg=AZUL, color_texto="FFFFFF", negrita=True, fuente="Montserrat")
+    ws.merge_cells("F2:G2")
+    _rescates_excel_celda(ws, 2, 6, "ACOMPAÑADOS", bg=VERDEOSC, color_texto="FFFFFF", negrita=True, fuente="Montserrat")
+    ws.merge_cells("H2:I2")
+    _rescates_excel_celda(ws, 2, 8, "NO ACOMPAÑADOS", bg=NARANJA, color_texto="FFFFFF", negrita=True, fuente="Montserrat")
+    _rescates_excel_celda(ws, 2, 10, "OFICINAS", bg=NARANJA, color_texto="FFFFFF", negrita=True, fuente="Montserrat")
+
+    _rescates_excel_celda(ws, 3, 1, "NACIONALIDAD", bg=AZUL, color_texto="FFFFFF", negrita=True, fuente="Montserrat")
+    _rescates_excel_celda(ws, 3, 2, "H", bg=NARANJA, color_texto="FFFFFF", negrita=True, fuente="Montserrat")
+    _rescates_excel_celda(ws, 3, 3, "M", bg=NARANJA, color_texto="FFFFFF", negrita=True, fuente="Montserrat")
+    _rescates_excel_celda(ws, 3, 4, "H", bg=AZULGRIS, color_texto="FFFFFF", negrita=True, fuente="Montserrat")
+    _rescates_excel_celda(ws, 3, 5, "M", bg=AZULGRIS, color_texto="FFFFFF", negrita=True, fuente="Montserrat")
+    _rescates_excel_celda(ws, 3, 6, "H", bg=VERDEOSC, color_texto="FFFFFF", negrita=True, fuente="Montserrat")
+    _rescates_excel_celda(ws, 3, 7, "M", bg=VERDEOSC, color_texto="FFFFFF", negrita=True, fuente="Montserrat")
+    _rescates_excel_celda(ws, 3, 8, "H", bg=NARANJA, color_texto="FFFFFF", negrita=True, fuente="Montserrat")
+    _rescates_excel_celda(ws, 3, 9, "M", bg=NARANJA, color_texto="FFFFFF", negrita=True, fuente="Montserrat")
+    _rescates_excel_celda(ws, 3, 10, None, bg=NARANJA)
+
+    fila = 4
+    for f in datos["filas"]:
+        _rescates_excel_celda(ws, fila, 1, f["nacionalidad"], fuente="Montserrat")
+        for i, (clave, _) in enumerate(RESCATES_ETIQUETAS_CATEGORIA):
+            _rescates_excel_celda(ws, fila, 2 + i, f[clave], fuente="Montserrat")
+        _rescates_excel_celda(ws, fila, 10, f["oficinas"], centrado=False, fuente="Montserrat")
+        _rescates_excel_celda(ws, fila, 11, f["total"], negrita=True, fuente="Montserrat")
+        fila += 1
+
+    _rescates_excel_celda(ws, fila, 1, "TOTAL", bg=GRISCLARO, negrita=True, fuente="Montserrat")
+    for i, (clave, _) in enumerate(RESCATES_ETIQUETAS_CATEGORIA):
+        _rescates_excel_celda(ws, fila, 2 + i, datos["fila_total"][clave], bg=GRISCLARO, negrita=True, fuente="Montserrat")
+    _rescates_excel_celda(ws, fila, 11, datos["fila_total"]["total"], bg=GRISCLARO, negrita=True, fuente="Montserrat")
+
+    nombre_archivo = _rescates_nacionalidades_especiales_nombre_archivo(fecha_inicio, fecha_fin, "xlsx")
+    response = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    response["Content-Disposition"] = f'attachment; filename="{nombre_archivo}"'
+    wb.save(response)
+    return response
+
+
+# =============================================================================
+# Reporte de nacionalidades extracontinentales -- mismo diseño que el
+# Reporte especial de nacionalidades (arriba), pero la lista de
+# nacionalidades es dinamica: cualquier nacionalidad extracontinental
+# (_rescates_es_extracontinental, la misma regla ya usada en Informe
+# Diario/Regiones/CECO V1-V2) que tenga registros en el rango -- sin filas
+# en 0, a diferencia del reporte de la lista fija de 4 paises.
+# =============================================================================
+
+def _rescates_nacionalidades_extracontinentales_detalle(fecha_inicio, fecha_fin):
+    fecha_ini_obj = datetime.strptime(fecha_inicio, "%Y-%m-%d")
+    fecha_fin_obj = datetime.strptime(fecha_fin, "%Y-%m-%d")
+
+    # @FADAR -- se agrupa por UPPER(nacionalidad), mismo criterio que ya
+    # usa _rescates_personalizado, para no duplicar un mismo pais por
+    # inconsistencias de mayusculas/minusculas en la captura.
+    with connection.cursor() as cur:
+        cur.execute(
+            'SELECT UPPER(nacionalidad), sexo, edad, "numFamilia", "oficinaRepre", iso3 '
+            "FROM usuario_rescatepunto "
+            "WHERE fecha = ANY(%s)",
+            [_rescates_array_fechas(fecha_inicio, fecha_fin)],
+        )
+        datos_rango = cur.fetchall()
+
+    def _fila_vacia():
+        fila = {clave: 0 for clave, _ in RESCATES_ETIQUETAS_CATEGORIA}
+        fila["total"] = 0
+        return fila
+
+    por_nacionalidad = {}
+    oficinas_por_nacionalidad = {}
+    nac_iso3 = {}
+    fila_total = _fila_vacia()
+
+    for nacionalidad, sexo, edad, num_familia, oficina, iso3 in datos_rango:
+        nac_iso3.setdefault(nacionalidad, iso3)
+        if not _rescates_es_extracontinental(str(nac_iso3[nacionalidad] or "").upper()):
+            continue
+        por_nacionalidad.setdefault(nacionalidad, _fila_vacia())
+        oficinas_por_nacionalidad.setdefault(nacionalidad, set())
+        cat = _rescates_clasificar_categoria(sexo, edad, num_familia)
+        por_nacionalidad[nacionalidad][cat] += 1
+        por_nacionalidad[nacionalidad]["total"] += 1
+        fila_total[cat] += 1
+        fila_total["total"] += 1
+        if oficina:
+            oficinas_por_nacionalidad[nacionalidad].add(oficina)
+
+    nacionalidades_ordenadas = sorted(por_nacionalidad, key=lambda n: por_nacionalidad[n]["total"], reverse=True)
+    filas = [
+        {"nacionalidad": nac, **por_nacionalidad[nac], "oficinas": ", ".join(sorted(oficinas_por_nacionalidad[nac]))}
+        for nac in nacionalidades_ordenadas
+    ]
+
+    fecha_actual = f"{fecha_ini_obj.day:02d} {RESCATES_MESES_ES[fecha_ini_obj.month]} {fecha_ini_obj.year}"
+    if fecha_ini_obj != fecha_fin_obj:
+        fecha_actual += f" – {fecha_fin_obj.day:02d} {RESCATES_MESES_ES[fecha_fin_obj.month]} {fecha_fin_obj.year}"
+
+    return {
+        "fecha_actual": fecha_actual,
+        "fecha_inicio": fecha_inicio,
+        "fecha_fin": fecha_fin,
+        "filas": filas,
+        "fila_total": fila_total,
+        "categorias": RESCATES_ETIQUETAS_CATEGORIA,
+    }
+
+
+def _rescates_nacionalidades_extracontinentales_titulo(fecha_inicio, fecha_fin):
+    """REPORTE NACIONALIDADES EXTRACONTINENTALES DIA MES AÑO -- mismo texto
+    para el titulo en pantalla/PDF y para el nombre de archivo (pedido
+    explicito), con 'A DIA MES AÑO' si es rango."""
+    fi = datetime.strptime(fecha_inicio, "%Y-%m-%d")
+    ff = datetime.strptime(fecha_fin, "%Y-%m-%d")
+    titulo = f"REPORTE NACIONALIDADES EXTRACONTINENTALES {fi.day:02d} {RESCATES_MESES_ES_LARGO[fi.month]} {fi.year}"
+    if fi != ff:
+        titulo += f" A {ff.day:02d} {RESCATES_MESES_ES_LARGO[ff.month]} {ff.year}"
+    return titulo
+
+
+@never_cache
+def rescates_reporte_nacionalidades_extracontinentales(request):
+    if not request.user.is_authenticated:
+        return redirect('/log-in/?next=%s' % request.path)
+    hoy = date.today().isoformat()
+    fecha_inicio = request.GET.get("fecha_inicio", hoy)
+    fecha_fin = request.GET.get("fecha_fin", hoy)
+    datos = _rescates_nacionalidades_extracontinentales_detalle(fecha_inicio, fecha_fin)
+    datos["titulo"] = _rescates_nacionalidades_extracontinentales_titulo(fecha_inicio, fecha_fin)
+    return render(request, "Reportes_Analisis/rescates_reporte_nacionalidades_extracontinentales.html", datos)
+
+
+def rescates_reporte_nacionalidades_extracontinentales_pdf(request):
+    if not request.user.is_authenticated:
+        return redirect('/log-in/?next=%s' % request.path)
+    hoy = date.today().isoformat()
+    fecha_inicio = request.GET.get("fecha_inicio", hoy)
+    fecha_fin = request.GET.get("fecha_fin", hoy)
+    datos = _rescates_nacionalidades_extracontinentales_detalle(fecha_inicio, fecha_fin)
+    titulo = _rescates_nacionalidades_extracontinentales_titulo(fecha_inicio, fecha_fin)
+    datos["titulo"] = titulo
+    template = get_template("Reportes_Analisis/_rescates_nacionalidades_extracontinentales_pdf.html")
+    html_string = template.render(datos)
+    pdf_file = HTML(string=html_string, base_url=request.build_absolute_uri()).write_pdf()
+    response = HttpResponse(pdf_file, content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="{titulo}.pdf"'
+    return response
+
+
+def rescates_reporte_nacionalidades_extracontinentales_excel(request):
+    if not request.user.is_authenticated:
+        return redirect('/log-in/?next=%s' % request.path)
+    hoy = date.today().isoformat()
+    fecha_inicio = request.GET.get("fecha_inicio", hoy)
+    fecha_fin = request.GET.get("fecha_fin", hoy)
+    datos = _rescates_nacionalidades_extracontinentales_detalle(fecha_inicio, fecha_fin)
+    titulo = _rescates_nacionalidades_extracontinentales_titulo(fecha_inicio, fecha_fin)
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "RESC"
+    ws.column_dimensions["A"].width = 32
+    for col in "BCDEFGHI":
+        ws.column_dimensions[col].width = 13
+    ws.column_dimensions["J"].width = 30
+    ws.column_dimensions["K"].width = 14
+
+    AZUL = "4472C4"
+    NARANJA = "ED7D31"
+    AZULGRIS = "44546A"
+    VERDEOSC = "13322B"
+    VERDE = "70AD47"
+    GRISCLARO = "E7E6E6"
+
+    ws.merge_cells("A1:A1")
+    _rescates_excel_celda(ws, 1, 1, "TOTAL\nRESCATADOS", bg=AZUL, color_texto="FFFFFF", negrita=True, fuente="Montserrat")
+    ws.merge_cells("B1:C2")
+    _rescates_excel_celda(ws, 1, 2, "MAYORES DE EDAD SOLOS", bg=NARANJA, color_texto="FFFFFF", negrita=True, fuente="Montserrat")
+    ws.merge_cells("D1:E2")
+    _rescates_excel_celda(ws, 1, 4, "MAYORES DE EDAD QUE ACOMPAÑAN A NNA'S", bg=AZULGRIS, color_texto="FFFFFF", negrita=True, fuente="Montserrat")
+    ws.merge_cells("F1:I1")
+    _rescates_excel_celda(ws, 1, 6, "MENORES DE EDAD", bg=VERDEOSC, color_texto="FFFFFF", negrita=True, fuente="Montserrat")
+    _rescates_excel_celda(ws, 1, 10, None, bg=VERDEOSC)
+    ws.merge_cells("K1:K3")
+    _rescates_excel_celda(ws, 1, 11, "TOTAL", bg=VERDE, color_texto="FFFFFF", negrita=True, fuente="Montserrat")
+
+    _rescates_excel_celda(ws, 2, 1, datos["fecha_actual"], bg=AZUL, color_texto="FFFFFF", negrita=True, fuente="Montserrat")
+    ws.merge_cells("F2:G2")
+    _rescates_excel_celda(ws, 2, 6, "ACOMPAÑADOS", bg=VERDEOSC, color_texto="FFFFFF", negrita=True, fuente="Montserrat")
+    ws.merge_cells("H2:I2")
+    _rescates_excel_celda(ws, 2, 8, "NO ACOMPAÑADOS", bg=NARANJA, color_texto="FFFFFF", negrita=True, fuente="Montserrat")
+    _rescates_excel_celda(ws, 2, 10, "OFICINAS", bg=NARANJA, color_texto="FFFFFF", negrita=True, fuente="Montserrat")
+
+    _rescates_excel_celda(ws, 3, 1, "NACIONALIDAD", bg=AZUL, color_texto="FFFFFF", negrita=True, fuente="Montserrat")
+    _rescates_excel_celda(ws, 3, 2, "H", bg=NARANJA, color_texto="FFFFFF", negrita=True, fuente="Montserrat")
+    _rescates_excel_celda(ws, 3, 3, "M", bg=NARANJA, color_texto="FFFFFF", negrita=True, fuente="Montserrat")
+    _rescates_excel_celda(ws, 3, 4, "H", bg=AZULGRIS, color_texto="FFFFFF", negrita=True, fuente="Montserrat")
+    _rescates_excel_celda(ws, 3, 5, "M", bg=AZULGRIS, color_texto="FFFFFF", negrita=True, fuente="Montserrat")
+    _rescates_excel_celda(ws, 3, 6, "H", bg=VERDEOSC, color_texto="FFFFFF", negrita=True, fuente="Montserrat")
+    _rescates_excel_celda(ws, 3, 7, "M", bg=VERDEOSC, color_texto="FFFFFF", negrita=True, fuente="Montserrat")
+    _rescates_excel_celda(ws, 3, 8, "H", bg=NARANJA, color_texto="FFFFFF", negrita=True, fuente="Montserrat")
+    _rescates_excel_celda(ws, 3, 9, "M", bg=NARANJA, color_texto="FFFFFF", negrita=True, fuente="Montserrat")
+    _rescates_excel_celda(ws, 3, 10, None, bg=NARANJA)
+
+    fila = 4
+    for f in datos["filas"]:
+        _rescates_excel_celda(ws, fila, 1, f["nacionalidad"], centrado=False, fuente="Montserrat")
+        for i, (clave, _) in enumerate(RESCATES_ETIQUETAS_CATEGORIA):
+            _rescates_excel_celda(ws, fila, 2 + i, f[clave], fuente="Montserrat")
+        _rescates_excel_celda(ws, fila, 10, f["oficinas"], centrado=False, fuente="Montserrat")
+        _rescates_excel_celda(ws, fila, 11, f["total"], negrita=True, fuente="Montserrat")
+        fila += 1
+
+    if not datos["filas"]:
+        _rescates_excel_celda(ws, fila, 1, "Sin registros extracontinentales en esta fecha/rango.", centrado=False, fuente="Montserrat")
+        ws.merge_cells(start_row=fila, start_column=1, end_row=fila, end_column=11)
+        fila += 1
+
+    _rescates_excel_celda(ws, fila, 1, "TOTAL", bg=GRISCLARO, negrita=True, fuente="Montserrat")
+    for i, (clave, _) in enumerate(RESCATES_ETIQUETAS_CATEGORIA):
+        _rescates_excel_celda(ws, fila, 2 + i, datos["fila_total"][clave], bg=GRISCLARO, negrita=True, fuente="Montserrat")
+    _rescates_excel_celda(ws, fila, 11, datos["fila_total"]["total"], bg=GRISCLARO, negrita=True, fuente="Montserrat")
+
+    response = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    response["Content-Disposition"] = f'attachment; filename="{titulo}.xlsx"'
+    wb.save(response)
+    return response
+
+
+# =============================================================================
+# Reporte "Disuadidos" -- mismo formato de tabla que CECO 2, pero para dejar
+# documentada una practica de captura no estandarizada: el formulario web
+# reutiliza el campo "casaSeguridad" de RescatePunto (pensado originalmente
+# para "rescate en casa de seguridad") para registrar tambien los clics de
+# "disuadidos" (dashboard/views.py, mapa 'disuadidos': 'casaSeguridad').
+# La tabla real DisuadidosPunto existe pero esta vacia en produccion -- se
+# asume esto como la regla de negocio de facto, confirmada explicitamente
+# con el usuario. Se incluye ademas la evidencia de la mezcla: ~4.6% de los
+# registros con casaSeguridad=True traen "puntoEstra" lleno (tipico de
+# captura movil, 91.8% de la tabla completa lo trae) -- posibles casos de
+# "casa de seguridad" real coladados entre los disuadidos.
+# =============================================================================
+
+def _rescates_disuadidos_detalle(fecha_str):
+    fecha_obj = datetime.strptime(fecha_str, "%Y-%m-%d")
+    fecha_rescate_fmt = fecha_obj.strftime("%d-%m-%y")
+
+    with connection.cursor() as cur:
+        cur.execute(
+            'SELECT "oficinaRepre", COUNT(*), '
+            '  COUNT(*) FILTER (WHERE "puntoEstra" IS NOT NULL AND "puntoEstra" != \'\') '
+            "FROM usuario_rescatepunto "
+            'WHERE fecha = %s AND "casaSeguridad" = true '
+            'GROUP BY "oficinaRepre" ORDER BY COUNT(*) DESC',
+            [fecha_rescate_fmt],
+        )
+        filas_rango = cur.fetchall()
+
+    filas = [
+        {"oficina": of, "total": total, "con_puntoestra": con_pe, "sin_puntoestra": total - con_pe}
+        for of, total, con_pe in filas_rango
+    ]
+    total_general = sum(f["total"] for f in filas)
+    total_con_puntoestra = sum(f["con_puntoestra"] for f in filas)
+    total_sin_puntoestra = sum(f["sin_puntoestra"] for f in filas)
+
+    # @FADAR -- desglose adicional pedido explicitamente: categoria
+    # (sexo/edad), nacionalidad y zona migratoria -- mismos criterios ya
+    # usados en el resto del modulo (RESCATES_ETIQUETAS_CATEGORIA,
+    # RESCATES_ZONA_*), una sola consulta extra en vez de una por desglose.
+    datos_detalle = list(
+        RescatePunto.objects.filter(fecha=fecha_rescate_fmt, casaSeguridad=True)
+        .values("oficinaRepre", "nacionalidad", "sexo", "edad", "numFamilia")
+    )
+
+    def _fila_vacia_categoria():
+        fila = {clave: 0 for clave, _ in RESCATES_ETIQUETAS_CATEGORIA}
+        fila["total"] = 0
+        return fila
+
+    por_categoria = _fila_vacia_categoria()
+    conteo_nacionalidad = {}
+    zonas = {"rio_bravo": 0, "centro": 0, "suchiate": 0, "sin_zona": 0}
+
+    for d in datos_detalle:
+        cat = _rescates_clasificar_categoria(d["sexo"], d["edad"], d["numFamilia"])
+        por_categoria[cat] += 1
+        por_categoria["total"] += 1
+
+        nac = str(d["nacionalidad"]).upper()
+        conteo_nacionalidad[nac] = conteo_nacionalidad.get(nac, 0) + 1
+
+        of = d["oficinaRepre"]
+        if of in RESCATES_ZONA_RIO_BRAVO:
+            zonas["rio_bravo"] += 1
+        elif of in RESCATES_ZONA_CENTRO:
+            zonas["centro"] += 1
+        elif of in RESCATES_ZONA_SUCHIATE:
+            zonas["suchiate"] += 1
+        else:
+            zonas["sin_zona"] += 1
+
+    nacionalidades = [
+        {"nacionalidad": nac, "total": n}
+        for nac, n in sorted(conteo_nacionalidad.items(), key=lambda x: x[1], reverse=True)
+    ]
+
+    # @FADAR -- (etiqueta, valor) ya emparejados -- Django templates no
+    # permiten indexar un dict con una variable de loop directamente.
+    categorias_valores = [(etiqueta, por_categoria[clave]) for clave, etiqueta in RESCATES_ETIQUETAS_CATEGORIA]
+
+    return {
+        "fecha_actual": f"{fecha_obj.day:02d} {RESCATES_MESES_ES[fecha_obj.month]} {fecha_obj.year}",
+        "fecha_iso": fecha_str,
+        "filas": filas,
+        "total": total_general,
+        "total_con_puntoestra": total_con_puntoestra,
+        "total_sin_puntoestra": total_sin_puntoestra,
+        "por_categoria": por_categoria,
+        "categorias_valores": categorias_valores,
+        "categorias": RESCATES_ETIQUETAS_CATEGORIA,
+        "nacionalidades": nacionalidades,
+        "zonas": zonas,
+    }
+
+
+@never_cache
+def rescates_reporte_disuadidos(request):
+    if not request.user.is_authenticated:
+        return redirect('/log-in/?next=%s' % request.path)
+    fecha_str = request.GET.get("fecha", date.today().isoformat())
+    datos = _rescates_disuadidos_detalle(fecha_str)
+    datos["oficinas"] = RESCATES_OFICINAS
+    return render(request, "Reportes_Analisis/rescates_reporte_disuadidos.html", datos)
+
+
+def rescates_reporte_disuadidos_pdf(request):
+    if not request.user.is_authenticated:
+        return redirect('/log-in/?next=%s' % request.path)
+    fecha_str = request.GET.get("fecha", date.today().isoformat())
+    datos = _rescates_disuadidos_detalle(fecha_str)
+    template = get_template("Reportes_Analisis/_rescates_disuadidos_pdf.html")
+    html_string = template.render(datos)
+    pdf_file = HTML(string=html_string, base_url=request.build_absolute_uri()).write_pdf()
+    fecha_obj = datetime.strptime(fecha_str, "%Y-%m-%d")
+    nombre_archivo = f"Disuadidos {fecha_obj.day:02d}{RESCATES_MESES_ES[fecha_obj.month].capitalize()}{fecha_obj.year}.pdf"
+    response = HttpResponse(pdf_file, content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="{nombre_archivo}"'
+    return response
+
+
+def rescates_reporte_disuadidos_excel(request):
+    if not request.user.is_authenticated:
+        return redirect('/log-in/?next=%s' % request.path)
+    fecha_str = request.GET.get("fecha", date.today().isoformat())
+    datos = _rescates_disuadidos_detalle(fecha_str)
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Disuadidos"
+    ws.column_dimensions["A"].width = 13
+    ws.column_dimensions["B"].width = 24
+    ws.column_dimensions["C"].width = 16
+
+    ws.merge_cells("A1:B2")
+    _rescates_excel_celda(ws, 1, 1, "Fecha:", bg=RESCATES_COLOR_FONDO[0], color_texto="FFFFFF", negrita=True)
+    ws.merge_cells("A3:B3")
+    _rescates_excel_celda(ws, 3, 1, datos["fecha_actual"], bg="FFFFFF", negrita=True)
+    ws.merge_cells("C1:C2")
+    _rescates_excel_celda(ws, 1, 3, "TOTAL", bg=RESCATES_COLOR_FONDO[0], color_texto="FFFFFF", negrita=True)
+    ws.merge_cells("C3:C3")
+    _rescates_excel_celda(ws, 3, 3, datos["total"], bg="FFFFFF", negrita=True, tam=14)
+
+    fila = 5
+    _rescates_excel_fila(ws, fila, ["FECHA", "OR", "TOTAL DISUADIDOS"], RESCATES_LETRA_T1, negrita=True)
+    fila += 1
+    for f in datos["filas"]:
+        _rescates_excel_celda(ws, fila, 1, datos["fecha_actual"], centrado=True)
+        _rescates_excel_celda(ws, fila, 2, f["oficina"], centrado=False)
+        _rescates_excel_celda(ws, fila, 3, f["total"])
+        fila += 1
+    _rescates_excel_celda(ws, fila, 1, "TOTAL", bg="1F3864", color_texto="FFFFFF", negrita=True, centrado=False)
+    ws.merge_cells(start_row=fila, start_column=1, end_row=fila, end_column=2)
+    _rescates_excel_celda(ws, fila, 3, datos["total"], bg="1F3864", color_texto="FFFFFF", negrita=True)
+
+    # @FADAR -- desglose adicional pedido: categoria, zona migratoria y
+    # nacionalidad, mismo estilo que la tabla principal.
+    fila += 3
+    _rescates_excel_fila(ws, fila, ["CATEGORÍA", "TOTAL"], RESCATES_LETRA_T1, negrita=True)
+    fila += 1
+    for etiqueta, valor in datos["categorias_valores"]:
+        _rescates_excel_celda(ws, fila, 1, etiqueta, centrado=False)
+        _rescates_excel_celda(ws, fila, 2, valor)
+        fila += 1
+    _rescates_excel_celda(ws, fila, 1, "TOTAL", bg="1F3864", color_texto="FFFFFF", negrita=True, centrado=False)
+    _rescates_excel_celda(ws, fila, 2, datos["por_categoria"]["total"], bg="1F3864", color_texto="FFFFFF", negrita=True)
+
+    fila += 3
+    _rescates_excel_fila(ws, fila, ["ZONA MIGRATORIA", "TOTAL"], RESCATES_LETRA_T1, negrita=True)
+    fila += 1
+    for etiqueta, clave in [("Río Bravo", "rio_bravo"), ("Centro", "centro"), ("Suchiate", "suchiate"), ("Sin zona", "sin_zona")]:
+        if clave == "sin_zona" and not datos["zonas"]["sin_zona"]:
+            continue
+        _rescates_excel_celda(ws, fila, 1, etiqueta, centrado=False)
+        _rescates_excel_celda(ws, fila, 2, datos["zonas"][clave])
+        fila += 1
+    _rescates_excel_celda(ws, fila, 1, "TOTAL", bg="1F3864", color_texto="FFFFFF", negrita=True, centrado=False)
+    _rescates_excel_celda(ws, fila, 2, datos["total"], bg="1F3864", color_texto="FFFFFF", negrita=True)
+
+    fila += 3
+    _rescates_excel_fila(ws, fila, ["NACIONALIDAD", "TOTAL"], RESCATES_LETRA_T1, negrita=True)
+    fila += 1
+    for n in datos["nacionalidades"]:
+        _rescates_excel_celda(ws, fila, 1, n["nacionalidad"], centrado=False)
+        _rescates_excel_celda(ws, fila, 2, n["total"])
+        fila += 1
+
+    # @FADAR -- nota metodologica oculta a peticion del usuario (no se
+    # borra, solo se deja de escribir en el archivo). Ver el mismo
+    # comentario en rescates_reporte_disuadidos.html para el texto
+    # completo.
+    # fila += 3
+    # _rescates_excel_celda(ws, fila, 1, 'NOTA: "Disuadidos" reutiliza el campo casaSeguridad de RescatePunto (pensado para "rescate en casa de seguridad"). No es un campo dedicado.', negrita=True, centrado=False)
+    # ws.merge_cells(start_row=fila, start_column=1, end_row=fila, end_column=3)
+    # fila += 2
+    # _rescates_excel_fila(ws, fila, ["", "Con 'puntoEstra' (posible casaSeguridad real)", "Sin 'puntoEstra' (posible disuadido real)"], RESCATES_LETRA_T2, negrita=True)
+    # fila += 1
+    # _rescates_excel_celda(ws, fila, 1, "Total del día", centrado=False)
+    # _rescates_excel_celda(ws, fila, 2, datos["total_con_puntoestra"])
+    # _rescates_excel_celda(ws, fila, 3, datos["total_sin_puntoestra"])
+
+    fecha_obj = datetime.strptime(fecha_str, "%Y-%m-%d")
+    nombre_archivo = f"Disuadidos {fecha_obj.day:02d}{RESCATES_MESES_ES[fecha_obj.month].capitalize()}{fecha_obj.year}.xlsx"
     response = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     response["Content-Disposition"] = f'attachment; filename="{nombre_archivo}"'
     wb.save(response)

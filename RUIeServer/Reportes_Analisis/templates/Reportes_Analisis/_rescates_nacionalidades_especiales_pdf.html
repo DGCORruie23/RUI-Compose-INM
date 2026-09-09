@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Reporte especial de nacionalidades {{ fecha_actual }}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        @page { size: A4 landscape; margin: 12mm; }
+        body { font-family: 'Montserrat', sans-serif; padding: 0; margin: 0; }
+        .titulo-inm { text-align: center; font-size: 9pt; margin: 0 0 4px; }
+        h2.nacesp-header {
+            text-align: center; font-size: 13pt; font-weight: 900; color: #fff;
+            background-color: #4472C4; padding: 6px 0; margin: 0 0 8px; border-radius: 4px;
+        }
+        table.nacesp-tabla { border-collapse: collapse; width: 100%; }
+        table.nacesp-tabla th, table.nacesp-tabla td { border: 1px solid #B4C6E7; padding: 4px 6px; text-align: center; font-size: 9pt; }
+        table.nacesp-tabla td:first-child { text-align: left; font-weight: bold; }
+        .col-azul { background-color: #4472C4; color: #fff; font-weight: bold; }
+        .col-naranja { background-color: #ED7D31; color: #fff; font-weight: bold; }
+        .col-azulgris { background-color: #44546A; color: #fff; font-weight: bold; }
+        .col-verdeosc { background-color: #13322B; color: #fff; font-weight: bold; }
+        .col-verde { background-color: #70AD47; color: #fff; font-weight: bold; }
+        tr.fila-total td { background-color: #E7E6E6; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <p class="titulo-inm">INSTITUTO NACIONAL DE MIGRACIÓN<br>DIRECCIÓN GENERAL DE COORDINACIÓN DE OFICINAS DE REPRESENTACION</p>
+    <h2 class="nacesp-header">Reporte especial de nacionalidades — {{ fecha_actual }}</h2>
+
+    <table class="nacesp-tabla">
+        <thead>
+            <tr>
+                <th class="col-azul">TOTAL<br>RESCATADOS</th>
+                <th colspan="2" rowspan="2" class="col-naranja">MAYORES DE EDAD SOLOS</th>
+                <th colspan="2" rowspan="2" class="col-azulgris">MAYORES DE EDAD QUE ACOMPAÑAN A NNA'S</th>
+                <th colspan="4" class="col-verdeosc">MENORES DE EDAD</th>
+                <th class="col-verdeosc"></th>
+                <th rowspan="3" class="col-verde">TOTAL</th>
+            </tr>
+            <tr>
+                <th class="col-azul">{{ fecha_actual }}</th>
+                <th colspan="2" class="col-verdeosc">ACOMPAÑADOS</th>
+                <th colspan="2" class="col-naranja">NO ACOMPAÑADOS</th>
+                <th class="col-naranja">OFICINAS</th>
+            </tr>
+            <tr>
+                <th class="col-azul">NACIONALIDAD</th>
+                <th class="col-naranja">H</th><th class="col-naranja">M</th>
+                <th class="col-azulgris">H</th><th class="col-azulgris">M</th>
+                <th class="col-verdeosc">H</th><th class="col-verdeosc">M</th>
+                <th class="col-naranja">H</th><th class="col-naranja">M</th>
+                <th class="col-naranja"></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for f in filas %}
+            <tr>
+                <td>{{ f.nacionalidad }}</td>
+                <td>{{ f.H_AS }}</td><td>{{ f.M_AS }}</td>
+                <td>{{ f.H_AA }}</td><td>{{ f.M_AA }}</td>
+                <td>{{ f.H_mA }}</td><td>{{ f.M_mA }}</td>
+                <td>{{ f.H_mS }}</td><td>{{ f.M_mS }}</td>
+                <td style="text-align:left; font-weight:normal;">{{ f.oficinas }}</td>
+                <td>{{ f.total }}</td>
+            </tr>
+            {% endfor %}
+            <tr class="fila-total">
+                <td>TOTAL</td>
+                <td>{{ fila_total.H_AS }}</td><td>{{ fila_total.M_AS }}</td>
+                <td>{{ fila_total.H_AA }}</td><td>{{ fila_total.M_AA }}</td>
+                <td>{{ fila_total.H_mA }}</td><td>{{ fila_total.M_mA }}</td>
+                <td>{{ fila_total.H_mS }}</td><td>{{ fila_total.M_mS }}</td>
+                <td></td>
+                <td>{{ fila_total.total }}</td>
+            </tr>
+        </tbody>
+    </table>
+
+</body>
+</html>

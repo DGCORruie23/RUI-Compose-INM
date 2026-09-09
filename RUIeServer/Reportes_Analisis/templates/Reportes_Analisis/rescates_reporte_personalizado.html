@@ -20,6 +20,15 @@
     }
     /* @FADAR -- nacionalidades extracontinentales (fuera de America) */
     td.extracontinental { color: #B45309; font-weight: 700; }
+
+    /* @FADAR -- distribucion de reincidencias: barras de proporcion,
+       estilo ejecutivo (numero grande + barra, sin tabla plana). El
+       bucket "10 o mas veces" se resalta en ambar -- es el grupo de
+       mayor riesgo operativo, no un dato mas entre los demas. */
+    .barra-fondo { background: #F3F4F6; border-radius: 999px; height: 8px; overflow: hidden; }
+    .barra-relleno { background: #9A0A38; height: 100%; border-radius: 999px; transition: width .2s; }
+    .fila-distribucion--alerta .barra-relleno { background: #B45309; }
+    .fila-distribucion--alerta span.font-semibold { color: #B45309; }
 </style>
 {% endblock styles %}
 
@@ -90,21 +99,35 @@
                 {% endfor %}
             </select>
         </div>
-        <div class="col-span-2 sm:col-span-3 lg:col-span-1 flex gap-2">
-            <button type="submit" class="flex-1 bg-[#9A0A38] hover:bg-[#7d0830] text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
+        {% comment %}
+        @FADAR -- rango de hora, opcional: si se deja vacio, el reporte se
+        comporta identico a como ya funcionaba (sin filtrar por hora).
+        {% endcomment %}
+        <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-1">Hora inicio</label>
+            <input type="time" name="hora_inicio" value="{{ hora_inicio }}"
+                   class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
+        </div>
+        <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-1">Hora fin</label>
+            <input type="time" name="hora_fin" value="{{ hora_fin }}"
+                   class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm">
+        </div>
+        <div class="col-span-2 sm:col-span-3 lg:col-span-2 flex gap-2 items-center">
+            <button type="submit" class="bg-[#9A0A38] hover:bg-[#7d0830] text-white text-sm font-semibold px-4 py-2 rounded-lg transition whitespace-nowrap">
                 Generar
             </button>
+            <a href="{{ request.path }}" class="inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition whitespace-nowrap">Limpiar filtros</a>
         </div>
         <div class="col-span-2 sm:col-span-3 lg:col-span-6 flex flex-wrap gap-3 items-center">
-            <a href="{% url 'Reportes_Analisis:rescates_reporte_personalizado_pdf' %}?fecha_inicio={{ fecha_inicio }}&fecha_fin={{ fecha_fin }}&oficina={{ oficina_seleccionada }}&zona={{ zona_seleccionada }}&tipo_rescate={{ tipo_rescate_seleccionado }}&categoria={{ categoria_seleccionada }}&nacionalidad={{ nacionalidad_seleccionada }}"
+            <a href="{% url 'Reportes_Analisis:rescates_reporte_personalizado_pdf' %}?fecha_inicio={{ fecha_inicio }}&fecha_fin={{ fecha_fin }}&oficina={{ oficina_seleccionada }}&zona={{ zona_seleccionada }}&tipo_rescate={{ tipo_rescate_seleccionado }}&categoria={{ categoria_seleccionada }}&nacionalidad={{ nacionalidad_seleccionada }}&hora_inicio={{ hora_inicio }}&hora_fin={{ hora_fin }}"
                class="inline-flex items-center gap-2 bg-gray-700 hover:bg-gray-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
                 ⬇ Descargar PDF
             </a>
-            <a href="{% url 'Reportes_Analisis:rescates_reporte_personalizado_excel' %}?fecha_inicio={{ fecha_inicio }}&fecha_fin={{ fecha_fin }}&oficina={{ oficina_seleccionada }}&zona={{ zona_seleccionada }}&tipo_rescate={{ tipo_rescate_seleccionado }}&categoria={{ categoria_seleccionada }}&nacionalidad={{ nacionalidad_seleccionada }}"
+            <a href="{% url 'Reportes_Analisis:rescates_reporte_personalizado_excel' %}?fecha_inicio={{ fecha_inicio }}&fecha_fin={{ fecha_fin }}&oficina={{ oficina_seleccionada }}&zona={{ zona_seleccionada }}&tipo_rescate={{ tipo_rescate_seleccionado }}&categoria={{ categoria_seleccionada }}&nacionalidad={{ nacionalidad_seleccionada }}&hora_inicio={{ hora_inicio }}&hora_fin={{ hora_fin }}"
                class="inline-flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
                 ⬇ Descargar Excel
             </a>
-            <a href="{% url 'Reportes_Analisis:rescates_reporte_personalizado' %}" class="text-sm font-semibold text-gray-500 hover:text-[#9A0A38] transition">Limpiar filtros</a>
         </div>
     </form>
 
@@ -150,6 +173,31 @@
                     {% endfor %}
                 </tbody>
             </table>
+        </div>
+    </div>
+
+    <!-- @FADAR -- distribucion de "veces reincidente" (sin nombres, solo conteo de personas por rango de veces) -->
+    <div class="rescates-grafica-box mb-10 caja-distribucion" style="max-width:520px;">
+        <div class="flex items-baseline justify-between mb-1">
+            <h2 class="text-sm font-semibold text-[#9A0A38]">Distribución de reincidencias</h2>
+            <div class="text-right">
+                <div class="text-2xl font-extrabold text-[#9A0A38] leading-none">{{ distribucion_reincidencia.total_personas }}</div>
+                <div class="text-[10px] font-bold uppercase tracking-wide text-gray-400">personas reincidentes</div>
+            </div>
+        </div>
+        <p class="text-xs text-gray-400 mb-3">Agrupadas por cuántas veces han sido rescatadas en total (histórico, con estos filtros).</p>
+        <div class="space-y-2">
+            {% for f in distribucion_reincidencia.filas %}
+            <div class="fila-distribucion{% if f.bucket == '10 o mas veces' %} fila-distribucion--alerta{% endif %}">
+                <div class="flex items-center justify-between text-xs mb-0.5">
+                    <span class="font-semibold text-gray-700">{{ f.bucket }}</span>
+                    <span class="text-gray-500"><strong class="text-gray-800">{{ f.personas }}</strong> ({{ f.pct }}%)</span>
+                </div>
+                <div class="barra-fondo">
+                    <div class="barra-relleno" style="width:{{ f.pct }}%;"></div>
+                </div>
+            </div>
+            {% endfor %}
         </div>
     </div>
 

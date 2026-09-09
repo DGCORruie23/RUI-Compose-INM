@@ -45,6 +45,23 @@
            colores exactos del archivo de referencia. */
         table.caja-resumen-ceco { width: 320px; margin: 40px auto 0; border-radius: 6px; border: none; font-family: Georgia, 'Times New Roman', serif; }
         table.caja-resumen-ceco td { border: none; color: #fff; font-weight: bold; font-size: 13pt; padding: 8px 16px; }
+
+        /* @FADAR -- Retornados / Apoyo Operativo: mismo diseño que el
+           Informe diario de operaciones, debajo del resumen por zona. */
+        .caja-retornados-detalle {
+            width: 480px; margin: 24px auto 0;
+            background-color: #F0F9FF; border: 1px solid #BAE6FD;
+            border-radius: 8px; padding: 10px 14px;
+        }
+        .caja-retornados-detalle h6 { color: rgb(3,105,161); margin: 0 0 6px; text-align: center; }
+        .total-retornados-voluntarios { text-align: center; margin-bottom: 6px; }
+        .total-retornados-voluntarios .valor { font-size: 16pt; font-weight: bold; color: rgb(14,165,233); }
+        .total-retornados-voluntarios .etiqueta { font-size: 8pt; font-weight: bold; color: rgb(3,105,161); text-transform: uppercase; }
+        .tabla-retornados-detalle { width: 100%; margin: 0 auto; border-collapse: collapse; }
+        .tabla-retornados-detalle th, .tabla-retornados-detalle td { font-size: 9pt; padding: 4px 8px; text-align: right; border: 1px solid #BAE6FD; }
+        .tabla-retornados-detalle td:first-child, .tabla-retornados-detalle th:first-child { text-align: left; }
+        .tabla-retornados-detalle thead th { color: rgb(3,105,161); background-color: #fff; }
+        .tabla-retornados-detalle tbody tr:last-child td { font-weight: bold; background-color: rgb(14,165,233); color: #fff; }
     </style>
 </head>
 <body>
@@ -54,6 +71,9 @@
         <p class="titulo-inm">INSTITUTO NACIONAL DE MIGRACIÓN<br>DIRECCIÓN GENERAL DE COORDINACIÓN DE OFICINAS DE REPRESENTACION</p>
         <h2 class="cecov-header {% if forloop.last %}col-verde{% else %}{% cycle 'col-gris' 'col-naranja-header' 'col-azulgris' %}{% endif %}">
             {{ titulo }} — {{ bloque.nombre }} — {{ fecha_actual }}
+            {% if forloop.first and hora_inicio and hora_fin %}
+            <div style="font-size:8pt; font-weight:normal;">Horario filtrado: {{ hora_inicio }} a {{ hora_fin }}</div>
+            {% endif %}
         </h2>
         <table class="cecov-tabla">
             <thead>
@@ -113,6 +133,48 @@
             <tr style="background-color:#808080;"><td style="text-align:left;">CENTRO</td><td style="text-align:right;">{{ resumen_zonas.centro }}</td></tr>
             <tr style="background-color:#70AD47;"><td style="text-align:left;color:#44546A;">TOTAL</td><td style="text-align:right;color:#44546A;">{{ resumen_zonas.total }}</td></tr>
         </table>
+
+        <div class="caja-retornados-detalle">
+            <div class="total-retornados-voluntarios">
+                <div class="valor">{{ retornados_detalle.total_retornado }}</div>
+                <div class="etiqueta">Retornados</div>
+            </div>
+            <h6>Retornados — detalle por {{ retornados_detalle.columna }}</h6>
+            <table class="tabla-retornados-detalle">
+                <thead>
+                    <tr><th>{{ retornados_detalle.columna }}</th><th>Deportados</th><th>Retornados</th><th>Total</th></tr>
+                </thead>
+                <tbody>
+                    {% for f in retornados_detalle.filas %}
+                    <tr><td>{{ f.nombre }}</td><td>{{ f.deportado }}</td><td>{{ f.retornado }}</td><td>{{ f.total }}</td></tr>
+                    {% empty %}
+                    <tr><td colspan="4">Sin retornados en esta fecha.</td></tr>
+                    {% endfor %}
+                    <tr><td>TOTAL</td><td>{{ retornados_detalle.total_deportado }}</td><td>{{ retornados_detalle.total_retornado }}</td><td>{{ retornados_detalle.total_general }}</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="caja-retornados-detalle">
+            <div class="total-retornados-voluntarios">
+                <div class="valor">{{ apoyo_operativo_detalle.total_general }}</div>
+                <div class="etiqueta">Apoyo Operativo</div>
+            </div>
+            <h6>Puestos a Disposición / DIF / Voluntarios — detalle por {{ apoyo_operativo_detalle.columna }}</h6>
+            <table class="tabla-retornados-detalle">
+                <thead>
+                    <tr><th>{{ apoyo_operativo_detalle.columna }}</th><th>Puestos a Disp.</th><th>DIF</th><th>Voluntarios</th><th>Total</th></tr>
+                </thead>
+                <tbody>
+                    {% for f in apoyo_operativo_detalle.filas %}
+                    <tr><td>{{ f.nombre }}</td><td>{{ f.puestos }}</td><td>{{ f.dif }}</td><td>{{ f.voluntarios }}</td><td>{{ f.total }}</td></tr>
+                    {% empty %}
+                    <tr><td colspan="5">Sin apoyo operativo en esta fecha.</td></tr>
+                    {% endfor %}
+                    <tr><td>TOTAL</td><td>{{ apoyo_operativo_detalle.total_puestos }}</td><td>{{ apoyo_operativo_detalle.total_dif }}</td><td>{{ apoyo_operativo_detalle.total_voluntarios }}</td><td>{{ apoyo_operativo_detalle.total_general }}</td></tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 
 </body>

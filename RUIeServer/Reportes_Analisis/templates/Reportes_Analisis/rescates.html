@@ -4,7 +4,7 @@
 {% block title %}Rescates / Operación{% endblock title %}
 
 {% block styles %}
-<link href="https://cdn.bokeh.org/bokeh/release/bokeh-3.6.2.min.css" rel="stylesheet" type="text/css">
+<link href="https://cdn.bokeh.org/bokeh/release/bokeh-3.4.3.min.css" rel="stylesheet" type="text/css">
 <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet">
 <style>
     .rescates-tarjeta {
@@ -109,12 +109,30 @@
         background: #F3F4F6;
         color: #374151;
     }
+
+    /* @FADAR -- Apoyo Operativo: mismo bloque azul celeste que Informe
+       diario de operaciones / CECO V1, para el rango del dashboard. */
+    .caja-retornados {
+        background: #F0F9FF;
+        border: 1px solid #BAE6FD;
+        border-radius: 1rem;
+        padding: 1.25rem;
+    }
+    .caja-retornados h3 { color: #0369A1; font-weight: 700; font-size: 0.95rem; margin-bottom: 0.75rem; }
+    .total-retornados-voluntarios { margin-bottom: 1rem; }
+    .total-retornados-voluntarios .valor { font-size: 1.8rem; font-weight: 800; color: #0EA5E9; line-height: 1; }
+    .total-retornados-voluntarios .etiqueta { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: #0369A1; margin-top: 0.25rem; }
+    .tabla-retornados-detalle { width: 100%; max-width: 480px; border-collapse: collapse; }
+    .tabla-retornados-detalle th, .tabla-retornados-detalle td { padding: 6px 10px; text-align: right; font-size: 12px; border-bottom: 1px solid #BAE6FD; }
+    .tabla-retornados-detalle th:first-child, .tabla-retornados-detalle td:first-child { text-align: left; }
+    .tabla-retornados-detalle thead th { color: #0369A1; text-transform: uppercase; font-size: 10px; letter-spacing: .03em; }
+    .tabla-retornados-detalle tbody tr:last-child td { font-weight: 700; background: #0EA5E9; color: #fff; border-bottom: none; }
 </style>
 {% endblock styles %}
 
 {% block content %}
 {# @FADAR -- librerias externas: cargan UNA sola vez, fuera de rescates-live (la region que se reemplaza en cada refresco en vivo). #}
-<script src="https://cdn.bokeh.org/bokeh/release/bokeh-3.6.2.min.js"></script>
+<script src="https://cdn.bokeh.org/bokeh/release/bokeh-3.4.3.min.js"></script>
 <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
 <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
 
@@ -165,7 +183,7 @@
             Filtrar
         </button>
         <a href="{% url 'Reportes_Analisis:rescates_dashboard' %}"
-           class="text-sm font-semibold text-gray-500 hover:text-[#9A0A38] transition">
+           class="inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
             Limpiar filtros
         </a>
     </form>
@@ -456,6 +474,32 @@
         </div>
     </div>
 
+    <!-- @FADAR -- Apoyo Operativo: Puestos a Disposicion / DIF / Voluntarios,
+         mismo bloque que Informe diario de operaciones / CECO V1, para el
+         rango de fechas seleccionado en el dashboard. -->
+    <div class="rescates-grafica-box mb-10">
+        <div class="caja-retornados">
+            <div class="total-retornados-voluntarios">
+                <div class="valor">{{ apoyo_operativo_detalle.total_general }}</div>
+                <div class="etiqueta">Apoyo Operativo</div>
+            </div>
+            <h3>Puestos a Disposición / DIF / Voluntarios — detalle por {{ apoyo_operativo_detalle.columna }}</h3>
+            <table class="tabla-retornados-detalle">
+                <thead>
+                    <tr><th>{{ apoyo_operativo_detalle.columna }}</th><th>Puestos a Disp.</th><th>DIF</th><th>Voluntarios</th><th>Total</th></tr>
+                </thead>
+                <tbody>
+                    {% for f in apoyo_operativo_detalle.filas %}
+                    <tr><td>{{ f.nombre }}</td><td>{{ f.puestos }}</td><td>{{ f.dif }}</td><td>{{ f.voluntarios }}</td><td>{{ f.total }}</td></tr>
+                    {% empty %}
+                    <tr><td colspan="5">Sin apoyo operativo en este rango.</td></tr>
+                    {% endfor %}
+                    <tr><td>TOTAL</td><td>{{ apoyo_operativo_detalle.total_puestos }}</td><td>{{ apoyo_operativo_detalle.total_dif }}</td><td>{{ apoyo_operativo_detalle.total_voluntarios }}</td><td>{{ apoyo_operativo_detalle.total_general }}</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
     <!-- Numero de Familia -- solo el conteo de familias en la seleccion -->
     <div class="rescates-grafica-box mb-10">
         <h2 class="text-sm font-semibold text-[#9A0A38] mb-1">Número de Familia</h2>
@@ -473,8 +517,6 @@
      dedicada rescates_regiones (y que mapa_interactivo), aqui en version
      compacta embebida directo en el dashboard. -->
 <script>
-    const geoDataRegionesMini = {{ geo_data_regiones_json|safe }};
-
     (function () {
         // @FADAR -- sin DOMContentLoaded: este script se re-ejecuta en cada
         // refresco en vivo (ver orquestador al final del bloque), no solo en
@@ -483,6 +525,10 @@
         // por si el script se dispara sin pasar por ahi. Envuelto en
         // try/catch: remove() puede fallar si el contenedor ya no esta en el
         // documento, y eso no debe frenar la creacion del mapa nuevo.
+        // @FADAR -- geoDataRegionesMini adentro de la funcion (no global):
+        // este script se reinserta en cada refresco en vivo, y un const/let
+        // global truena con "redeclaration" la segunda vez que se ejecuta.
+        const geoDataRegionesMini = {{ geo_data_regiones_json|safe }};
         if (window._rescatesMapaMini) {
             try { window._rescatesMapaMini.remove(); } catch (e) { console.error('Error al remover el mini-mapa:', e); }
             window._rescatesMapaMini = null;
@@ -491,6 +537,9 @@
             container: 'regiones-mapa-mini',
             style: {
                 version: 8,
+                // @FADAR -- necesario para que las capas "symbol" con
+                // text-field (etiquetas de total) puedan dibujar texto.
+                glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
                 sources: {
                     'esri-imagery-mini': {
                         type: 'raster',
@@ -530,7 +579,19 @@
                 id: 'regiones-mini-fill',
                 type: 'fill',
                 source: 'regiones-mini-estados',
-                paint: { 'fill-color': ['get', 'color_zona_rescates'], 'fill-opacity': 0.72 }
+                // @FADAR -- color fijo por zona ("a mano"), en vez de la
+                // propiedad color_zona_rescates calculada por registro --
+                // mismos colores que el cuadro resumen SUCHIATE/RÍO BRAVO/CENTRO.
+                paint: {
+                    'fill-color': [
+                        'match', ['get', 'zona_rescates'],
+                        'Río Bravo', '#1D4ED8',
+                        'Centro', '#7C3AED',
+                        'Suchiate', '#B45309',
+                        '#D1D5DB'
+                    ],
+                    'fill-opacity': 0.72
+                }
             });
             mapaMini.addLayer({
                 id: 'regiones-mini-line',

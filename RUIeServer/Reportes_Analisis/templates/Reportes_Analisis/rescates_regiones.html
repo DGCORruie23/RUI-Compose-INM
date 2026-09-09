@@ -286,6 +286,9 @@
             container: 'regiones-map',
             style: {
                 version: 8,
+                // @FADAR -- necesario para que las capas "symbol" con
+                // text-field (etiquetas de total) puedan dibujar texto.
+                glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
                 sources: {
                     'esri-imagery': {
                         type: 'raster',
@@ -322,7 +325,19 @@
                 id: 'regiones-fill',
                 type: 'fill',
                 source: 'regiones-estados',
-                paint: { 'fill-color': ['get', 'color_zona_rescates'], 'fill-opacity': 0.72 }
+                // @FADAR -- color fijo por zona ("a mano"), en vez de la
+                // propiedad color_zona_rescates calculada por registro --
+                // mismos colores que el cuadro resumen SUCHIATE/RÍO BRAVO/CENTRO.
+                paint: {
+                    'fill-color': [
+                        'match', ['get', 'zona_rescates'],
+                        'Río Bravo', '#1D4ED8',
+                        'Centro', '#7C3AED',
+                        'Suchiate', '#B45309',
+                        '#D1D5DB'
+                    ],
+                    'fill-opacity': 0.72
+                }
             });
 
             map.addLayer({

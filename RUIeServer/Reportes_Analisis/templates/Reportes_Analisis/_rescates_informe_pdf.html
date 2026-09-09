@@ -81,6 +81,9 @@
     <p class="titulo-inm">INSTITUTO NACIONAL DE MIGRACIÓN<br>DIRECCIÓN GENERAL DE COORDINACIÓN DE OFICINAS DE REPRESENTACION</p>
     <div class="colorFondo">
         <h6>Informe diario de operaciones<br>{{ fecha_actual }}</h6>
+        {% if hora_inicio and hora_fin %}
+        <div style="font-size:8pt; font-weight:normal;">Horario filtrado: {{ hora_inicio }} a {{ hora_fin }}</div>
+        {% endif %}
     </div>
 
     <h5>Reporte de Rescates por Oficina</h5>
@@ -150,6 +153,16 @@
             {% empty %}
             <tr><td colspan="10">No hay datos disponibles.</td></tr>
             {% endfor %}
+            {% if nacionalidades %}
+            <tr>
+                <td class="letraT6">TOTAL</td>
+                <td class="letraT6">{{ total_nacionalidades_nuevos.H_AS }}</td><td class="letraT6">{{ total_nacionalidades_nuevos.M_AS }}</td>
+                <td class="letraT6">{{ total_nacionalidades_nuevos.H_AA }}</td><td class="letraT6">{{ total_nacionalidades_nuevos.M_AA }}</td>
+                <td class="letraT6">{{ total_nacionalidades_nuevos.H_mA }}</td><td class="letraT6">{{ total_nacionalidades_nuevos.M_mA }}</td>
+                <td class="letraT6">{{ total_nacionalidades_nuevos.H_mS }}</td><td class="letraT6">{{ total_nacionalidades_nuevos.M_mS }}</td>
+                <td class="letraT6">{{ total_nacionalidades_nuevos.total }}</td>
+            </tr>
+            {% endif %}
         </tbody>
     </table>
 
@@ -179,6 +192,16 @@
             {% empty %}
             <tr><td colspan="10">No hay datos disponibles.</td></tr>
             {% endfor %}
+            {% if nacionalidades_re %}
+            <tr>
+                <td class="letraT6">TOTAL</td>
+                <td class="letraT6">{{ total_nacionalidades_reincidentes.H_AS }}</td><td class="letraT6">{{ total_nacionalidades_reincidentes.M_AS }}</td>
+                <td class="letraT6">{{ total_nacionalidades_reincidentes.H_AA }}</td><td class="letraT6">{{ total_nacionalidades_reincidentes.M_AA }}</td>
+                <td class="letraT6">{{ total_nacionalidades_reincidentes.H_mA }}</td><td class="letraT6">{{ total_nacionalidades_reincidentes.M_mA }}</td>
+                <td class="letraT6">{{ total_nacionalidades_reincidentes.H_mS }}</td><td class="letraT6">{{ total_nacionalidades_reincidentes.M_mS }}</td>
+                <td class="letraT6">{{ total_nacionalidades_reincidentes.total }}</td>
+            </tr>
+            {% endif %}
         </tbody>
     </table>
 
@@ -224,6 +247,27 @@
                 <tr><td colspan="4">Sin retornados en esta fecha.</td></tr>
                 {% endfor %}
                 <tr><td>TOTAL</td><td>{{ retornados_detalle.total_deportado }}</td><td>{{ retornados_detalle.total_retornado }}</td><td>{{ retornados_detalle.total_general }}</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="caja-retornados-detalle">
+        <div class="total-retornados-voluntarios">
+            <div class="valor">{{ apoyo_operativo_detalle.total_general }}</div>
+            <div class="etiqueta">Apoyo Operativo</div>
+        </div>
+        <h6>Puestos a Disposición / DIF / Voluntarios — detalle por {{ apoyo_operativo_detalle.columna }}</h6>
+        <table class="tabla-retornados-detalle">
+            <thead>
+                <tr><th>{{ apoyo_operativo_detalle.columna }}</th><th>Puestos a Disp.</th><th>DIF</th><th>Voluntarios</th><th>Total</th></tr>
+            </thead>
+            <tbody>
+                {% for f in apoyo_operativo_detalle.filas %}
+                <tr><td>{{ f.nombre }}</td><td>{{ f.puestos }}</td><td>{{ f.dif }}</td><td>{{ f.voluntarios }}</td><td>{{ f.total }}</td></tr>
+                {% empty %}
+                <tr><td colspan="5">Sin apoyo operativo en esta fecha.</td></tr>
+                {% endfor %}
+                <tr><td>TOTAL</td><td>{{ apoyo_operativo_detalle.total_puestos }}</td><td>{{ apoyo_operativo_detalle.total_dif }}</td><td>{{ apoyo_operativo_detalle.total_voluntarios }}</td><td>{{ apoyo_operativo_detalle.total_general }}</td></tr>
             </tbody>
         </table>
     </div>

@@ -53,8 +53,8 @@
     <div class="flex items-center justify-between mb-6">
         <h1 class="text-2xl font-bold text-[#9A0A38]">Informe diario de operaciones</h1>
         <div class="flex gap-3">
-            <a href="{% url 'Reportes_Analisis:rescates_reporte_cuadro' %}" class="text-sm font-semibold text-gray-500 hover:text-[#9A0A38] transition">Cuadro de Datos</a>
-            <a href="{% url 'Reportes_Analisis:rescates_reporte_regiones' %}" class="text-sm font-semibold text-gray-500 hover:text-[#9A0A38] transition">Regiones (CECO)</a>
+            <a href="{% url 'Reportes_Analisis:rescates_reporte_cuadro' %}?fecha={{ fecha_iso }}" class="text-sm font-semibold text-gray-500 hover:text-[#9A0A38] transition">Cuadro de Datos</a>
+            <a href="{% url 'Reportes_Analisis:rescates_reporte_regiones' %}?fecha={{ fecha_iso }}" class="text-sm font-semibold text-gray-500 hover:text-[#9A0A38] transition">Regiones (CECO)</a>
             <a href="{% url 'Reportes_Analisis:rescates_dashboard' %}" class="text-sm font-semibold text-gray-500 hover:text-[#9A0A38] transition">← Volver al dashboard</a>
         </div>
     </div>
@@ -65,15 +65,32 @@
             <input type="date" name="fecha" value="{{ fecha_iso }}"
                    class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm">
         </div>
+        {% comment %}
+        @FADAR -- rango de hora opcional, mismo criterio que Reporte
+        Personalizado: si falta cualquiera de los dos, no se filtra por hora
+        y el informe se comporta identico a como ya funcionaba. No afecta a
+        Retornados (sin hora por registro).
+        {% endcomment %}
+        <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-1">Hora inicio</label>
+            <input type="time" name="hora_inicio" value="{{ hora_inicio }}"
+                   class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm">
+        </div>
+        <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-1">Hora fin</label>
+            <input type="time" name="hora_fin" value="{{ hora_fin }}"
+                   class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm">
+        </div>
         <button type="submit" class="bg-[#9A0A38] hover:bg-[#7d0830] text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
             Generar
         </button>
+        <a href="{{ request.path }}" class="inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition">Limpiar filtros</a>
         <div class="flex-1"></div>
-        <a href="{% url 'Reportes_Analisis:rescates_reporte_informe_pdf' %}?fecha={{ fecha_iso }}"
+        <a href="{% url 'Reportes_Analisis:rescates_reporte_informe_pdf' %}?fecha={{ fecha_iso }}&hora_inicio={{ hora_inicio }}&hora_fin={{ hora_fin }}"
            class="inline-flex items-center gap-2 bg-gray-700 hover:bg-gray-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
             ⬇ Descargar PDF
         </a>
-        <a href="{% url 'Reportes_Analisis:rescates_reporte_informe_excel' %}?fecha={{ fecha_iso }}"
+        <a href="{% url 'Reportes_Analisis:rescates_reporte_informe_excel' %}?fecha={{ fecha_iso }}&hora_inicio={{ hora_inicio }}&hora_fin={{ hora_fin }}"
            class="inline-flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
             ⬇ Descargar Excel
         </a>
@@ -83,6 +100,9 @@
         <p style="text-align:center;">INSTITUTO NACIONAL DE MIGRACIÓN<br>DIRECCIÓN GENERAL DE COORDINACIÓN DE OFICINAS DE REPRESENTACION</p>
         <div class="colorFondo my-3">
             <strong>Informe diario de operaciones<br>{{ fecha_actual }}</strong>
+            {% if hora_inicio and hora_fin %}
+            <div style="font-size:0.8rem; font-weight:normal; margin-top:0.25rem;">Horario filtrado: {{ hora_inicio }} a {{ hora_fin }}</div>
+            {% endif %}
         </div>
 
         <h2 class="text-center font-semibold my-3">Reporte de Rescates por Oficina</h2>
@@ -145,6 +165,16 @@
                     {% empty %}
                     <tr><td colspan="10">No hay datos disponibles.</td></tr>
                     {% endfor %}
+                    {% if nacionalidades %}
+                    <tr>
+                        <td class="letraT6">TOTAL</td>
+                        <td class="letraT6">{{ total_nacionalidades_nuevos.H_AS }}</td><td class="letraT6">{{ total_nacionalidades_nuevos.M_AS }}</td>
+                        <td class="letraT6">{{ total_nacionalidades_nuevos.H_AA }}</td><td class="letraT6">{{ total_nacionalidades_nuevos.M_AA }}</td>
+                        <td class="letraT6">{{ total_nacionalidades_nuevos.H_mA }}</td><td class="letraT6">{{ total_nacionalidades_nuevos.M_mA }}</td>
+                        <td class="letraT6">{{ total_nacionalidades_nuevos.H_mS }}</td><td class="letraT6">{{ total_nacionalidades_nuevos.M_mS }}</td>
+                        <td class="letraT6">{{ total_nacionalidades_nuevos.total }}</td>
+                    </tr>
+                    {% endif %}
                 </tbody>
             </table>
         </div>
@@ -175,6 +205,16 @@
                     {% empty %}
                     <tr><td colspan="10">No hay datos disponibles.</td></tr>
                     {% endfor %}
+                    {% if nacionalidades_re %}
+                    <tr>
+                        <td class="letraT6">TOTAL</td>
+                        <td class="letraT6">{{ total_nacionalidades_reincidentes.H_AS }}</td><td class="letraT6">{{ total_nacionalidades_reincidentes.M_AS }}</td>
+                        <td class="letraT6">{{ total_nacionalidades_reincidentes.H_AA }}</td><td class="letraT6">{{ total_nacionalidades_reincidentes.M_AA }}</td>
+                        <td class="letraT6">{{ total_nacionalidades_reincidentes.H_mA }}</td><td class="letraT6">{{ total_nacionalidades_reincidentes.M_mA }}</td>
+                        <td class="letraT6">{{ total_nacionalidades_reincidentes.H_mS }}</td><td class="letraT6">{{ total_nacionalidades_reincidentes.M_mS }}</td>
+                        <td class="letraT6">{{ total_nacionalidades_reincidentes.total }}</td>
+                    </tr>
+                    {% endif %}
                 </tbody>
             </table>
         </div>
@@ -207,26 +247,49 @@
         </div>
     </div>
 
-    <!-- @FADAR -- Retornados: apartado independiente del informe de arriba -->
-    <div class="caja-retornados">
-        <div class="total-retornados-voluntarios">
-            <div class="valor">{{ retornados_detalle.total_retornado }}</div>
-            <div class="etiqueta">Retornados</div>
+    <!-- @FADAR -- Retornados y Apoyo Operativo: apartados independientes del informe de arriba, uno al lado del otro -->
+    <div class="flex flex-wrap gap-6 items-start">
+        <div class="caja-retornados">
+            <div class="total-retornados-voluntarios">
+                <div class="valor">{{ retornados_detalle.total_retornado }}</div>
+                <div class="etiqueta">Retornados</div>
+            </div>
+            <h3>Retornados — detalle por {{ retornados_detalle.columna }}</h3>
+            <table class="tabla-retornados-detalle">
+                <thead>
+                    <tr><th>{{ retornados_detalle.columna }}</th><th>Deportados</th><th>Retornados</th><th>Total</th></tr>
+                </thead>
+                <tbody>
+                    {% for f in retornados_detalle.filas %}
+                    <tr><td>{{ f.nombre }}</td><td>{{ f.deportado }}</td><td>{{ f.retornado }}</td><td>{{ f.total }}</td></tr>
+                    {% empty %}
+                    <tr><td colspan="4">Sin retornados en esta fecha.</td></tr>
+                    {% endfor %}
+                    <tr><td>TOTAL</td><td>{{ retornados_detalle.total_deportado }}</td><td>{{ retornados_detalle.total_retornado }}</td><td>{{ retornados_detalle.total_general }}</td></tr>
+                </tbody>
+            </table>
         </div>
-        <h3>Retornados — detalle por {{ retornados_detalle.columna }}</h3>
-        <table class="tabla-retornados-detalle">
-            <thead>
-                <tr><th>{{ retornados_detalle.columna }}</th><th>Deportados</th><th>Retornados</th><th>Total</th></tr>
-            </thead>
-            <tbody>
-                {% for f in retornados_detalle.filas %}
-                <tr><td>{{ f.nombre }}</td><td>{{ f.deportado }}</td><td>{{ f.retornado }}</td><td>{{ f.total }}</td></tr>
-                {% empty %}
-                <tr><td colspan="4">Sin retornados en esta fecha.</td></tr>
-                {% endfor %}
-                <tr><td>TOTAL</td><td>{{ retornados_detalle.total_deportado }}</td><td>{{ retornados_detalle.total_retornado }}</td><td>{{ retornados_detalle.total_general }}</td></tr>
-            </tbody>
-        </table>
+
+        <div class="caja-retornados">
+            <div class="total-retornados-voluntarios">
+                <div class="valor">{{ apoyo_operativo_detalle.total_general }}</div>
+                <div class="etiqueta">Apoyo Operativo</div>
+            </div>
+            <h3>Puestos a Disposición / DIF / Voluntarios — detalle por {{ apoyo_operativo_detalle.columna }}</h3>
+            <table class="tabla-retornados-detalle">
+                <thead>
+                    <tr><th>{{ apoyo_operativo_detalle.columna }}</th><th>Puestos a Disp.</th><th>DIF</th><th>Voluntarios</th><th>Total</th></tr>
+                </thead>
+                <tbody>
+                    {% for f in apoyo_operativo_detalle.filas %}
+                    <tr><td>{{ f.nombre }}</td><td>{{ f.puestos }}</td><td>{{ f.dif }}</td><td>{{ f.voluntarios }}</td><td>{{ f.total }}</td></tr>
+                    {% empty %}
+                    <tr><td colspan="5">Sin apoyo operativo en esta fecha.</td></tr>
+                    {% endfor %}
+                    <tr><td>TOTAL</td><td>{{ apoyo_operativo_detalle.total_puestos }}</td><td>{{ apoyo_operativo_detalle.total_dif }}</td><td>{{ apoyo_operativo_detalle.total_voluntarios }}</td><td>{{ apoyo_operativo_detalle.total_general }}</td></tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 
 </main>

@@ -27,6 +27,11 @@ urlpatterns = [
     path('rescates/reportes/ceco2/pdf', views.rescates_reporte_ceco2_pdf, name="rescates_reporte_ceco2_pdf"),
     path('rescates/reportes/ceco2/excel', views.rescates_reporte_ceco2_excel, name="rescates_reporte_ceco2_excel"),
 
+    # @FADAR -- CECO 2.1 (copia de CECO 2, solo primera vez, sin reincidentes)
+    path('rescates/reportes/ceco2-1', views.rescates_reporte_ceco21, name="rescates_reporte_ceco21"),
+    path('rescates/reportes/ceco2-1/pdf', views.rescates_reporte_ceco21_pdf, name="rescates_reporte_ceco21_pdf"),
+    path('rescates/reportes/ceco2-1/excel', views.rescates_reporte_ceco21_excel, name="rescates_reporte_ceco21_excel"),
+
     # @FADAR -- CECO V1/V2
     path('rescates/reportes/ceco-v1', views.rescates_reporte_cecov1, name="rescates_reporte_cecov1"),
     path('rescates/reportes/ceco-v1/pdf', views.rescates_reporte_cecov1_pdf, name="rescates_reporte_cecov1_pdf"),
@@ -40,8 +45,28 @@ urlpatterns = [
     path('rescates/reportes/personalizado/pdf', views.rescates_reporte_personalizado_pdf, name="rescates_reporte_personalizado_pdf"),
     path('rescates/reportes/personalizado/excel', views.rescates_reporte_personalizado_excel, name="rescates_reporte_personalizado_excel"),
 
+    # @FADAR -- Reporte especial de nacionalidades (lista fija de 4 paises)
+    path('rescates/reportes/nacionalidades-especiales', views.rescates_reporte_nacionalidades_especiales, name="rescates_reporte_nacionalidades_especiales"),
+    path('rescates/reportes/nacionalidades-especiales/pdf', views.rescates_reporte_nacionalidades_especiales_pdf, name="rescates_reporte_nacionalidades_especiales_pdf"),
+    path('rescates/reportes/nacionalidades-especiales/excel', views.rescates_reporte_nacionalidades_especiales_excel, name="rescates_reporte_nacionalidades_especiales_excel"),
+
+    # @FADAR -- Nacionalidades extracontinentales (lista dinamica, solo con registros)
+    path('rescates/reportes/nacionalidades-extracontinentales', views.rescates_reporte_nacionalidades_extracontinentales, name="rescates_reporte_nacionalidades_extracontinentales"),
+    path('rescates/reportes/nacionalidades-extracontinentales/pdf', views.rescates_reporte_nacionalidades_extracontinentales_pdf, name="rescates_reporte_nacionalidades_extracontinentales_pdf"),
+    path('rescates/reportes/nacionalidades-extracontinentales/excel', views.rescates_reporte_nacionalidades_extracontinentales_excel, name="rescates_reporte_nacionalidades_extracontinentales_excel"),
+
+    # @FADAR -- Disuadidos (formato CECO2, usa casaSeguridad como regla de negocio de facto)
+    path('rescates/reportes/disuadidos', views.rescates_reporte_disuadidos, name="rescates_reporte_disuadidos"),
+    path('rescates/reportes/disuadidos/pdf', views.rescates_reporte_disuadidos_pdf, name="rescates_reporte_disuadidos_pdf"),
+    path('rescates/reportes/disuadidos/excel', views.rescates_reporte_disuadidos_excel, name="rescates_reporte_disuadidos_excel"),
+
     # @FADAR -- Mexicanos vs Extranjeros
     path('rescates/reportes/mexicanos-extranjeros', views.reporte_mex_extranjeros, name="reporte_mex_extranjeros"),
     path('rescates/reportes/mexicanos-extranjeros/pdf', views.reporte_mex_extranjeros_pdf, name="reporte_mex_extranjeros_pdf"),
     path('rescates/reportes/mexicanos-extranjeros/excel', views.reporte_mex_extranjeros_excel, name="reporte_mex_extranjeros_excel"),
+
+    # @FADAR -- Rescates vía ferrocarril (analisis de ruta, no un reporte operativo diario)
+    path('rescates/reportes/ferrocarril', views.rescates_reporte_ferrocarril, name="rescates_reporte_ferrocarril"),
+    path('rescates/reportes/ferrocarril/pdf', views.rescates_reporte_ferrocarril_pdf, name="rescates_reporte_ferrocarril_pdf"),
+    path('rescates/reportes/ferrocarril/excel', views.rescates_reporte_ferrocarril_excel, name="rescates_reporte_ferrocarril_excel"),
 ]

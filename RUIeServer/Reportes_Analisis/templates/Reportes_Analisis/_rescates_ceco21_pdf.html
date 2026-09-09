@@ -2,14 +2,14 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>CECO 2 {{ fecha_actual }}</title>
+    <title>Primera vez CECO 2 {{ fecha_actual }}</title>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
     <style>
         @page { size: A4 portrait; margin: 10mm; }
         body { font-family: 'Montserrat', sans-serif; padding: 0; margin: 0; }
         .titulo-inm { text-align: center; font-size: 9pt; margin: 0 0 8px; }
 
-        /* @FADAR -- CECO 2: mismo estilo visual del Excel de referencia */
+        /* @FADAR -- CECO 2.1: mismo estilo visual del Excel de referencia */
         table.ceco2-resumen { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
         table.ceco2-resumen td { border: 1px solid #B4C6E7; padding: 4px 8px; text-align: center; font-size: 9pt; }
         table.ceco2-resumen .etiqueta { background-color: #4472C4; color: #fff; font-weight: bold; }
@@ -52,7 +52,6 @@
                 <th>PRH</th>
                 <th class="col-rescates">Rescates total</th>
                 <th class="col-rescates">Primera vez/Rescates reales</th>
-                <th class="col-rescates">Reincidencias</th>
                 <th>Tipo</th>
             </tr>
         </thead>
@@ -63,18 +62,16 @@
                 <td>{{ f.oficina }}</td>
                 <td>{{ f.prh|default:"OTRA AUTORIDAD" }}</td>
                 <td class="col-rescates">{{ f.rescates }}</td>
-                <td class="col-rescates">{{ f.primera_vez }}</td>
-                <td class="col-rescates">{{ f.reincidencias }}</td>
+                <td class="col-rescates">{{ f.rescates }}</td>
                 <td>{{ f.tipo }}</td>
             </tr>
             {% empty %}
-            <tr><td colspan="7" style="text-align:center;">Sin registros en esta fecha/entidad.</td></tr>
+            <tr><td colspan="6" style="text-align:center;">Sin registros en esta fecha/entidad.</td></tr>
             {% endfor %}
             <tr style="background-color:#1F3864; color:#fff; font-weight:bold;">
                 <td colspan="3">TOTAL</td>
                 <td class="col-rescates">{{ total|default:0 }}</td>
-                <td class="col-rescates">{{ total_primera_vez|default:0 }}</td>
-                <td class="col-rescates">{{ total_reincidencias|default:0 }}</td>
+                <td class="col-rescates">{{ total|default:0 }}</td>
                 <td></td>
             </tr>
         </tbody>

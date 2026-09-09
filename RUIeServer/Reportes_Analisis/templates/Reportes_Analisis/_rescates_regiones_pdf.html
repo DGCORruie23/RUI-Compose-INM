@@ -47,6 +47,9 @@
     <p class="titulo-inm">INSTITUTO NACIONAL DE MIGRACIÓN<br>DIRECCIÓN GENERAL DE COORDINACIÓN DE OFICINAS DE REPRESENTACION</p>
     <div class="colorFondo">
         <h6>Informe de personas extranjeras rescatadas registradas por primera vez y reincidentes<br>{{ fecha_actual }} — {{ oficina }}</h6>
+        {% if hora_inicio and hora_fin %}
+        <div style="font-size:8pt; font-weight:normal;">Horario filtrado: {{ hora_inicio }} a {{ hora_fin }}</div>
+        {% endif %}
     </div>
 
     <h5>Rescates por CECO y Oficina</h5>

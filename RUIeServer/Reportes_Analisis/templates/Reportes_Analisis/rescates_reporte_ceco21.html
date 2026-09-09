@@ -1,7 +1,7 @@
 {% extends "base/base.html" %}
 {% load static %}
 
-{% block title %}CECO 2{% endblock title %}
+{% block title %}Primera vez CECO 2{% endblock title %}
 
 {% block styles %}
 <style>
@@ -9,7 +9,7 @@
         background: #ffffff; border-radius: 1rem; border: 1px solid #e5e7eb;
         padding: 1rem 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
     }
-    /* @FADAR -- CECO 2: mismo estilo visual del Excel de referencia
+    /* @FADAR -- CECO 2.1: mismo estilo visual del Excel de referencia
        (cabeceras azules, filas alternadas). */
     .ceco2-caja { background: #fff; border-radius: 1rem; border: 1px solid #e5e7eb; box-shadow: 0 1px 3px rgba(0,0,0,0.06); overflow: hidden; }
     .ceco2-resumen { display: grid; grid-template-columns: 1fr 1fr; }
@@ -32,7 +32,7 @@
 <main class="max-w-6xl mx-auto px-4 py-6">
 
     <div class="flex items-center justify-between mb-4">
-        <h1 class="text-2xl font-bold text-[#9A0A38]">CECO 2 rescates + reincidencias</h1>
+        <h1 class="text-2xl font-bold text-[#9A0A38]">Primera vez CECO 2</h1>
         {# @FADAR -- dashboard y Regiones ya viven en Reportes_Analisis #}
         <a href="{% url 'Reportes_Analisis:rescates_dashboard' %}" class="text-sm font-semibold text-gray-500 hover:text-[#9A0A38] transition">← Volver al dashboard</a>
     </div>
@@ -43,9 +43,9 @@
            class="inline-flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold px-4 py-2 rounded-lg transition">
             CECO
         </a>
-        <a href="{% url 'Reportes_Analisis:rescates_reporte_ceco21' %}?fecha={{ fecha_iso }}&oficina={{ oficina_seleccionada }}" target="_blank"
+        <a href="{% url 'Reportes_Analisis:rescates_reporte_ceco2' %}?fecha={{ fecha_iso }}&oficina={{ oficina_seleccionada }}" target="_blank"
            class="inline-flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
-            Primera vez CECO 2
+            Generar CECO 2
         </a>
         <a href="{% url 'Reportes_Analisis:rescates_reporte_cecov1' %}?fecha={{ fecha_iso }}" target="_blank"
            class="inline-flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
@@ -91,11 +91,11 @@
         </button>
         <a href="{{ request.path }}" class="inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition">Limpiar filtros</a>
         <div class="flex-1"></div>
-        <a href="{% url 'Reportes_Analisis:rescates_reporte_ceco2_pdf' %}?fecha={{ fecha_iso }}&oficina={{ oficina_seleccionada }}&hora_inicio={{ hora_inicio }}&hora_fin={{ hora_fin }}"
+        <a href="{% url 'Reportes_Analisis:rescates_reporte_ceco21_pdf' %}?fecha={{ fecha_iso }}&oficina={{ oficina_seleccionada }}&hora_inicio={{ hora_inicio }}&hora_fin={{ hora_fin }}"
            class="inline-flex items-center gap-2 bg-gray-700 hover:bg-gray-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
             ⬇ Descargar PDF
         </a>
-        <a href="{% url 'Reportes_Analisis:rescates_reporte_ceco2_excel' %}?fecha={{ fecha_iso }}&oficina={{ oficina_seleccionada }}&hora_inicio={{ hora_inicio }}&hora_fin={{ hora_fin }}"
+        <a href="{% url 'Reportes_Analisis:rescates_reporte_ceco21_excel' %}?fecha={{ fecha_iso }}&oficina={{ oficina_seleccionada }}&hora_inicio={{ hora_inicio }}&hora_fin={{ hora_fin }}"
            class="inline-flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
             ⬇ Descargar Excel
         </a>
@@ -103,7 +103,8 @@
 
     <p class="text-xs text-gray-400 mb-4">
         "TIPO" se calcula a partir del medio de rescate real capturado en cada registro (no del catálogo manual) —
-        por eso el total siempre cuadra exacto contra los rescates reales del día.
+        por eso el total siempre cuadra exacto contra los rescates reales del día. Este reporte incluye
+        únicamente rescates de primera vez (sin reincidentes).
     </p>
 
     <div class="ceco2-caja mb-6">
@@ -129,7 +130,6 @@
                         <th>PRH</th>
                         <th class="text-right">Rescates total</th>
                         <th class="text-right">Primera vez/Rescates reales</th>
-                        <th class="text-right">Reincidencias</th>
                         <th>Tipo</th>
                     </tr>
                 </thead>
@@ -140,18 +140,16 @@
                         <td>{{ f.oficina }}</td>
                         <td>{{ f.prh|default:"OTRA AUTORIDAD" }}</td>
                         <td class="text-right">{{ f.rescates }}</td>
-                        <td class="text-right">{{ f.primera_vez }}</td>
-                        <td class="text-right">{{ f.reincidencias }}</td>
+                        <td class="text-right">{{ f.rescates }}</td>
                         <td>{{ f.tipo }}</td>
                     </tr>
                     {% empty %}
-                    <tr><td colspan="7" class="text-center">Sin registros en esta fecha/entidad.</td></tr>
+                    <tr><td colspan="6" class="text-center">Sin registros en esta fecha/entidad.</td></tr>
                     {% endfor %}
                     <tr class="fila-total-ceco2">
                         <td colspan="3">TOTAL</td>
                         <td class="text-right">{{ total|default:0 }}</td>
-                        <td class="text-right">{{ total_primera_vez|default:0 }}</td>
-                        <td class="text-right">{{ total_reincidencias|default:0 }}</td>
+                        <td class="text-right">{{ total|default:0 }}</td>
                         <td></td>
                     </tr>
                 </tbody>
