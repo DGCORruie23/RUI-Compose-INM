@@ -748,52 +748,62 @@ def rescates_dashboard(request):
         if oficina:
             filtro_estado_sql = ' AND r."oficinaRepre" = %s'
             params_reinc = params_reinc + [oficina]
-        with connection.cursor() as cur:
-            # Reincidentes y primera vez del rango filtrado en UNA sola
-            # pasada sobre el JOIN.
-            cur.execute(
-                f"SELECT "
-                f"  COUNT(*) FILTER (WHERE {RESCATES_SQL_ES_REINCIDENTE}), "
-                f"  COUNT(*) FILTER (WHERE {RESCATES_SQL_ES_PRIMERA_VEZ}) "
-                f"FROM usuario_rescatepunto r "
-                f"JOIN {RESCATES_MV_REINCIDENCIA} v "
-                f"  ON r.nombre = v.nombre AND r.apellidos = v.apellidos AND r.nacionalidad = v.nacionalidad "
-                f"WHERE r.fecha = ANY(%s){filtro_estado_sql}",
-                params_reinc,
-            )
-            total_reincidentes_local, total_primera_vez_local = cur.fetchone()
+        # @FADAR -- las 3 consultas de aqui abajo hacen JOIN contra
+        # mapa_mv_reincidencia_rescates (909K filas); con work_mem por
+        # default (4MB) Postgres subestima la selectividad de
+        # fecha = ANY(...) y elige Nested Loop (lento para rangos amplios,
+        # verificado: 16.5s -> 7.7s con este ajuste, cambia a Hash Join).
+        # SET LOCAL dentro de transaction.atomic() revierte solo al
+        # terminar -- no se filtra a ninguna otra consulta ni modulo.
+        with transaction.atomic():
+            with connection.cursor() as cur:
+                cur.execute("SET LOCAL work_mem = '256MB'")
 
-            # @FADAR -- ambas categorias por dia (antes solo reincidentes),
-            # para poder apilar reincidentes + primera vez en la misma barra.
-            cur.execute(
-                f"SELECT TO_DATE(r.fecha,'DD-MM-YY') AS dia, "
-                f"  COUNT(*) FILTER (WHERE {RESCATES_SQL_ES_REINCIDENTE}) AS reinc, "
-                f"  COUNT(*) FILTER (WHERE {RESCATES_SQL_ES_PRIMERA_VEZ}) AS primera "
-                f"FROM usuario_rescatepunto r "
-                f"JOIN {RESCATES_MV_REINCIDENCIA} v "
-                f"  ON r.nombre = v.nombre AND r.apellidos = v.apellidos AND r.nacionalidad = v.nacionalidad "
-                f"WHERE r.fecha = ANY(%s){filtro_estado_sql} "
-                f"GROUP BY dia ORDER BY dia",
-                params_reinc,
-            )
-            reincidentes_por_dia_local = cur.fetchall()
-
-            # @FADAR -- historico: antes sumaba "veces" directo de la vista
-            # (sin tocar usuario_rescatepunto, porque no necesitaba saber
-            # la oficina de cada aparicion). 
-            historico_cacheado = cache.get(RESCATES_CACHE_KEY_REINCIDENCIA_HISTORICO)
-            if historico_cacheado is None:
+                # Reincidentes y primera vez del rango filtrado en UNA sola
+                # pasada sobre el JOIN.
                 cur.execute(
                     f"SELECT "
                     f"  COUNT(*) FILTER (WHERE {RESCATES_SQL_ES_REINCIDENTE}), "
                     f"  COUNT(*) FILTER (WHERE {RESCATES_SQL_ES_PRIMERA_VEZ}) "
                     f"FROM usuario_rescatepunto r "
                     f"JOIN {RESCATES_MV_REINCIDENCIA} v "
-                    f"  ON r.nombre = v.nombre AND r.apellidos = v.apellidos AND r.nacionalidad = v.nacionalidad"
+                    f"  ON r.nombre = v.nombre AND r.apellidos = v.apellidos AND r.nacionalidad = v.nacionalidad "
+                    f"WHERE r.fecha = ANY(%s){filtro_estado_sql}",
+                    params_reinc,
                 )
-                historico_cacheado = cur.fetchone()
-                cache.set(RESCATES_CACHE_KEY_REINCIDENCIA_HISTORICO, historico_cacheado, RESCATES_CACHE_TTL_REINCIDENCIA_HISTORICO)
-            total_reincidentes_historico_local, total_primera_vez_historico_local = historico_cacheado
+                total_reincidentes_local, total_primera_vez_local = cur.fetchone()
+
+                # @FADAR -- ambas categorias por dia (antes solo reincidentes),
+                # para poder apilar reincidentes + primera vez en la misma barra.
+                cur.execute(
+                    f"SELECT TO_DATE(r.fecha,'DD-MM-YY') AS dia, "
+                    f"  COUNT(*) FILTER (WHERE {RESCATES_SQL_ES_REINCIDENTE}) AS reinc, "
+                    f"  COUNT(*) FILTER (WHERE {RESCATES_SQL_ES_PRIMERA_VEZ}) AS primera "
+                    f"FROM usuario_rescatepunto r "
+                    f"JOIN {RESCATES_MV_REINCIDENCIA} v "
+                    f"  ON r.nombre = v.nombre AND r.apellidos = v.apellidos AND r.nacionalidad = v.nacionalidad "
+                    f"WHERE r.fecha = ANY(%s){filtro_estado_sql} "
+                    f"GROUP BY dia ORDER BY dia",
+                    params_reinc,
+                )
+                reincidentes_por_dia_local = cur.fetchall()
+
+                # @FADAR -- historico: antes sumaba "veces" directo de la vista
+                # (sin tocar usuario_rescatepunto, porque no necesitaba saber
+                # la oficina de cada aparicion).
+                historico_cacheado = cache.get(RESCATES_CACHE_KEY_REINCIDENCIA_HISTORICO)
+                if historico_cacheado is None:
+                    cur.execute(
+                        f"SELECT "
+                        f"  COUNT(*) FILTER (WHERE {RESCATES_SQL_ES_REINCIDENTE}), "
+                        f"  COUNT(*) FILTER (WHERE {RESCATES_SQL_ES_PRIMERA_VEZ}) "
+                        f"FROM usuario_rescatepunto r "
+                        f"JOIN {RESCATES_MV_REINCIDENCIA} v "
+                        f"  ON r.nombre = v.nombre AND r.apellidos = v.apellidos AND r.nacionalidad = v.nacionalidad"
+                    )
+                    historico_cacheado = cur.fetchone()
+                    cache.set(RESCATES_CACHE_KEY_REINCIDENCIA_HISTORICO, historico_cacheado, RESCATES_CACHE_TTL_REINCIDENCIA_HISTORICO)
+                total_reincidentes_historico_local, total_primera_vez_historico_local = historico_cacheado
         connection.close()
         return (
             total_reincidentes_local, reincidentes_por_dia_local,
@@ -2245,35 +2255,38 @@ def rescates_reporte_informe_excel(request):
     _rescates_excel_celda(ws5, f5, 3, rd["total_retornado"], bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True)
     _rescates_excel_celda(ws5, f5, 4, rd["total_general"], bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True)
 
-    # @FADAR -- Apoyo Operativo: hoja aparte, mismo formato que "Retornados (detalle)".
-    ws6 = wb.create_sheet("Apoyo Operativo (detalle)")
-    ws6.column_dimensions["A"].width = 28
-    for col in "BCDE":
-        ws6.column_dimensions[col].width = 16
-    ao = datos["apoyo_operativo_detalle"]
-    _rescates_excel_celda(ws6, 1, 1, f"Puestos a Disposición / DIF / Voluntarios — detalle por {ao['columna']}", bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True, centrado=False)
-    ws6.merge_cells(start_row=1, start_column=1, end_row=1, end_column=5)
-    _rescates_excel_celda(ws6, 2, 1, "Apoyo Operativo:", bg="FFFFFF", negrita=True, centrado=False)
-    _rescates_excel_celda(ws6, 2, 2, ao["total_general"], bg="FFFFFF", color_texto=RESCATES_COLOR_CELESTE, negrita=True)
-    fila_hdr6 = 4
-    _rescates_excel_celda(ws6, fila_hdr6, 1, ao["columna"].upper(), bg="FFFFFF", negrita=True, centrado=False)
-    _rescates_excel_celda(ws6, fila_hdr6, 2, "PUESTOS A DISP.", bg="FFFFFF", negrita=True)
-    _rescates_excel_celda(ws6, fila_hdr6, 3, "DIF", bg="FFFFFF", negrita=True)
-    _rescates_excel_celda(ws6, fila_hdr6, 4, "VOLUNTARIOS", bg="FFFFFF", negrita=True)
-    _rescates_excel_celda(ws6, fila_hdr6, 5, "TOTAL", bg="FFFFFF", negrita=True)
-    f6 = fila_hdr6 + 1
-    for fila_a in ao["filas"]:
-        _rescates_excel_celda(ws6, f6, 1, fila_a["nombre"], centrado=False)
-        _rescates_excel_celda(ws6, f6, 2, fila_a["puestos"])
-        _rescates_excel_celda(ws6, f6, 3, fila_a["dif"])
-        _rescates_excel_celda(ws6, f6, 4, fila_a["voluntarios"])
-        _rescates_excel_celda(ws6, f6, 5, fila_a["total"])
-        f6 += 1
-    _rescates_excel_celda(ws6, f6, 1, "TOTAL", bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True, centrado=False)
-    _rescates_excel_celda(ws6, f6, 2, ao["total_puestos"], bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True)
-    _rescates_excel_celda(ws6, f6, 3, ao["total_dif"], bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True)
-    _rescates_excel_celda(ws6, f6, 4, ao["total_voluntarios"], bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True)
-    _rescates_excel_celda(ws6, f6, 5, ao["total_general"], bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True)
+    # @FADAR -- hoja "Apoyo Operativo (detalle)" desactivada a peticion del
+    # usuario (2026-09-09): ese cuadro debe estar solo en el dashboard.
+    # No borrar -- if False: para reactivarla facil mas adelante.
+    if False:
+        ws6 = wb.create_sheet("Apoyo Operativo (detalle)")
+        ws6.column_dimensions["A"].width = 28
+        for col in "BCDE":
+            ws6.column_dimensions[col].width = 16
+        ao = datos["apoyo_operativo_detalle"]
+        _rescates_excel_celda(ws6, 1, 1, f"Puestos a Disposición / DIF / Voluntarios — detalle por {ao['columna']}", bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True, centrado=False)
+        ws6.merge_cells(start_row=1, start_column=1, end_row=1, end_column=5)
+        _rescates_excel_celda(ws6, 2, 1, "Apoyo Operativo:", bg="FFFFFF", negrita=True, centrado=False)
+        _rescates_excel_celda(ws6, 2, 2, ao["total_general"], bg="FFFFFF", color_texto=RESCATES_COLOR_CELESTE, negrita=True)
+        fila_hdr6 = 4
+        _rescates_excel_celda(ws6, fila_hdr6, 1, ao["columna"].upper(), bg="FFFFFF", negrita=True, centrado=False)
+        _rescates_excel_celda(ws6, fila_hdr6, 2, "PUESTOS A DISP.", bg="FFFFFF", negrita=True)
+        _rescates_excel_celda(ws6, fila_hdr6, 3, "DIF", bg="FFFFFF", negrita=True)
+        _rescates_excel_celda(ws6, fila_hdr6, 4, "VOLUNTARIOS", bg="FFFFFF", negrita=True)
+        _rescates_excel_celda(ws6, fila_hdr6, 5, "TOTAL", bg="FFFFFF", negrita=True)
+        f6 = fila_hdr6 + 1
+        for fila_a in ao["filas"]:
+            _rescates_excel_celda(ws6, f6, 1, fila_a["nombre"], centrado=False)
+            _rescates_excel_celda(ws6, f6, 2, fila_a["puestos"])
+            _rescates_excel_celda(ws6, f6, 3, fila_a["dif"])
+            _rescates_excel_celda(ws6, f6, 4, fila_a["voluntarios"])
+            _rescates_excel_celda(ws6, f6, 5, fila_a["total"])
+            f6 += 1
+        _rescates_excel_celda(ws6, f6, 1, "TOTAL", bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True, centrado=False)
+        _rescates_excel_celda(ws6, f6, 2, ao["total_puestos"], bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True)
+        _rescates_excel_celda(ws6, f6, 3, ao["total_dif"], bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True)
+        _rescates_excel_celda(ws6, f6, 4, ao["total_voluntarios"], bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True)
+        _rescates_excel_celda(ws6, f6, 5, ao["total_general"], bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True)
 
     # @FADAR -- nombre pedido: INFORME DIARIO DE OPERACIONES DIA DE MES AÑO.xlsx
     fecha_obj = datetime.strptime(fecha_str, "%Y-%m-%d")
@@ -2776,13 +2789,15 @@ def rescates_reporte_ceco2_excel(request):
     ws.column_dimensions["F"].width = 15
     ws.column_dimensions["G"].width = 20
 
+    # @FADAR -- azul uniforme (#4472C4/#1F3864/#DCE6F1), igual que el PDF de
+    # este mismo reporte -- antes usaba el guinda generico de otros reportes.
     ws.merge_cells("A1:B2")
-    _rescates_excel_celda(ws, 1, 1, "Fecha:", bg=RESCATES_COLOR_FONDO[0], color_texto="FFFFFF", negrita=True)
+    _rescates_excel_celda(ws, 1, 1, "Fecha:", bg="4472C4", color_texto="FFFFFF", negrita=True)
     ws.merge_cells("A3:B3")
     _rescates_excel_celda(ws, 3, 1, datos["fecha_actual"], bg="FFFFFF", negrita=True)
 
     ws.merge_cells("D1:E1")
-    _rescates_excel_celda(ws, 1, 4, "TOTAL", bg=RESCATES_COLOR_FONDO[0], color_texto="FFFFFF", negrita=True)
+    _rescates_excel_celda(ws, 1, 4, "TOTAL", bg="4472C4", color_texto="FFFFFF", negrita=True)
     ws.merge_cells("D2:E2")
     _rescates_excel_celda(ws, 2, 4, datos["total"], bg="FFFFFF", negrita=True, tam=14)
     if hora_inicio and hora_fin:
@@ -2790,16 +2805,17 @@ def rescates_reporte_ceco2_excel(request):
         _rescates_excel_celda(ws, 4, 1, f"Horario filtrado: {hora_inicio} a {hora_fin}", tam=9)
 
     fila = 5
-    _rescates_excel_fila(ws, fila, ["FECHA", "OR", "PRH", "RESCATES TOTAL", "PRIMERA VEZ/RESCATES REALES", "REINCIDENCIAS", "TIPO"], RESCATES_LETRA_T1, negrita=True)
+    _rescates_excel_fila(ws, fila, ["FECHA", "OR", "PRH", "RESCATES TOTAL", "PRIMERA VEZ/RESCATES REALES", "REINCIDENCIAS", "TIPO"], ("4472C4", "FFFFFF"), negrita=True)
     fila += 1
-    for f in datos["filas"]:
-        _rescates_excel_celda(ws, fila, 1, datos["fecha_actual"], centrado=True)
-        _rescates_excel_celda(ws, fila, 2, f["oficina"], centrado=False)
-        _rescates_excel_celda(ws, fila, 3, f["prh"] or "OTRA AUTORIDAD", centrado=False)
-        _rescates_excel_celda(ws, fila, 4, f["rescates"])
-        _rescates_excel_celda(ws, fila, 5, f["primera_vez"])
-        _rescates_excel_celda(ws, fila, 6, f["reincidencias"])
-        _rescates_excel_celda(ws, fila, 7, f["tipo"], centrado=False)
+    for i, f in enumerate(datos["filas"]):
+        bg_fila = "DCE6F1" if i % 2 == 1 else None
+        _rescates_excel_celda(ws, fila, 1, datos["fecha_actual"], bg=bg_fila, centrado=True)
+        _rescates_excel_celda(ws, fila, 2, f["oficina"], bg=bg_fila, centrado=False)
+        _rescates_excel_celda(ws, fila, 3, f["prh"] or "OTRA AUTORIDAD", bg=bg_fila, centrado=False)
+        _rescates_excel_celda(ws, fila, 4, f["rescates"], bg=bg_fila)
+        _rescates_excel_celda(ws, fila, 5, f["primera_vez"], bg=bg_fila)
+        _rescates_excel_celda(ws, fila, 6, f["reincidencias"], bg=bg_fila)
+        _rescates_excel_celda(ws, fila, 7, f["tipo"], bg=bg_fila, centrado=False)
         fila += 1
 
     _rescates_excel_celda(ws, fila, 1, "TOTAL", bg="1F3864", color_texto="FFFFFF", negrita=True, centrado=False)
@@ -2928,13 +2944,15 @@ def rescates_reporte_ceco21_excel(request):
     ws.column_dimensions["E"].width = 18
     ws.column_dimensions["F"].width = 20
 
+    # @FADAR -- azul uniforme (#4472C4/#1F3864/#DCE6F1), igual que el PDF de
+    # este mismo reporte -- antes usaba el guinda generico de otros reportes.
     ws.merge_cells("A1:B2")
-    _rescates_excel_celda(ws, 1, 1, "Fecha:", bg=RESCATES_COLOR_FONDO[0], color_texto="FFFFFF", negrita=True)
+    _rescates_excel_celda(ws, 1, 1, "Fecha:", bg="4472C4", color_texto="FFFFFF", negrita=True)
     ws.merge_cells("A3:B3")
     _rescates_excel_celda(ws, 3, 1, datos["fecha_actual"], bg="FFFFFF", negrita=True)
 
     ws.merge_cells("D1:E1")
-    _rescates_excel_celda(ws, 1, 4, "TOTAL", bg=RESCATES_COLOR_FONDO[0], color_texto="FFFFFF", negrita=True)
+    _rescates_excel_celda(ws, 1, 4, "TOTAL", bg="4472C4", color_texto="FFFFFF", negrita=True)
     ws.merge_cells("D2:E2")
     _rescates_excel_celda(ws, 2, 4, datos["total"], bg="FFFFFF", negrita=True, tam=14)
     if hora_inicio and hora_fin:
@@ -2942,15 +2960,16 @@ def rescates_reporte_ceco21_excel(request):
         _rescates_excel_celda(ws, 4, 1, f"Horario filtrado: {hora_inicio} a {hora_fin}", tam=9)
 
     fila = 5
-    _rescates_excel_fila(ws, fila, ["FECHA", "OR", "PRH", "RESCATES TOTAL", "PRIMERA VEZ/RESCATES REALES", "TIPO"], RESCATES_LETRA_T1, negrita=True)
+    _rescates_excel_fila(ws, fila, ["FECHA", "OR", "PRH", "RESCATES TOTAL", "PRIMERA VEZ/RESCATES REALES", "TIPO"], ("4472C4", "FFFFFF"), negrita=True)
     fila += 1
-    for f in datos["filas"]:
-        _rescates_excel_celda(ws, fila, 1, datos["fecha_actual"], centrado=True)
-        _rescates_excel_celda(ws, fila, 2, f["oficina"], centrado=False)
-        _rescates_excel_celda(ws, fila, 3, f["prh"] or "OTRA AUTORIDAD", centrado=False)
-        _rescates_excel_celda(ws, fila, 4, f["rescates"])
-        _rescates_excel_celda(ws, fila, 5, f["rescates"])
-        _rescates_excel_celda(ws, fila, 6, f["tipo"], centrado=False)
+    for i, f in enumerate(datos["filas"]):
+        bg_fila = "DCE6F1" if i % 2 == 1 else None
+        _rescates_excel_celda(ws, fila, 1, datos["fecha_actual"], bg=bg_fila, centrado=True)
+        _rescates_excel_celda(ws, fila, 2, f["oficina"], bg=bg_fila, centrado=False)
+        _rescates_excel_celda(ws, fila, 3, f["prh"] or "OTRA AUTORIDAD", bg=bg_fila, centrado=False)
+        _rescates_excel_celda(ws, fila, 4, f["rescates"], bg=bg_fila)
+        _rescates_excel_celda(ws, fila, 5, f["rescates"], bg=bg_fila)
+        _rescates_excel_celda(ws, fila, 6, f["tipo"], bg=bg_fila, centrado=False)
         fila += 1
 
     _rescates_excel_celda(ws, fila, 1, "TOTAL", bg="1F3864", color_texto="FFFFFF", negrita=True, centrado=False)
@@ -3323,34 +3342,38 @@ def _rescates_ceco_v_excel(datos, titulo, hoja_nombre="Hoja1"):
     _rescates_excel_celda(ws5, f5, 3, rd["total_retornado"], bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True)
     _rescates_excel_celda(ws5, f5, 4, rd["total_general"], bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True)
 
-    ws6 = wb.create_sheet("Apoyo Operativo (detalle)")
-    ws6.column_dimensions["A"].width = 28
-    for c in "BCDE":
-        ws6.column_dimensions[c].width = 16
-    ao = datos["apoyo_operativo_detalle"]
-    _rescates_excel_celda(ws6, 1, 1, f"Puestos a Disposición / DIF / Voluntarios — detalle por {ao['columna']}", bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True, centrado=False)
-    ws6.merge_cells(start_row=1, start_column=1, end_row=1, end_column=5)
-    _rescates_excel_celda(ws6, 2, 1, "Apoyo Operativo:", bg="FFFFFF", negrita=True, centrado=False)
-    _rescates_excel_celda(ws6, 2, 2, ao["total_general"], bg="FFFFFF", color_texto=RESCATES_COLOR_CELESTE, negrita=True)
-    fila_hdr6 = 4
-    _rescates_excel_celda(ws6, fila_hdr6, 1, ao["columna"].upper(), bg="FFFFFF", negrita=True, centrado=False)
-    _rescates_excel_celda(ws6, fila_hdr6, 2, "PUESTOS A DISP.", bg="FFFFFF", negrita=True)
-    _rescates_excel_celda(ws6, fila_hdr6, 3, "DIF", bg="FFFFFF", negrita=True)
-    _rescates_excel_celda(ws6, fila_hdr6, 4, "VOLUNTARIOS", bg="FFFFFF", negrita=True)
-    _rescates_excel_celda(ws6, fila_hdr6, 5, "TOTAL", bg="FFFFFF", negrita=True)
-    f6 = fila_hdr6 + 1
-    for fila_a in ao["filas"]:
-        _rescates_excel_celda(ws6, f6, 1, fila_a["nombre"], centrado=False)
-        _rescates_excel_celda(ws6, f6, 2, fila_a["puestos"])
-        _rescates_excel_celda(ws6, f6, 3, fila_a["dif"])
-        _rescates_excel_celda(ws6, f6, 4, fila_a["voluntarios"])
-        _rescates_excel_celda(ws6, f6, 5, fila_a["total"])
-        f6 += 1
-    _rescates_excel_celda(ws6, f6, 1, "TOTAL", bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True, centrado=False)
-    _rescates_excel_celda(ws6, f6, 2, ao["total_puestos"], bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True)
-    _rescates_excel_celda(ws6, f6, 3, ao["total_dif"], bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True)
-    _rescates_excel_celda(ws6, f6, 4, ao["total_voluntarios"], bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True)
-    _rescates_excel_celda(ws6, f6, 5, ao["total_general"], bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True)
+    # @FADAR -- hoja "Apoyo Operativo (detalle)" desactivada a peticion del
+    # usuario (2026-09-09): ese cuadro debe estar solo en el dashboard.
+    # No borrar -- si False: para reactivarla facil mas adelante.
+    if False:
+        ws6 = wb.create_sheet("Apoyo Operativo (detalle)")
+        ws6.column_dimensions["A"].width = 28
+        for c in "BCDE":
+            ws6.column_dimensions[c].width = 16
+        ao = datos["apoyo_operativo_detalle"]
+        _rescates_excel_celda(ws6, 1, 1, f"Puestos a Disposición / DIF / Voluntarios — detalle por {ao['columna']}", bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True, centrado=False)
+        ws6.merge_cells(start_row=1, start_column=1, end_row=1, end_column=5)
+        _rescates_excel_celda(ws6, 2, 1, "Apoyo Operativo:", bg="FFFFFF", negrita=True, centrado=False)
+        _rescates_excel_celda(ws6, 2, 2, ao["total_general"], bg="FFFFFF", color_texto=RESCATES_COLOR_CELESTE, negrita=True)
+        fila_hdr6 = 4
+        _rescates_excel_celda(ws6, fila_hdr6, 1, ao["columna"].upper(), bg="FFFFFF", negrita=True, centrado=False)
+        _rescates_excel_celda(ws6, fila_hdr6, 2, "PUESTOS A DISP.", bg="FFFFFF", negrita=True)
+        _rescates_excel_celda(ws6, fila_hdr6, 3, "DIF", bg="FFFFFF", negrita=True)
+        _rescates_excel_celda(ws6, fila_hdr6, 4, "VOLUNTARIOS", bg="FFFFFF", negrita=True)
+        _rescates_excel_celda(ws6, fila_hdr6, 5, "TOTAL", bg="FFFFFF", negrita=True)
+        f6 = fila_hdr6 + 1
+        for fila_a in ao["filas"]:
+            _rescates_excel_celda(ws6, f6, 1, fila_a["nombre"], centrado=False)
+            _rescates_excel_celda(ws6, f6, 2, fila_a["puestos"])
+            _rescates_excel_celda(ws6, f6, 3, fila_a["dif"])
+            _rescates_excel_celda(ws6, f6, 4, fila_a["voluntarios"])
+            _rescates_excel_celda(ws6, f6, 5, fila_a["total"])
+            f6 += 1
+        _rescates_excel_celda(ws6, f6, 1, "TOTAL", bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True, centrado=False)
+        _rescates_excel_celda(ws6, f6, 2, ao["total_puestos"], bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True)
+        _rescates_excel_celda(ws6, f6, 3, ao["total_dif"], bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True)
+        _rescates_excel_celda(ws6, f6, 4, ao["total_voluntarios"], bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True)
+        _rescates_excel_celda(ws6, f6, 5, ao["total_general"], bg=RESCATES_COLOR_CELESTE, color_texto="FFFFFF", negrita=True)
 
     # @FADAR -- hoja aparte, solo si se filtro por hora: la hoja principal
     # tiene su encabezado verificado celda por celda contra el archivo de

@@ -68,13 +68,13 @@
     <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
         <h1 class="text-2xl font-bold text-[#9A0A38] whitespace-nowrap">Reporte — Cuadro de Datos</h1>
         <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
-            <a href="{% url 'Reportes_Analisis:rescates_reporte_informe' %}?fecha={{ fecha_iso }}" class="inline-flex items-center gap-2 bg-[#4C69B0] hover:bg-[#3f5899] text-white text-sm font-medium px-4 py-2 rounded-lg transition">Informe Diario</a>
-            <a href="{% url 'Reportes_Analisis:rescates_reporte_regiones' %}?fecha={{ fecha_iso }}&oficina={{ oficina_seleccionada }}" class="inline-flex items-center gap-2 bg-[#4C69B0] hover:bg-[#3f5899] text-white text-sm font-medium px-4 py-2 rounded-lg transition">Regiones (CECO)</a>
+            <a href="{% url 'Reportes_Analisis:rescates_reporte_informe' %}?fecha={{ fecha_iso }}" class="inline-flex items-center gap-2 bg-[#4C69B0] hover:bg-[#3f5899] text-white text-sm font-medium px-4 py-2 rounded-lg transition">Informe Diario Operación</a>
+            <a href="{% url 'Reportes_Analisis:rescates_reporte_regiones' %}?fecha={{ fecha_iso }}&oficina={{ oficina_seleccionada }}" class="inline-flex items-center gap-2 bg-[#4C69B0] hover:bg-[#3f5899] text-white text-sm font-medium px-4 py-2 rounded-lg transition">Reportes CECO</a>
             <a href="{% url 'Reportes_Analisis:rescates_reporte_nacionalidades_especiales' %}?fecha_inicio={{ fecha_iso }}&fecha_fin={{ fecha_iso }}" target="_blank" class="inline-flex items-center gap-2 bg-[#4C69B0] hover:bg-[#3f5899] text-white text-sm font-medium px-4 py-2 rounded-lg transition">Reporte nacionalidades especiales</a>
             <a href="{% url 'Reportes_Analisis:rescates_reporte_nacionalidades_extracontinentales' %}?fecha_inicio={{ fecha_iso }}&fecha_fin={{ fecha_iso }}" target="_blank" class="inline-flex items-center gap-2 bg-[#4C69B0] hover:bg-[#3f5899] text-white text-sm font-medium px-4 py-2 rounded-lg transition">Nacionalidades extra-continentales</a>
-            <a href="{% url 'Reportes_Analisis:rescates_reporte_disuadidos' %}?fecha={{ fecha_iso }}" target="_blank" class="inline-flex items-center gap-2 bg-[#4C69B0] hover:bg-[#3f5899] text-white text-sm font-medium px-4 py-2 rounded-lg transition">Disuadidos</a>
+            <!--<a href="{% url 'Reportes_Analisis:rescates_reporte_disuadidos' %}?fecha={{ fecha_iso }}" target="_blank" class="inline-flex items-center gap-2 bg-[#4C69B0] hover:bg-[#3f5899] text-white text-sm font-medium px-4 py-2 rounded-lg transition">Disuadidos</a> -->
             <a href="{% url 'Reportes_Analisis:rescates_reporte_ferrocarril' %}" target="_blank" class="inline-flex items-center gap-2 bg-[#4C69B0] hover:bg-[#3f5899] text-white text-sm font-medium px-4 py-2 rounded-lg transition">Rescates vía ferrocarril</a>
-            <a href="{% url 'Reportes_Analisis:rescates_dashboard' %}" class="text-sm font-semibold text-gray-500 hover:text-[#9A0A38] transition">← Volver al dashboard</a>
+            <a href="{% url 'Reportes_Analisis:rescates_dashboard' %}" class="text-sm font-semibold text-blue-500 hover:text-[#9A0A38] transition">← Volver al dashboard</a>
         </div>
     </div>
 
