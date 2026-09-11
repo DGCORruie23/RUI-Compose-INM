@@ -646,6 +646,271 @@ def _rescates_geojson_regiones(zona_rio_bravo, zona_centro, zona_suchiate):
     return geo_data
 
 
+def _rescates_dashboard_pdf_detalle(fecha_inicio, fecha_fin, oficina=None):
+    """Version 'ejecutiva' (solo cifras/tablas, sin graficas) de
+    rescates_dashboard, para el PDF descargable. Reutiliza las mismas
+    consultas donde aplica, pero omite las que solo alimentan graficas de
+    Bokeh (_consulta_dia_hora, _consulta_por_entidad -- nunca se muestran
+    en el PDF) y simplifica reincidencia/nucleos familiares a solo totales
+    (no se necesita el desglose dia por dia ni el listado de integrantes).
+    Es una copia deliberada, no una llamada a rescates_dashboard -- separar
+    "calcular datos" de "construir graficas" en la funcion original
+    implicaria tocarla, y se prefirio no arriesgar el dashboard que ya
+    funciona."""
+    filtro_oficina_sql = ''
+    params_base = [fecha_inicio, fecha_fin]
+    if oficina:
+        filtro_oficina_sql = ' AND "oficinaRepre" = %s'
+        params_base = params_base + [oficina]
+
+    array_fechas = _rescates_array_fechas(fecha_inicio, fecha_fin)
+    params_indexado = [array_fechas]
+    if oficina:
+        params_indexado = params_indexado + [oficina]
+
+    def _consulta_sexo_edad():
+        with connection.cursor() as cur:
+            cur.execute(
+                f"SELECT "
+                f"  COUNT(*) FILTER (WHERE sexo=true  AND edad>=18) AS hombres, "
+                f"  COUNT(*) FILTER (WHERE sexo=false AND edad>=18) AS mujeres, "
+                f"  COUNT(*) FILTER (WHERE sexo=true  AND edad<18)  AS ninos, "
+                f"  COUNT(*) FILTER (WHERE sexo=false AND edad<18)  AS ninas "
+                f"FROM usuario_rescatepunto "
+                f"WHERE fecha = ANY(%s){filtro_oficina_sql}",
+                params_indexado,
+            )
+            resultado = cur.fetchone()
+        connection.close()
+        return resultado
+
+    def _consulta_nacionalidad():
+        with connection.cursor() as cur:
+            cur.execute(
+                f"SELECT iso3, UPPER(MAX(nacionalidad)), COUNT(*) FROM usuario_rescatepunto "
+                f"WHERE fecha = ANY(%s){filtro_oficina_sql} "
+                f"GROUP BY iso3",
+                params_indexado,
+            )
+            iso_rows_local = cur.fetchall()
+        connection.close()
+        return iso_rows_local
+
+    def _consulta_reincidentes():
+        # @FADAR -- solo el total (rango + historico), sin el desglose por
+        # dia -- eso solo alimentaba la barra apilada en pantalla.
+        filtro_estado_sql = ""
+        params_reinc = [array_fechas]
+        if oficina:
+            filtro_estado_sql = ' AND r."oficinaRepre" = %s'
+            params_reinc = params_reinc + [oficina]
+        with transaction.atomic():
+            with connection.cursor() as cur:
+                cur.execute("SET LOCAL work_mem = '256MB'")
+                cur.execute(
+                    f"SELECT "
+                    f"  COUNT(*) FILTER (WHERE {RESCATES_SQL_ES_REINCIDENTE}), "
+                    f"  COUNT(*) FILTER (WHERE {RESCATES_SQL_ES_PRIMERA_VEZ}) "
+                    f"FROM usuario_rescatepunto r "
+                    f"JOIN {RESCATES_MV_REINCIDENCIA} v "
+                    f"  ON r.nombre = v.nombre AND r.apellidos = v.apellidos AND r.nacionalidad = v.nacionalidad "
+                    f"WHERE r.fecha = ANY(%s){filtro_estado_sql}",
+                    params_reinc,
+                )
+                total_reincidentes_local, total_primera_vez_local = cur.fetchone()
+
+                historico_cacheado = cache.get(RESCATES_CACHE_KEY_REINCIDENCIA_HISTORICO)
+                if historico_cacheado is None:
+                    cur.execute(
+                        f"SELECT "
+                        f"  COUNT(*) FILTER (WHERE {RESCATES_SQL_ES_REINCIDENTE}), "
+                        f"  COUNT(*) FILTER (WHERE {RESCATES_SQL_ES_PRIMERA_VEZ}) "
+                        f"FROM usuario_rescatepunto r "
+                        f"JOIN {RESCATES_MV_REINCIDENCIA} v "
+                        f"  ON r.nombre = v.nombre AND r.apellidos = v.apellidos AND r.nacionalidad = v.nacionalidad"
+                    )
+                    historico_cacheado = cur.fetchone()
+                    cache.set(RESCATES_CACHE_KEY_REINCIDENCIA_HISTORICO, historico_cacheado, RESCATES_CACHE_TTL_REINCIDENCIA_HISTORICO)
+                total_reincidentes_historico_local, total_primera_vez_historico_local = historico_cacheado
+        connection.close()
+        return (
+            total_reincidentes_local, total_reincidentes_historico_local,
+            total_primera_vez_local, total_primera_vez_historico_local,
+        )
+
+    def _consulta_total_familias():
+        # @FADAR -- solo el conteo, sin materializar cada integrante --
+        # GROUP BY + HAVING en vez de la ventana PARTITION BY que usa la
+        # pantalla (que si necesita el detalle fila por fila).
+        with connection.cursor() as cur:
+            cur.execute(
+                f'SELECT COUNT(*) FROM ( '
+                f'  SELECT 1 FROM usuario_rescatepunto '
+                f'  WHERE fecha = ANY(%s){filtro_oficina_sql} AND "numFamilia" > 0 '
+                f'  GROUP BY "oficinaRepre", fecha, hora, "puntoEstra", "numFamilia" '
+                f'  HAVING COUNT(*) >= 2 '
+                f") sub",
+                params_indexado,
+            )
+            total = cur.fetchone()[0]
+        connection.close()
+        return total
+
+    def _consulta_tipo_rescate():
+        with connection.cursor() as cur:
+            cur.execute(
+                f"SELECT "
+                f"  COUNT(*) FILTER (WHERE carretero) AS carretero, "
+                f"  COUNT(*) FILTER (WHERE aeropuerto) AS aereo, "
+                f"  COUNT(*) FILTER (WHERE ferrocarril) AS ferroviario, "
+                f'  COUNT(*) FILTER (WHERE "centralAutobus") AS central_autobus, '
+                f'  COUNT(*) FILTER (WHERE "casaSeguridad") AS casa_seguridad, '
+                f"  COUNT(*) FILTER (WHERE hotel) AS hotel, "
+                f"  COUNT(*) FILTER (WHERE reclusorio) AS reclusorio "
+                f"FROM usuario_rescatepunto "
+                f"WHERE fecha = ANY(%s){filtro_oficina_sql}",
+                params_indexado,
+            )
+            resultado = cur.fetchone()
+        connection.close()
+        return resultado
+
+    def _consulta_retornados():
+        filtro_estado_sql = ""
+        params_ret = [fecha_inicio, fecha_fin]
+        if oficina:
+            filtro_estado_sql = " AND estado_id = (SELECT id FROM mapa_estado WHERE nombre = %s)"
+            params_ret = params_ret + [oficina]
+        with connection.cursor() as cur:
+            cur.execute(
+                f"SELECT COALESCE(SUM(retornados_total),0), COALESCE(SUM(deportado),0), COALESCE(SUM(retornado),0) "
+                f"FROM mapa_retornados WHERE fecha BETWEEN %s AND %s{filtro_estado_sql}",
+                params_ret,
+            )
+            total_local, deportado_local, retornado_local = cur.fetchone()
+            cur.execute("SELECT COALESCE(SUM(retornados_total),0) FROM mapa_retornados")
+            total_historico_local = cur.fetchone()[0]
+        connection.close()
+        return total_local, deportado_local, retornado_local, total_historico_local
+
+    def _consulta_apoyo_operativo():
+        condicion_inadmitido = (
+            'NOT aeropuerto AND NOT carretero AND NOT "casaSeguridad" AND NOT "centralAutobus" '
+            'AND NOT ferrocarril AND NOT hotel AND NOT "puestosADispo" AND NOT voluntarios AND NOT otro'
+        )
+        with connection.cursor() as cur:
+            cur.execute(
+                f'SELECT "oficinaRepre", '
+                f'  COUNT(*) FILTER (WHERE "puestosADispo") AS puestos, '
+                f'  COUNT(*) FILTER (WHERE dif) AS dif, '
+                f'  COUNT(*) FILTER (WHERE voluntarios) AS voluntarios, '
+                f'  COUNT(*) FILTER (WHERE {condicion_inadmitido}) AS inadmitidos '
+                f'FROM usuario_rescatepunto '
+                f'WHERE fecha = ANY(%s){filtro_oficina_sql} '
+                f'GROUP BY "oficinaRepre" '
+                f'HAVING COUNT(*) FILTER (WHERE "puestosADispo" OR dif OR voluntarios) > 0 '
+                f'  OR COUNT(*) FILTER (WHERE {condicion_inadmitido}) > 0 '
+                f'ORDER BY "oficinaRepre"',
+                params_indexado,
+            )
+            filas_local = [
+                {"nombre": of, "puestos": p, "dif": d, "voluntarios": v, "inadmitidos": i, "total": p + d + v + i}
+                for of, p, d, v, i in cur.fetchall()
+            ]
+        connection.close()
+        return {
+            "columna": "Entidad",
+            "filas": filas_local,
+            "total_puestos": sum(f["puestos"] for f in filas_local),
+            "total_dif": sum(f["dif"] for f in filas_local),
+            "total_voluntarios": sum(f["voluntarios"] for f in filas_local),
+            "total_inadmitidos": sum(f["inadmitidos"] for f in filas_local),
+            "total_general": sum(f["total"] for f in filas_local),
+        }
+
+    with ThreadPoolExecutor(max_workers=7) as executor:
+        futuro_sexo = executor.submit(_consulta_sexo_edad)
+        futuro_nac = executor.submit(_consulta_nacionalidad)
+        futuro_reincidentes = executor.submit(_consulta_reincidentes)
+        futuro_familias = executor.submit(_consulta_total_familias)
+        futuro_tipo_rescate = executor.submit(_consulta_tipo_rescate)
+        futuro_retornados = executor.submit(_consulta_retornados)
+        futuro_apoyo_operativo = executor.submit(_consulta_apoyo_operativo)
+        futuro_regiones = executor.submit(_rescates_regiones, fecha_inicio, fecha_fin, oficina)
+
+        hombres, mujeres, ninos, ninas = futuro_sexo.result()
+        iso_rows = futuro_nac.result()
+        (
+            total_reincidentes, total_reincidentes_historico,
+            total_primera_vez, total_primera_vez_historico,
+        ) = futuro_reincidentes.result()
+        total_familias = futuro_familias.result()
+        carretero, aereo, ferroviario, central_autobus, casa_seguridad, hotel, reclusorio = futuro_tipo_rescate.result()
+        total_retornados, retornados_deportado, retornados_retornado, total_retornados_historico = futuro_retornados.result()
+        apoyo_operativo_detalle = futuro_apoyo_operativo.result()
+        (
+            zona_rio_bravo, zona_centro, zona_suchiate,
+            subtotal_rio_bravo, subtotal_centro, subtotal_suchiate,
+            total_regiones, _nac_1_reinc_sin_usar, _total_nac_1_reinc_sin_usar,
+            _nac_extracontinentales_sin_usar,
+        ) = futuro_regiones.result()
+
+    total_rango = hombres + mujeres + ninos + ninas
+
+    atipicas_por_region = {"Medio Oriente": 0, "Europa": 0, "Otras / poco conocidas": 0}
+    detalle_atipicas = []
+    for iso3, nombre, total in iso_rows:
+        region = _rescates_region_atipica(iso3)
+        if region:
+            atipicas_por_region[region] += total
+            detalle_atipicas.append({"iso3": iso3, "nombre": nombre, "total": total, "region": region})
+    total_atipicas = sum(atipicas_por_region.values())
+    # @FADAR -- color por frecuencia (mismo degradado que ferrocarril/dashboard),
+    # relativo al maximo global de nacionalidades atipicas del PDF.
+    max_atipica = max((d["total"] for d in detalle_atipicas), default=1)
+    for d in detalle_atipicas:
+        d["color"] = _rescates_color_frecuencia(d["total"] / max_atipica if max_atipica else 0)
+    detalle_atipicas_agrupado = [
+        {
+            "region": region,
+            "etiqueta": "Otras" if region == "Otras / poco conocidas" else region,
+            "total": atipicas_por_region[region],
+            "filas": sorted(
+                (d for d in detalle_atipicas if d["region"] == region),
+                key=lambda d: d["total"], reverse=True,
+            ),
+        }
+        for region in ("Europa", "Medio Oriente", "Otras / poco conocidas")
+    ]
+
+    return {
+        "fecha_inicio": fecha_inicio,
+        "fecha_fin": fecha_fin,
+        "oficina": oficina or "Nacional",
+        "total_rango": total_rango,
+        "hombres": hombres, "mujeres": mujeres, "ninos": ninos, "ninas": ninas,
+        "total_atipicas": total_atipicas,
+        "detalle_atipicas_agrupado": detalle_atipicas_agrupado,
+        "total_reincidentes": total_reincidentes,
+        "total_reincidentes_historico": total_reincidentes_historico,
+        "total_primera_vez": total_primera_vez,
+        "total_primera_vez_historico": total_primera_vez_historico,
+        "total_familias": total_familias,
+        "carretero": carretero, "aereo": aereo, "ferroviario": ferroviario,
+        "central_autobus": central_autobus, "casa_seguridad": casa_seguridad,
+        "hotel": hotel, "reclusorio": reclusorio,
+        "total_retornados": total_retornados,
+        "retornados_deportado": retornados_deportado,
+        "retornados_retornado": retornados_retornado,
+        "total_retornados_historico": total_retornados_historico,
+        "apoyo_operativo_detalle": apoyo_operativo_detalle,
+        "subtotal_rio_bravo": subtotal_rio_bravo,
+        "subtotal_centro": subtotal_centro,
+        "subtotal_suchiate": subtotal_suchiate,
+        "total_regiones": total_regiones,
+    }
+
+
 @never_cache
 def rescates_dashboard(request):
     """Tablero de Rescates/Operación: diagrama de dispersión de rescates por
@@ -1305,6 +1570,28 @@ def rescates_dashboard(request):
         "div_reincidentes_dia": div_reincidentes_dia,
     }
     return render(request, "Reportes_Analisis/rescates.html", context)
+
+
+def rescates_dashboard_pdf(request):
+    """PDF ejecutivo del dashboard principal -- solo cifras/tablas (sin
+    graficas). Igual que ferrocarril: exige fecha_inicio/fecha_fin
+    explicitos en la URL, si faltan regresa a la pantalla del dashboard en
+    vez de generar con el rango completo por accidente."""
+    if not request.user.is_authenticated:
+        return redirect('/log-in/?next=%s' % request.path)
+    if 'fecha_inicio' not in request.GET or 'fecha_fin' not in request.GET:
+        return redirect('Reportes_Analisis:rescates_dashboard')
+    fecha_inicio = request.GET.get('fecha_inicio')
+    fecha_fin = request.GET.get('fecha_fin')
+    oficina = request.GET.get('oficina', '').strip()
+    datos = _rescates_dashboard_pdf_detalle(fecha_inicio, fecha_fin, oficina or None)
+    template = get_template("Reportes_Analisis/_rescates_dashboard_pdf.html")
+    html_string = template.render(datos)
+    pdf_file = HTML(string=html_string, base_url=request.build_absolute_uri()).write_pdf()
+    nombre_archivo = f"Resumen ejecutivo {fecha_inicio} a {fecha_fin}.pdf"
+    response = HttpResponse(pdf_file, content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="{nombre_archivo}"'
+    return response
 
 
 @never_cache

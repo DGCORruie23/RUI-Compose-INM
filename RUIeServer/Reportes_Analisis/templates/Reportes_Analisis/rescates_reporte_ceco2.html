@@ -32,13 +32,13 @@
 <main class="max-w-6xl mx-auto px-4 py-6">
 
     <div class="flex items-center justify-between mb-4">
-        <h1 class="text-2xl font-bold text-[#9A0A38]">CECO 2 rescates + reincidencias</h1>
+        <h1 class="text-2xl font-bold text-[#9A0A38]">CECO 2 PRH's rescates + reincidencias</h1>
         {# @FADAR -- dashboard y Regiones ya viven en Reportes_Analisis #}
-        <a href="{% url 'Reportes_Analisis:rescates_dashboard' %}" class="text-sm font-semibold text-gray-500 hover:text-[#9A0A38] transition">← Volver al dashboard</a>
+        <a href="{% url 'Reportes_Analisis:rescates_dashboard' %}" class="text-sm font-semibold text-blue-500 hover:text-[#9A0A38] transition">← Volver al dashboard</a>
     </div>
 
     {# @FADAR -- barra de reportes relacionados, aparte del titulo #}
-    <div class="rescates-tarjeta mb-6 flex flex-wrap gap-3">
+    <!-- <div class="rescates-tarjeta mb-6 flex flex-wrap gap-3">
         <a href="{% url 'Reportes_Analisis:rescates_reporte_regiones' %}?fecha={{ fecha_iso }}&oficina={{ oficina_seleccionada }}" target="_blank"
            class="inline-flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold px-4 py-2 rounded-lg transition">
             CECO
@@ -55,7 +55,7 @@
            class="inline-flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
             Generar CECO RESCATES PRIMERA VEZ
         </a>
-    </div>
+    </div> -->
 
     <form method="get" class="rescates-tarjeta mb-8 flex flex-wrap items-end gap-4">
         <div>

@@ -5,6 +5,7 @@ app_name = 'Reportes_Analisis'
 
 urlpatterns = [
     path('rescates', views.rescates_dashboard, name="rescates_dashboard"),
+    path('rescates/pdf', views.rescates_dashboard_pdf, name="rescates_dashboard_pdf"),
 
     # @FADAR -- Regiones (CECO): widget/detalle interactivo + reporte formal
     path('rescates/regiones', views.rescates_regiones, name="rescates_regiones"),

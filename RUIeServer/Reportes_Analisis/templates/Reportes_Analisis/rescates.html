@@ -186,6 +186,11 @@
            class="inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
             Limpiar filtros
         </a>
+        <div class="flex-1"></div>
+        <a href="{% url 'Reportes_Analisis:rescates_dashboard_pdf' %}?fecha_inicio={{ fecha_inicio }}&fecha_fin={{ fecha_fin }}&oficina={{ oficina_seleccionada }}"
+           class="inline-flex items-center gap-2 bg-gray-700 hover:bg-gray-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+            ⬇ Descargar PDF ejecutivo
+        </a>
     </form>
 
     <!-- Tarjetas resumen -->
