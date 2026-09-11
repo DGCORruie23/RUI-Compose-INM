@@ -918,25 +918,34 @@ def rescates_dashboard(request):
         return total_local, deportado_local, retornado_local, total_historico_local
 
     def _consulta_apoyo_operativo():
-        # @FADAR -- Puestos a Disposicion / DIF / Voluntarios por entidad,
-        # mismo formato que _rescates_apoyo_operativo_detalle (informe/CECO)
-        # pero para el rango de fechas del dashboard en vez de un solo dia.
+        # @FADAR -- Puestos a Disposicion / DIF / Voluntarios / Inadmitidos
+        # por entidad, mismo formato que _rescates_apoyo_operativo_detalle
+        # (informe/CECO) pero para el rango de fechas del dashboard en vez
+        # de un solo dia. "Inadmitido" = ninguna bandera de medio de rescate
+        # activa -- misma regla ya usada en _rescates_cuadro_datos
+        # (RESCATES_BANDERAS_MEDIO), a peticion del usuario se agrega aqui.
+        condicion_inadmitido = (
+            'NOT aeropuerto AND NOT carretero AND NOT "casaSeguridad" AND NOT "centralAutobus" '
+            'AND NOT ferrocarril AND NOT hotel AND NOT "puestosADispo" AND NOT voluntarios AND NOT otro'
+        )
         with connection.cursor() as cur:
             cur.execute(
                 f'SELECT "oficinaRepre", '
                 f'  COUNT(*) FILTER (WHERE "puestosADispo") AS puestos, '
                 f'  COUNT(*) FILTER (WHERE dif) AS dif, '
-                f'  COUNT(*) FILTER (WHERE voluntarios) AS voluntarios '
+                f'  COUNT(*) FILTER (WHERE voluntarios) AS voluntarios, '
+                f'  COUNT(*) FILTER (WHERE {condicion_inadmitido}) AS inadmitidos '
                 f'FROM usuario_rescatepunto '
                 f'WHERE fecha = ANY(%s){filtro_oficina_sql} '
                 f'GROUP BY "oficinaRepre" '
                 f'HAVING COUNT(*) FILTER (WHERE "puestosADispo" OR dif OR voluntarios) > 0 '
+                f'  OR COUNT(*) FILTER (WHERE {condicion_inadmitido}) > 0 '
                 f'ORDER BY "oficinaRepre"',
                 params_indexado,
             )
             filas_local = [
-                {"nombre": of, "puestos": p, "dif": d, "voluntarios": v, "total": p + d + v}
-                for of, p, d, v in cur.fetchall()
+                {"nombre": of, "puestos": p, "dif": d, "voluntarios": v, "inadmitidos": i, "total": p + d + v + i}
+                for of, p, d, v, i in cur.fetchall()
             ]
         connection.close()
         return {
@@ -945,6 +954,7 @@ def rescates_dashboard(request):
             "total_puestos": sum(f["puestos"] for f in filas_local),
             "total_dif": sum(f["dif"] for f in filas_local),
             "total_voluntarios": sum(f["voluntarios"] for f in filas_local),
+            "total_inadmitidos": sum(f["inadmitidos"] for f in filas_local),
             "total_general": sum(f["total"] for f in filas_local),
         }
 
@@ -2019,8 +2029,11 @@ def _rescates_informe_diario(fecha_str, hora_inicio=None, hora_fin=None):
 
     # @FADAR -- fila TOTAL pedida para ambas tablas (ya traian el subtotal
     # por nacionalidad en la ultima columna, pero no la suma general).
-    def _fila_total_categorias(tabla):
-        claves = [clave for clave, _ in RESCATES_ETIQUETAS_CATEGORIA]
+    # claves=None reusa las 8 categorias de nuevos/reincidentes; Inadmitidos
+    # usa sus propias 4 (H_A/M_A/H_m/M_m), se le pasan explicitas.
+    def _fila_total_categorias(tabla, claves=None):
+        if claves is None:
+            claves = [clave for clave, _ in RESCATES_ETIQUETAS_CATEGORIA]
         total = {clave: 0 for clave in claves}
         total["total"] = 0
         for d in tabla.values():
@@ -2049,6 +2062,7 @@ def _rescates_informe_diario(fecha_str, hora_inicio=None, hora_fin=None):
         else:
             tabla_inadm[d["nacionalidad"]]["M_m"] += 1
     nacionalidades_inadmitidos = dict(sorted(tabla_inadm.items(), key=lambda x: x[1]["total"], reverse=True))
+    total_nacionalidades_inadmitidos = _fila_total_categorias(nacionalidades_inadmitidos, claves=["H_A", "M_A", "H_m", "M_m"])
 
     # @FADAR -- nacionalidades extracontinentales (fuera de America), para
     # remarcarlas en las 3 tablas del informe. Un nombre de nacionalidad
@@ -2080,6 +2094,7 @@ def _rescates_informe_diario(fecha_str, hora_inicio=None, hora_fin=None):
         "total_nacionalidades_nuevos": total_nacionalidades_nuevos,
         "total_nacionalidades_reincidentes": total_nacionalidades_reincidentes,
         "nacionalidades_inadm": nacionalidades_inadmitidos,
+        "total_nacionalidades_inadmitidos": total_nacionalidades_inadmitidos,
         "nacionalidades_extracontinentales": nacionalidades_extracontinentales,
         "dato": total_retornados,
         "categorias": RESCATES_ETIQUETAS_CATEGORIA,
@@ -2223,6 +2238,15 @@ def rescates_reporte_informe_excel(request):
         for i, campo in enumerate(("H_A", "M_A", "H_m", "M_m")):
             _rescates_excel_celda(ws4, f, 2 + i, d[campo], bg=RESCATES_LETRA_T3[0], color_texto=RESCATES_LETRA_T3[1])
         _rescates_excel_celda(ws4, f, 6, d["total"], bg=RESCATES_LETRA_T0[0], color_texto=RESCATES_LETRA_T0[1], negrita=True)
+        f += 1
+    # @FADAR -- fila TOTAL de Inadmitidos, mismo criterio que ya tienen
+    # "Nacionalidades Nuevos"/"Nacionalidades Reincidentes" (_hoja_nacionalidad).
+    if datos["nacionalidades_inadm"]:
+        t = datos["total_nacionalidades_inadmitidos"]
+        _rescates_excel_celda(ws4, f, 1, "TOTAL", bg=RESCATES_LETRA_T6[0], color_texto=RESCATES_LETRA_T6[1], negrita=True, centrado=False)
+        for i, campo in enumerate(("H_A", "M_A", "H_m", "M_m")):
+            _rescates_excel_celda(ws4, f, 2 + i, t[campo], bg=RESCATES_LETRA_T6[0], color_texto=RESCATES_LETRA_T6[1], negrita=True)
+        _rescates_excel_celda(ws4, f, 6, t["total"], bg=RESCATES_LETRA_T6[0], color_texto=RESCATES_LETRA_T6[1], negrita=True)
         f += 1
     f += 1
     _rescates_excel_fila(ws4, f, ["TOTAL DE RETORNADOS A SU PAÍS DE ORIGEN", datos["dato"]], RESCATES_LETRA_T6, negrita=True)

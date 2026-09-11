@@ -492,18 +492,18 @@
                 <div class="valor">{{ apoyo_operativo_detalle.total_general }}</div>
                 <div class="etiqueta">Apoyo Operativo</div>
             </div>
-            <h3>Puestos a Disposición / DIF / Voluntarios — detalle por {{ apoyo_operativo_detalle.columna }}</h3>
+            <h3>Puestos a Disposición / DIF / Voluntarios / Inadmitidos — detalle por {{ apoyo_operativo_detalle.columna }}</h3>
             <table class="tabla-retornados-detalle">
                 <thead>
-                    <tr><th>{{ apoyo_operativo_detalle.columna }}</th><th>Puestos a Disp.</th><th>DIF</th><th>Voluntarios</th><th>Total</th></tr>
+                    <tr><th>{{ apoyo_operativo_detalle.columna }}</th><th>Puestos a Disp.</th><th>DIF</th><th>Voluntarios</th><th>Inadmitidos</th><th>Total</th></tr>
                 </thead>
                 <tbody>
                     {% for f in apoyo_operativo_detalle.filas %}
-                    <tr><td>{{ f.nombre }}</td><td>{{ f.puestos }}</td><td>{{ f.dif }}</td><td>{{ f.voluntarios }}</td><td>{{ f.total }}</td></tr>
+                    <tr><td>{{ f.nombre }}</td><td>{{ f.puestos }}</td><td>{{ f.dif }}</td><td>{{ f.voluntarios }}</td><td>{{ f.inadmitidos }}</td><td>{{ f.total }}</td></tr>
                     {% empty %}
-                    <tr><td colspan="5">Sin apoyo operativo en este rango.</td></tr>
+                    <tr><td colspan="6">Sin apoyo operativo en este rango.</td></tr>
                     {% endfor %}
-                    <tr><td>TOTAL</td><td>{{ apoyo_operativo_detalle.total_puestos }}</td><td>{{ apoyo_operativo_detalle.total_dif }}</td><td>{{ apoyo_operativo_detalle.total_voluntarios }}</td><td>{{ apoyo_operativo_detalle.total_general }}</td></tr>
+                    <tr><td>TOTAL</td><td>{{ apoyo_operativo_detalle.total_puestos }}</td><td>{{ apoyo_operativo_detalle.total_dif }}</td><td>{{ apoyo_operativo_detalle.total_voluntarios }}</td><td>{{ apoyo_operativo_detalle.total_inadmitidos }}</td><td>{{ apoyo_operativo_detalle.total_general }}</td></tr>
                 </tbody>
             </table>
         </div>

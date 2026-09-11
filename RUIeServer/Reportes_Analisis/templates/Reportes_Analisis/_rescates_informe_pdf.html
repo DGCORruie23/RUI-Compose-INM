@@ -3,10 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <title>Informe diario de operaciones {{ fecha_actual }}</title>
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
     <style>
         @page { size: A4 landscape; margin: 8mm; }
-        body { font-family: 'Montserrat', sans-serif; padding: 0; margin: 0; }
+        body { font-family: sans-serif; padding: 0; margin: 0; }
         h5 { text-align: center; margin: 6px 0; font-size: 13pt; }
         h6 { text-align: center; margin: 4px 0; font-size: 11pt; }
         .fecha { text-align: right; font-size: 10pt; margin-top: 10px; }
@@ -227,6 +226,14 @@
             {% empty %}
             <tr><td colspan="6">No hay datos disponibles.</td></tr>
             {% endfor %}
+            {% if nacionalidades_inadm %}
+            <tr>
+                <td class="letraT6">TOTAL</td>
+                <td class="letraT6">{{ total_nacionalidades_inadmitidos.H_A }}</td><td class="letraT6">{{ total_nacionalidades_inadmitidos.M_A }}</td>
+                <td class="letraT6">{{ total_nacionalidades_inadmitidos.H_m }}</td><td class="letraT6">{{ total_nacionalidades_inadmitidos.M_m }}</td>
+                <td class="letraT6">{{ total_nacionalidades_inadmitidos.total }}</td>
+            </tr>
+            {% endif %}
         </tbody>
     </table>
 
