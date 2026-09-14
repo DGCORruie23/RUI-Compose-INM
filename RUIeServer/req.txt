@@ -9,3 +9,4 @@ bokeh
 requests
 matplotlib==3.9.4
 python-pptx==1.0.2
+Pillow==10.4.0
