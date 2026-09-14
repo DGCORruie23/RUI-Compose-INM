@@ -70,4 +70,9 @@ urlpatterns = [
     path('rescates/reportes/ferrocarril', views.rescates_reporte_ferrocarril, name="rescates_reporte_ferrocarril"),
     path('rescates/reportes/ferrocarril/pdf', views.rescates_reporte_ferrocarril_pdf, name="rescates_reporte_ferrocarril_pdf"),
     path('rescates/reportes/ferrocarril/excel', views.rescates_reporte_ferrocarril_excel, name="rescates_reporte_ferrocarril_excel"),
+
+    # @FADAR -- Operación_Migratoria: reincidencia comparada por periodo de gobierno
+    path('rescates/reportes/operacion-migratoria', views.rescates_reporte_operacion_migratoria, name="rescates_reporte_operacion_migratoria"),
+    path('rescates/reportes/operacion-migratoria/pdf', views.rescates_reporte_operacion_migratoria_pdf, name="rescates_reporte_operacion_migratoria_pdf"),
+    path('rescates/reportes/operacion-migratoria/pptx', views.rescates_reporte_operacion_migratoria_pptx, name="rescates_reporte_operacion_migratoria_pptx"),
 ]

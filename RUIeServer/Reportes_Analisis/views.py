@@ -1,10 +1,24 @@
 from bokeh.plotting import figure
-from bokeh.models import ColumnDataSource, HoverTool, DatetimeTickFormatter, LabelSet, NumeralTickFormatter, RangeTool
+from bokeh.models import ColumnDataSource, HoverTool, DatetimeTickFormatter, LabelSet, NumeralTickFormatter, RangeTool, CrosshairTool
 from bokeh.layouts import column
 from bokeh.embed import components
 from bokeh.transform import cumsum
 from math import pi, cos, sin
 
+# @FADAR -- Agg ANTES de pyplot: backend sin pantalla, para renderizar
+# imagenes estaticas (PDF/PPTX de Operación_Migratoria) en un proceso de
+# servidor sin display. matplotlib/python-pptx son SOLO para esos
+# descargables -- la pantalla sigue siendo Bokeh, sin cambios.
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+from pptx import Presentation
+from pptx.util import Inches, Pt, Emu
+from pptx.dml.color import RGBColor
+from pptx.enum.text import PP_ALIGN
+
+import base64
+import io
 import json
 import openpyxl
 import os
@@ -124,6 +138,71 @@ def _rescates_region_atipica(iso3):
     if iso3 in RESCATES_ISO3_LATAM_CARIBE or iso3 in RESCATES_ISO3_CONOCIDOS_NO_ATIPICOS:
         return None
     return "Otras / poco conocidas"
+
+
+# =============================================================================
+# Mapeo ISO3 -> continente/region, EXCLUSIVO del apartado "Extranjeros
+# identificados... por nacionalidad" de Operación_Migratoria -- no
+# reemplaza ni se mezcla con la clasificacion "atipicas" de arriba (esa es
+# para el widget del dashboard, con un criterio distinto). Generado una
+# sola vez a partir del catalogo publico ISO 3166 (UN geoscheme), acotado
+# a los codigos ISO3 que realmente aparecen en usuario_rescatepunto
+# (verificado: SELECT DISTINCT iso3 FROM usuario_rescatepunto). Tabla
+# estatica -- sin llamadas a ninguna API en tiempo de ejecucion.
+RESCATES_OM_ISO3_REGION = {
+    # América
+    'VEN': 'América', 'ECU': 'América', 'HND': 'América', 'GTM': 'América',
+    'COL': 'América', 'SLV': 'América', 'CUB': 'América', 'NIC': 'América',
+    'HTI': 'América', 'PER': 'América', 'DOM': 'América', 'BOL': 'América',
+    'BRA': 'América', 'CHL': 'América', 'PAN': 'América', 'BLZ': 'América',
+    'CRI': 'América', 'URY': 'América', 'JAM': 'América', 'ARG': 'América',
+    'DMA': 'América', 'GUY': 'América', 'TTO': 'América', 'MEX': 'América',
+    'ANT': 'América', 'PRI': 'América', 'GLP': 'América', 'SUR': 'América',
+    'VGB': 'América', 'VCT': 'América', 'TCA': 'América', 'BHS': 'América',
+    'LCA': 'América', 'GRD': 'América', 'GUF': 'América', 'PRY': 'América',
+    'USA': 'América', 'CAN': 'América', 'SGS': 'América', 'VIR': 'América',
+    'SPM': 'América', 'CYM': 'América',
+    # Europa
+    'POL': 'Europa', 'DEU': 'Europa', 'FRA': 'Europa', 'NLD': 'Europa',
+    'ITA': 'Europa', 'ESP': 'Europa', 'ROU': 'Europa', 'GBR': 'Europa',
+    'CHE': 'Europa', 'ALB': 'Europa', 'BEL': 'Europa', 'SVK': 'Europa',
+    'CZE': 'Europa', 'HUN': 'Europa', 'SVN': 'Europa', 'DNK': 'Europa',
+    'IRL': 'Europa', 'AUT': 'Europa', 'MKD': 'Europa', 'PRT': 'Europa',
+    'LTU': 'Europa', 'BGR': 'Europa', 'FIN': 'Europa', 'BLR': 'Europa',
+    'SWE': 'Europa', 'GRC': 'Europa', 'NOR': 'Europa', 'EST': 'Europa',
+    'HRV': 'Europa', 'LVA': 'Europa', 'KOS': 'Europa', 'SRB': 'Europa',
+    'SMR': 'Europa', 'LUX': 'Europa', 'AND': 'Europa', 'MCO': 'Europa',
+    'RUS': 'Europa', 'UKR': 'Europa', 'MDA': 'Europa',
+    # Asia (incluye Medio Oriente y Cáucaso/Asia Central, criterio ONU)
+    'IND': 'Asia', 'CHN': 'Asia', 'TUR': 'Asia', 'UZB': 'Asia', 'AFG': 'Asia',
+    'BGD': 'Asia', 'NPL': 'Asia', 'KAZ': 'Asia', 'KGZ': 'Asia', 'JOR': 'Asia',
+    'IRN': 'Asia', 'VNM': 'Asia', 'AZE': 'Asia', 'GEO': 'Asia', 'PAK': 'Asia',
+    'TJK': 'Asia', 'IRQ': 'Asia', 'SYR': 'Asia', 'ARM': 'Asia', 'JPN': 'Asia',
+    'LKA': 'Asia', 'KOR': 'Asia', 'YEM': 'Asia', 'ISR': 'Asia', 'PHL': 'Asia',
+    'MNG': 'Asia', 'SGP': 'Asia', 'TWN': 'Asia', 'LBN': 'Asia', 'SAU': 'Asia',
+    'PSE': 'Asia', 'MYS': 'Asia', 'IDN': 'Asia', 'ARE': 'Asia', 'TKM': 'Asia',
+    'HKG': 'Asia', 'PRK': 'Asia', 'THA': 'Asia', 'BRN': 'Asia', 'CYP': 'Asia',
+    'MDV': 'Asia', 'KWT': 'Asia',
+    # África
+    'MRT': 'África', 'SEN': 'África', 'GIN': 'África', 'AGO': 'África',
+    'GHA': 'África', 'EGY': 'África', 'CMR': 'África', 'COG': 'África',
+    'NGA': 'África', 'ERI': 'África', 'TGO': 'África', 'SOM': 'África',
+    'ETH': 'África', 'MAR': 'África', 'TCD': 'África', 'BFA': 'África',
+    'COD': 'África', 'MLI': 'África', 'GMB': 'África', 'SDN': 'África',
+    'BEN': 'África', 'GNQ': 'África', 'SLE': 'África', 'RWA': 'África',
+    'CAF': 'África', 'ZAF': 'África', 'TZA': 'África', 'ZWE': 'África',
+    'UGA': 'África', 'GNB': 'África', 'CIV': 'África', 'IOT': 'África',
+    'KEN': 'África', 'MOZ': 'África', 'CPV': 'África', 'LBY': 'África',
+    'NAM': 'África', 'ZMB': 'África', 'DJI': 'África', 'GAB': 'África',
+    'BDI': 'África', 'TUN': 'África', 'SSD': 'África', 'DZA': 'África',
+    'NER': 'África', 'LBR': 'África', 'COM': 'África', 'SYC': 'África',
+    'ESH': 'África', 'MUS': 'África', 'MWI': 'África',
+    # Oceanía
+    'AUS': 'Oceanía', 'NZL': 'Oceanía', 'TON': 'Oceanía', 'PNG': 'Oceanía',
+    'MNP': 'Oceanía', 'UMI': 'Oceanía',
+    # No es un pais -- se deja aparte, no se mezcla con ningun continente.
+    'APA': 'Apátrida',
+}
 
 
 RESCATES_MV_REINCIDENCIA = "mapa_mv_reincidencia_rescates"
@@ -4546,6 +4625,1231 @@ def _leer_rango_mex_ext(request, fecha_max):
     fi = datetime.strptime(fecha_inicio, '%Y-%m-%d').date()
     ff = datetime.strptime(fecha_fin, '%Y-%m-%d').date()
     return fecha_inicio, fecha_fin, fi, ff
+
+
+# =============================================================================
+# Reporte "Operación_Migratoria" -- reincidencia de rescates comparada entre
+# 2 periodos de gobierno (Sheinbaum / Trump). Independiente de la app mapa:
+# solo SQL crudo contra usuario_rescatepunto, sin importar ningun modelo de
+# esa app (los nombres CSP_START/TRUMP_START se reutilizan de
+# _datos_mex_extranjeros abajo -- misma convencion, cero dependencia real).
+# =============================================================================
+
+RESCATES_OM_2026_START = '2026-01-01'
+
+RESCATES_CSP_START = '2024-10-01'
+RESCATES_TRUMP_START = '2025-01-20'
+
+# @FADAR -- Trump arranco 111 dias despues que Sheinbaum. En las graficas de
+# "dia de gobierno" con ambos periodos superpuestos, se usa este desfase
+# para correr la curva de Trump hacia la derecha ese mismo numero de dias
+# (eje compartido, ancla en el arranque de Sheinbaum) -- asi el grafico
+# refleja la diferencia cronologica real entre ambos, en vez de alinear
+# artificialmente los 2 arranques en el mismo punto.
+RESCATES_TRUMP_DESFASE_DIAS = (
+    datetime.strptime(RESCATES_TRUMP_START, "%Y-%m-%d") - datetime.strptime(RESCATES_CSP_START, "%Y-%m-%d")
+).days
+
+
+# @FADAR -- cache del periodo completo: las 2 consultas con JOIN contra la
+# vista materializada miden ~18.5s CADA UNA para el periodo Sheinbaum
+# (~700 dias) -- medido, sin mejora real posible via SQL sin un indice (no
+# autorizado, ver feedback_no_alterar_tablas_ni_campos). Como fecha_inicio
+# es fija y fecha_fin normalmente es "hoy" (mismo valor para todos los que
+# vean el reporte ese dia), cachear evita pagar ese costo en cada carga de
+# pagina. TTL igual al ciclo de refresco de la vista materializada (cron,
+# 600s) -- nunca sirve un dato mas viejo que la vista misma.
+RESCATES_OM_CACHE_TTL_PERIODO = 600
+
+
+def _rescates_periodo_gobierno(fecha_inicio, fecha_fin, etiqueta):
+    clave_cache = f"rescates_om_periodo_{fecha_inicio}_{fecha_fin}"
+    resultado = cache.get(clave_cache)
+    if resultado is None:
+        resultado = _rescates_periodo_gobierno_calcular(fecha_inicio, fecha_fin, etiqueta)
+        cache.set(clave_cache, resultado, RESCATES_OM_CACHE_TTL_PERIODO)
+    return resultado
+
+
+def _rescates_periodo_gobierno_calcular(fecha_inicio, fecha_fin, etiqueta):
+    """Un periodo (Sheinbaum o Trump), desde su arranque hasta fecha_fin:
+    serie diaria de reincidencia, top-20 nacionalidades por reincidencia, y
+    las 8 categorias de _rescates_clasificar_categoria en agregado SQL."""
+    array_fechas = _rescates_array_fechas(fecha_inicio, fecha_fin)
+    dias_transcurridos = len(array_fechas)
+
+    # @FADAR -- antes eran 3 consultas separadas (2 con JOIN contra
+    # mapa_mv_reincidencia_rescates + 1 mas sin JOIN), cada una con su
+    # propio Seq Scan completo de la tabla (EXPLAIN ANALYZE confirmo Seq
+    # Scan, no Index Scan: con ~65% de filas coincidiendo en un rango de 714
+    # dias, Postgres descarta el indice y lee todo). Se combinan en 1 solo
+    # SELECT (1 sola pasada por la tabla) + clasificacion de reincidencia en
+    # Python con el set en cache de _rescates_set_duplicados_historicos --
+    # medido: mismo resultado exacto, ~39s -> ~20s. Mismo riesgo ya
+    # documentado en _rescates_set_duplicados_historicos: si la vista
+    # llegara a tener una clave duplicada a futuro, esto y el JOIN original
+    # podrian divergir sin aviso.
+    set_reincidentes = _rescates_set_duplicados_historicos()
+
+    with transaction.atomic():
+        with connection.cursor() as cur:
+            cur.execute("SET LOCAL work_mem = '256MB'")
+            cur.execute("SET LOCAL max_parallel_workers_per_gather = 0")
+            cur.execute(
+                'SELECT fecha, "oficinaRepre", nombre, apellidos, nacionalidad, iso3, '
+                '  edad, sexo, "numFamilia" '
+                'FROM usuario_rescatepunto WHERE fecha = ANY(%s)',
+                [array_fechas],
+            )
+            filas = cur.fetchall()
+    connection.close()
+
+    # @FADAR -- clasificacion identica a RESCATES_SQL_ES_REINCIDENTE /
+    # RESCATES_SQL_ES_PRIMERA_VEZ (Chiapas siempre reincidente, si no, segun
+    # el set en cache) + los mismos filtros de edad/sexo/numFamilia que
+    # antes iban en SQL, ahora en una sola pasada en Python.
+    serie_diaria_dict = {}
+    nac_por_iso3 = {}
+    nna_no_acomp_dict = {}
+    hombres = mujeres = ninos = ninas = 0
+    h_as = m_as = h_aa = m_aa = h_ma = m_ma = h_ms = m_ms = 0
+    for fecha, oficina, nombre, apellidos, nacionalidad, iso3, edad, sexo, num_familia in filas:
+        es_reincidente = oficina == 'CHIAPAS' or (nombre, apellidos, nacionalidad) in set_reincidentes
+        dia = serie_diaria_dict.setdefault(fecha, [0, 0])
+        dia[0 if es_reincidente else 1] += 1
+
+        entrada = nac_por_iso3.setdefault(iso3, {"nac_raw": None, "reinc": 0})
+        if nacionalidad is not None and (entrada["nac_raw"] is None or nacionalidad > entrada["nac_raw"]):
+            entrada["nac_raw"] = nacionalidad
+        if es_reincidente:
+            entrada["reinc"] += 1
+
+        if edad is None or sexo is None:
+            continue
+        # @FADAR -- replica exacta de los 2 filtros SQL originales sobre
+        # numFamilia (ninguno de los 2 cubre valores negativos, igual que
+        # las 2 consultas que reemplaza).
+        sin_acompanante = num_familia is None or num_familia == 0
+        acompanado = num_familia is not None and num_familia > 0
+        if edad < 18 and sin_acompanante:
+            nna_no_acomp_dict[fecha] = nna_no_acomp_dict.get(fecha, 0) + 1
+        if sexo and edad >= 18:
+            hombres += 1
+            h_as += sin_acompanante
+            h_aa += acompanado
+        elif not sexo and edad >= 18:
+            mujeres += 1
+            m_as += sin_acompanante
+            m_aa += acompanado
+        elif sexo and edad < 18:
+            ninos += 1
+            h_ms += sin_acompanante
+            h_ma += acompanado
+        elif not sexo and edad < 18:
+            ninas += 1
+            m_ms += sin_acompanante
+            m_ma += acompanado
+    serie_diaria = [(fecha, r, p) for fecha, (r, p) in serie_diaria_dict.items()]
+    # @FADAR -- la consulta original agrupaba por fecha sobre TODA la tabla
+    # filtrada (GROUP BY fecha), asi que un dia con registros pero 0 NNA no
+    # acompañados igual aparecia con valor 0 -- se completa aqui con las
+    # mismas fechas de serie_diaria_dict (todo dia con al menos 1 registro).
+    serie_nna_no_acomp = [(fecha, nna_no_acomp_dict.get(fecha, 0)) for fecha in serie_diaria_dict]
+    top_nacionalidades = sorted(
+        ((e["nac_raw"].upper() if e["nac_raw"] is not None else None, iso3, e["reinc"])
+         for iso3, e in nac_por_iso3.items()),
+        key=lambda x: -x[2],
+    )[:20]
+
+    total_reincidentes = sum(r for _, r, p in serie_diaria)
+    total_primera_vez = sum(p for _, r, p in serie_diaria)
+    total_rango = total_reincidentes + total_primera_vez
+
+    valores_categoria = {"H_AS": h_as, "M_AS": m_as, "H_AA": h_aa, "M_AA": m_aa,
+                         "H_mA": h_ma, "M_mA": m_ma, "H_mS": h_ms, "M_mS": m_ms}
+    categorias = [{"clave": clave, "etiqueta": etq, "total": valores_categoria[clave]}
+                  for clave, etq in RESCATES_ETIQUETAS_CATEGORIA]
+    # @FADAR -- mismos 8 valores, reagrupados para las tarjetas KPI (mas
+    # legible que la tabla de 8 filas): mayores/menores de edad, y el
+    # desglose de NNA acompañado/no acompañado que es el dato que importa.
+    mayores_edad = hombres + mujeres
+    menores_edad = ninos + ninas
+    nna_acompanados = h_ma + m_ma
+    nna_no_acompanados = h_ms + m_ms
+
+    top_nacionalidades_lista = [
+        {"nacionalidad": n or "DESCONOCIDA", "iso3": iso, "total": t}
+        for n, iso, t in top_nacionalidades
+    ]
+    # @FADAR -- 21a barra "Otras nacionalidades" = el resto no incluido en
+    # el top 20, para que la grafica sume el 100% del periodo.
+    resto_nacionalidades = total_reincidentes - sum(n["total"] for n in top_nacionalidades_lista)
+    nacionalidades_grafico = top_nacionalidades_lista + (
+        [{"nacionalidad": "OTRAS NACIONALIDADES", "iso3": "", "total": resto_nacionalidades}]
+        if resto_nacionalidades > 0 else []
+    )
+
+    return {
+        "etiqueta": etiqueta, "fecha_inicio": fecha_inicio, "fecha_fin": fecha_fin,
+        "dias_transcurridos": dias_transcurridos, "serie_diaria": serie_diaria,
+        "serie_nna_no_acomp": serie_nna_no_acomp,
+        "top_nacionalidades": top_nacionalidades_lista,
+        "nacionalidades_grafico": nacionalidades_grafico,
+        "hombres": hombres, "mujeres": mujeres, "ninos": ninos, "ninas": ninas,
+        "categorias": categorias,
+        "mayores_edad": mayores_edad, "menores_edad": menores_edad,
+        "nna_acompanados": nna_acompanados, "nna_no_acompanados": nna_no_acompanados,
+        "total_reincidentes": total_reincidentes, "total_primera_vez": total_primera_vez,
+        "total_rango": total_rango,
+        "media_diaria_reincidentes": round(total_reincidentes / dias_transcurridos, 1) if dias_transcurridos else 0,
+        "media_diaria_primera_vez": round(total_primera_vez / dias_transcurridos, 1) if dias_transcurridos else 0,
+        "media_diaria_total": round(total_rango / dias_transcurridos, 1) if dias_transcurridos else 0,
+    }
+
+
+def _rescates_dia_relativo(serie_diaria):
+    """[(fecha 'DD-MM-YY', reinc, primera), ...] -> (dias_relativos, valores_reincidentes),
+    alineado al primer dia real de la serie."""
+    if not serie_diaria:
+        return [], []
+    parsed = sorted((datetime.strptime(f, "%d-%m-%y").date(), r) for f, r, _ in serie_diaria)
+    inicio = parsed[0][0]
+    return [(d - inicio).days for d, _ in parsed], [r for _, r in parsed]
+
+
+def _rescates_interpolar(dias, valores):
+    """Funcion de interpolacion lineal sobre (dias, valores) -- asume dias
+    ordenados. Series de a lo mucho ~700 puntos, busqueda lineal de sobra."""
+    def f(x):
+        if x <= dias[0]:
+            return valores[0]
+        if x >= dias[-1]:
+            return valores[-1]
+        for i in range(1, len(dias)):
+            if dias[i] >= x:
+                x0, x1, y0, y1 = dias[i - 1], dias[i], valores[i - 1], valores[i]
+                if x1 == x0:
+                    return y1
+                t = (x - x0) / (x1 - x0)
+                return y0 + t * (y1 - y0)
+        return valores[-1]
+    return f
+
+
+def _rescates_cruces_curvas(dias_a, avg_a, dias_b, avg_b):
+    """Puntos donde 2 curvas suavizadas (con su propio dominio de dias, ya
+    en el mismo eje compartido) se cruzan -- interpola ambas sobre el
+    rango de dias en comun y busca cambios de signo en la diferencia.
+    Devuelve TODOS los cruces crudos; ver _rescates_cruces_notables para
+    quedarse solo con los mas relevantes."""
+    if not dias_a or not dias_b:
+        return []
+    f_a, f_b = _rescates_interpolar(dias_a, avg_a), _rescates_interpolar(dias_b, avg_b)
+    ini, fin = max(dias_a[0], dias_b[0]), min(dias_a[-1], dias_b[-1])
+    if fin <= ini:
+        return []
+    cruces = []
+    prev_x, prev_diff = ini, f_a(ini) - f_b(ini)
+    for x in range(ini + 1, fin + 1):
+        diff = f_a(x) - f_b(x)
+        if prev_diff == 0:
+            cruces.append((prev_x, f_a(prev_x)))
+        elif (prev_diff < 0) != (diff < 0):
+            t = prev_diff / (prev_diff - diff)
+            cx = prev_x + t * (x - prev_x)
+            cy = f_a(prev_x) + t * (f_a(x) - f_a(prev_x))
+            cruces.append((cx, cy))
+        prev_x, prev_diff = x, diff
+    return cruces
+
+
+def _rescates_cruces_notables(dias_a, avg_a, dias_b, avg_b, top_n=5, ventana_dias=20):
+    """De todos los cruces crudos (que pueden ser decenas, sobre todo
+    cuando las 2 curvas quedan pegadas y oscilan por ruido), se agrupan
+    los que caen muy seguidos (mismo "episodio") y se ordenan por que
+    tanto se separan las curvas justo antes y justo despues -- se
+    devuelven solo los top_n mas notables (la separacion real, no el
+    ruido, es la señal que importa para resaltar en el grafico)."""
+    crudos = _rescates_cruces_curvas(dias_a, avg_a, dias_b, avg_b)
+    agrupados = _rescates_cruces_agrupados(crudos)
+    if not agrupados:
+        return []
+    f_a, f_b = _rescates_interpolar(dias_a, avg_a), _rescates_interpolar(dias_b, avg_b)
+    ini, fin = max(dias_a[0], dias_b[0]), min(dias_a[-1], dias_b[-1])
+
+    def _separacion_maxima(x0, x1):
+        x0, x1 = max(ini, x0), min(fin, x1)
+        if x1 <= x0:
+            return 0
+        paso = max(1, int(x1 - x0) // 10)
+        return max((abs(f_a(x) - f_b(x)) for x in range(int(x0), int(x1) + 1, paso)), default=0)
+
+    puntuados = [
+        (cx, cy, min(_separacion_maxima(cx - ventana_dias, cx), _separacion_maxima(cx, cx + ventana_dias)))
+        for cx, cy in agrupados
+    ]
+    puntuados.sort(key=lambda t: -t[2])
+    return [(cx, cy) for cx, cy, _ in puntuados[:top_n]]
+
+
+def _rescates_cruces_agrupados(cruces, ventana_dias=14):
+    """Agrupa cruces muy pegados entre si (mismo 'episodio' de curvas
+    entrelazadas -- ej. cuando ambas quedan casi planas y se cruzan dia
+    tras dia por ruido) en uno solo, para no saturar el grafico. Se queda
+    con 1 marcador por cada racha de cruces separada por mas de
+    ventana_dias del anterior."""
+    if not cruces:
+        return []
+    agrupados = [cruces[0]]
+    for c in cruces[1:]:
+        if c[0] - agrupados[-1][0] > ventana_dias:
+            agrupados.append(c)
+    return agrupados
+
+
+def _rescates_suavizar(valores, ventana=7):
+    return [
+        sum(valores[max(0, i - ventana + 1):i + 1]) / len(valores[max(0, i - ventana + 1):i + 1])
+        for i in range(len(valores))
+    ]
+
+
+def _rescates_grafico_operacion_migratoria(periodo_csp, periodo_trump):
+    """Linea suavizada + area + dispersion tenue -- eje compartido "dia
+    desde el arranque de Sheinbaum": Trump se corre RESCATES_TRUMP_DESFASE_DIAS
+    (111 dias) a la derecha, para que el grafico refleje la diferencia
+    cronologica real entre los 2 arranques en vez de alinearlos en el
+    mismo punto (corregido: se veia falsamente simetrico)."""
+    dias_csp, val_csp = _rescates_dia_relativo(periodo_csp["serie_diaria"])
+    dias_trump_propio, val_trump = _rescates_dia_relativo(periodo_trump["serie_diaria"])
+    dias_trump = [d + RESCATES_TRUMP_DESFASE_DIAS for d in dias_trump_propio]
+    avg_csp = _rescates_suavizar(val_csp)
+    avg_trump = _rescates_suavizar(val_trump)
+    # @FADAR -- "dia_propio" para el hover: el eje x ya viene corrido
+    # (Trump +111 dias) para que el grafico refleje el desfase real, pero
+    # mostrar ese numero compartido en el tooltip de Trump se ve como un
+    # dato erroneo (ej. "Día 111" justo en el arranque de su curva, cuando
+    # en realidad es su dia 0). El tooltip usa el dia propio de cada
+    # periodo (desde SU arranque), no la coordenada del eje compartido.
+    src_csp = ColumnDataSource(data=dict(x=dias_csp, dia_propio=dias_csp, raw=val_csp, avg=avg_csp))
+    src_trump = ColumnDataSource(data=dict(x=dias_trump, dia_propio=dias_trump_propio, raw=val_trump, avg=avg_trump))
+    cruces = _rescates_cruces_notables(dias_csp, avg_csp, dias_trump, avg_trump)
+
+    p = figure(
+        height=460, sizing_mode="stretch_width", toolbar_location="right", tools="pan,box_zoom,reset",
+        background_fill_color="#f6f3ec", border_fill_color=None, outline_line_color=None,
+        title="Reincidencia por día de gobierno (eje: días desde el arranque de Sheinbaum)",
+    )
+    p.varea(x='x', y1=0, y2='avg', source=src_csp, fill_color="#ad2142", fill_alpha=0.12)
+    p.varea(x='x', y1=0, y2='avg', source=src_trump, fill_color="#2b5a8f", fill_alpha=0.12)
+    p.scatter(x='x', y='raw', source=src_csp, size=4, color="#ad2142", alpha=0.28, line_color=None)
+    p.scatter(x='x', y='raw', source=src_trump, size=4, color="#2b5a8f", alpha=0.28, line_color=None)
+    # @FADAR -- alpha<1 en ambas para que ninguna tape por completo a la
+    # otra donde se superponen (mismo ajuste que en el grafico de control).
+    r_csp = p.line(x='x', y='avg', source=src_csp, line_width=2.4, color="#ad2142", alpha=0.9, legend_label="Sheinbaum")
+    r_trump = p.line(x='x', y='avg', source=src_trump, line_width=2.4, color="#2b5a8f", alpha=0.9, legend_label="Trump")
+    # @FADAR -- cruces de las 2 curvas suavizadas (donde Sheinbaum y Trump
+    # coinciden en el mismo nivel), interpolados con _rescates_cruces_curvas.
+    # Marcados con una "X" oscura, discreta, distinta de ambos colores de
+    # periodo para que no se confunda con ninguna de las 2 series.
+    if cruces:
+        src_cruces = ColumnDataSource(data=dict(x=[c[0] for c in cruces], y=[c[1] for c in cruces]))
+        r_cruces = p.scatter(x='x', y='y', source=src_cruces, marker="x", size=11, line_width=2.5, color="#22221d", legend_label="Cruce Sheinbaum/Trump")
+        p.add_tools(HoverTool(renderers=[r_cruces], tooltips=[("Cruce en el día", "@x{0}"), ("Nivel", "@y{0,0}")]))
+    # @FADAR -- media diaria HISTORICA de cada periodo (total del periodo /
+    # dias transcurridos, ya calculada en _rescates_periodo_gobierno), como
+    # referencia horizontal -- no es la media de la ventana visible, es la
+    # media de todo el historico del periodo. BUG corregido: cada linea
+    # debe llegar solo hasta el ULTIMO DIA REAL de SU PROPIO periodo, no
+    # hasta el maximo compartido entre los 2 -- Sheinbaum y Trump arrancan
+    # en fechas distintas y llevan meses de diferencia, usar el mismo
+    # limite para ambas hacia que la de Trump se estirara de mas y el
+    # grafico se viera falsamente simetrico.
+    # @FADAR -- Trump ya trae el desfase sumado en dias_trump, asi que su
+    # linea de media arranca en RESCATES_TRUMP_DESFASE_DIAS (no en 0) y
+    # llega hasta su propio ultimo dia real -- no antes, no mas alla.
+    x_max_csp = max(dias_csp) if dias_csp else 0
+    x_max_trump = max(dias_trump) if dias_trump else RESCATES_TRUMP_DESFASE_DIAS
+    p.line(x=[0, x_max_csp], y=[periodo_csp["media_diaria_reincidentes"]] * 2,
+           line_dash="dashed", line_width=1.5, color="#ad2142", alpha=0.55,
+           legend_label="Media histórica Sheinbaum")
+    p.line(x=[RESCATES_TRUMP_DESFASE_DIAS, x_max_trump], y=[periodo_trump["media_diaria_reincidentes"]] * 2,
+           line_dash="dashed", line_width=1.5, color="#2b5a8f", alpha=0.55,
+           legend_label="Media histórica Trump")
+    p.y_range.start = 0
+    p.xaxis.axis_label = "Día de gobierno"
+    p.yaxis.axis_label = "Reincidentes"
+    # @FADAR -- estilo mas cercano al prototipo aislado: cuadricula/ejes
+    # tenues (color linea del artefacto), sin borde de figura, toolbar que
+    # se oculta sola, y una linea vertical guia (crosshair) al pasar el
+    # cursor. El tooltip en si sigue siendo el estandar de Bokeh -- su
+    # contenedor usa Shadow DOM en esta version y no se puede reestilizar
+    # con CSS externo sin arriesgar que se rompa.
+    p.xgrid.grid_line_color = "#22221d"
+    p.xgrid.grid_line_alpha = 0.06
+    p.ygrid.grid_line_color = "#22221d"
+    p.ygrid.grid_line_alpha = 0.06
+    p.axis.axis_line_color = "#6b6255"
+    p.axis.major_tick_line_color = "#6b6255"
+    p.axis.minor_tick_line_color = None
+    p.legend.location = "top_right"
+    p.legend.background_fill_alpha = 0.6
+    p.legend.border_line_color = None
+    p.toolbar.autohide = True
+    p.add_tools(CrosshairTool(line_color="#22221d", line_alpha=0.35))
+    # @FADAR -- mode='vline': por defecto el HoverTool solo dispara si el
+    # cursor cae exactamente sobre el pixel de la linea (2.4px, dificil de
+    # acertar) -- 'vline' lo activa en cualquier punto de esa columna
+    # vertical, igual que el area de hover de ancho completo del prototipo
+    # aislado (bug reportado: "no trae detalles").
+    p.add_tools(HoverTool(renderers=[r_csp], mode='vline', tooltips=[("Día (Sheinbaum)", "@dia_propio"), ("Sheinbaum", "@raw{0,0}")]))
+    p.add_tools(HoverTool(renderers=[r_trump], mode='vline', tooltips=[("Día (Trump)", "@dia_propio"), ("Trump", "@raw{0,0}")]))
+    return p
+
+
+def _rescates_grafico_nacionalidades(periodo, color):
+    """Barras horizontales descendentes -- top 20 nacionalidades por
+    reincidencia + 'Otras nacionalidades' como barra 21 (el resto del
+    periodo), mismo patron ya usado en reporte_mex_extranjeros (p_top)."""
+    filas = periodo["nacionalidades_grafico"]
+    nombres = [f["nacionalidad"] for f in filas][::-1]
+    valores = [f["total"] for f in filas][::-1]
+    source = ColumnDataSource(data=dict(nombres=nombres, valores=valores))
+    p = figure(
+        y_range=nombres, height=560, toolbar_location=None, tools="", sizing_mode="stretch_width",
+        title=f"Top 20 nacionalidades por reincidencia — {periodo['etiqueta']}",
+        background_fill_color="#f6f3ec", border_fill_color=None, outline_line_color=None,
+    )
+    p.hbar(y='nombres', right='valores', height=0.7, color=color, source=source)
+    p.x_range.start = 0
+    p.xaxis.formatter = NumeralTickFormatter(format="0,0")
+    p.grid.grid_line_color = None
+    p.add_tools(HoverTool(tooltips=[("Nacionalidad", "@nombres"), ("Reincidentes", "@valores{0,0}")]))
+    return p
+
+
+def _rescates_serie_ordenada(serie):
+    """[(fecha 'DD-MM-YY', valor), ...] -> (dias_relativos, valores),
+    ordenado y alineado al primer dia real de la serie."""
+    if not serie:
+        return [], []
+    parsed = sorted((datetime.strptime(f, "%d-%m-%y").date(), v) for f, v in serie)
+    inicio = parsed[0][0]
+    return [(d - inicio).days for d, _ in parsed], [v for _, v in parsed]
+
+
+def _rescates_control_nna_datos(periodo_csp, periodo_trump):
+    """Calculo compartido del grafico de control de NNA no acompañados:
+    series ordenadas por dia relativo + limites (media + 3 sigma via rango
+    movil, constante estandar 2.66) sobre los 2 periodos combinados +
+    deteccion de puntos fuera de esos limites. Separado de la funcion que
+    dibuja la figura para poder reutilizarlo en mas de una grafica."""
+    dias_csp, val_csp = _rescates_serie_ordenada(periodo_csp["serie_nna_no_acomp"])
+    dias_trump_propio, val_trump = _rescates_serie_ordenada(periodo_trump["serie_nna_no_acomp"])
+    # @FADAR -- mismo desfase cronologico real que en _rescates_grafico_
+    # operacion_migratoria (Trump arranco 111 dias despues) -- eje
+    # compartido anclado en el arranque de Sheinbaum, no alineado en 0.
+    dias_trump = [d + RESCATES_TRUMP_DESFASE_DIAS for d in dias_trump_propio]
+
+    valores_combinados = val_csp + val_trump
+    media = sum(valores_combinados) / len(valores_combinados) if valores_combinados else 0
+    if len(valores_combinados) >= 3:
+        rangos_moviles = [abs(valores_combinados[i] - valores_combinados[i - 1]) for i in range(1, len(valores_combinados))]
+        mr_barra = sum(rangos_moviles) / len(rangos_moviles)
+        ucl = media + 2.66 * mr_barra
+        lcl = max(0, media - 2.66 * mr_barra)
+    else:
+        ucl = lcl = media
+
+    def _fuera_de_control(dias, valores):
+        return (
+            [d for d, v in zip(dias, valores) if v > ucl or v < lcl],
+            [v for v in valores if v > ucl or v < lcl],
+        )
+    atip_csp_x, atip_csp_y = _fuera_de_control(dias_csp, val_csp)
+    atip_trump_x, atip_trump_y = _fuera_de_control(dias_trump, val_trump)
+
+    return {
+        "dias_csp": dias_csp, "val_csp": val_csp, "dias_trump": dias_trump, "val_trump": val_trump,
+        "dias_trump_propio": dias_trump_propio,
+        "media": media, "ucl": ucl, "lcl": lcl,
+        "atip_csp_x": atip_csp_x, "atip_csp_y": atip_csp_y,
+        "atip_trump_x": atip_trump_x, "atip_trump_y": atip_trump_y,
+    }
+
+
+def _rescates_grafico_control_nna(datos, titulo, mostrar_atipicos):
+    """Una figura del grafico de control, a partir de 'datos' ya calculados
+    por _rescates_control_nna_datos (se reutiliza el mismo calculo en las
+    2 versiones -- limpia y con detalle de puntos fuera de control --
+    en vez de repetirlo)."""
+    # @FADAR -- "dia_propio" para el hover, igual que en el grafico de
+    # tendencia: el eje x esta corrido (Trump +111 dias), mostrar ese
+    # numero compartido en el tooltip de Trump se ve como dato erroneo
+    # justo al inicio de su curva.
+    src_csp = ColumnDataSource(data=dict(x=datos["dias_csp"], dia_propio=datos["dias_csp"], y=datos["val_csp"]))
+    src_trump = ColumnDataSource(data=dict(x=datos["dias_trump"], dia_propio=datos["dias_trump_propio"], y=datos["val_trump"]))
+    x_max = max(datos["dias_csp"] + datos["dias_trump"]) if (datos["dias_csp"] or datos["dias_trump"]) else 1
+
+    p = figure(
+        height=460, sizing_mode="stretch_width", toolbar_location="right", tools="pan,box_zoom,reset",
+        background_fill_color="#f6f3ec", border_fill_color=None, outline_line_color=None,
+        title=titulo,
+    )
+    p.line(x=[0, x_max], y=[datos["media"]] * 2, line_dash="dashed", color="#374151", line_width=1.5, legend_label="Media")
+    p.line(x=[0, x_max], y=[datos["ucl"]] * 2, line_dash="dotted", color="#b45309", line_width=1.5, legend_label="Límite superior (3σ)")
+    p.line(x=[0, x_max], y=[datos["lcl"]] * 2, line_dash="dotted", color="#b45309", line_width=1.5, legend_label="Límite inferior (3σ)")
+    # @FADAR -- sin marcador por dia (ruido visual con series largas) --
+    # solo la curva de comportamiento.
+    # @FADAR -- alpha < 1 en ambas: sin transparencia, la linea dibujada
+    # despues (Trump) tapa por completo a la de antes (Sheinbaum) donde se
+    # superponen -- se veia como si Sheinbaum "desapareciera" justo cuando
+    # arranca Trump, aunque el dato seguia ahi.
+    # @FADAR -- alpha por si solo no basta: en el tramo donde ambas curvas
+    # fluctuan pegadas, se cruzan tantas veces que la de encima (Trump) se
+    # ve como si tapara del todo a la otra. Se agrega ademas un trazo
+    # distinto (Trump punteado) -- asi Sheinbaum (solida) queda visible
+    # SIEMPRE sin depender de que tan bien se note la transparencia.
+    r_csp = p.line(x='x', y='y', source=src_csp, line_width=1.8, color="#ad2142", alpha=0.9, legend_label="Sheinbaum")
+    r_trump = p.line(x='x', y='y', source=src_trump, line_width=1.8, color="#2b5a8f", alpha=0.75, line_dash=[4, 3], legend_label="Trump")
+    p.y_range.start = 0
+    p.xaxis.axis_label = "Día de gobierno"
+    p.yaxis.axis_label = "NNA no acompañados"
+    p.xgrid.grid_line_color = "#22221d"
+    p.xgrid.grid_line_alpha = 0.06
+    p.ygrid.grid_line_color = "#22221d"
+    p.ygrid.grid_line_alpha = 0.06
+    p.axis.axis_line_color = "#6b6255"
+    p.axis.major_tick_line_color = "#6b6255"
+    p.axis.minor_tick_line_color = None
+    p.legend.location = "top_right"
+    p.legend.background_fill_alpha = 0.6
+    p.legend.border_line_color = None
+    p.legend.label_text_font_size = "8pt"
+    p.toolbar.autohide = True
+    p.add_tools(CrosshairTool(line_color="#22221d", line_alpha=0.35))
+    p.add_tools(HoverTool(renderers=[r_csp], mode='vline', tooltips=[("Día (Sheinbaum)", "@dia_propio"), ("Sheinbaum", "@y{0,0}")]))
+    p.add_tools(HoverTool(renderers=[r_trump], mode='vline', tooltips=[("Día (Trump)", "@dia_propio"), ("Trump", "@y{0,0}")]))
+
+    if mostrar_atipicos:
+        src_atip_csp = ColumnDataSource(data=dict(x=datos["atip_csp_x"], y=datos["atip_csp_y"]))
+        src_atip_trump = ColumnDataSource(data=dict(x=datos["atip_trump_x"], y=datos["atip_trump_y"]))
+        r_atip_csp = p.scatter(x='x', y='y', source=src_atip_csp, size=9, color="#dc2626", line_color="#7f1d1d", line_width=1.5, legend_label="Fuera de control")
+        r_atip_trump = p.scatter(x='x', y='y', source=src_atip_trump, size=9, color="#dc2626", line_color="#7f1d1d", line_width=1.5)
+        p.add_tools(HoverTool(renderers=[r_atip_csp, r_atip_trump], tooltips=[("Día", "@x"), ("Fuera de control", "@y{0,0}")]))
+    return p
+
+
+# =============================================================================
+# Apartado "Extranjeros Identificados en Acciones de Control y Verificación
+# Migratoria por Nacionalidad" -- 8 paises destacados + "Otros Países",
+# con su alojamiento EM/DIF-Albergue (misma regla que Cuadro de Datos, pero
+# implementacion propia e independiente, y sobre el TOTAL de rescates, no
+# solo primera vez -- decision explicita del usuario para este reporte) +
+# desglose por region/continente (RESCATES_OM_ISO3_REGION). Se repite para
+# los 3 periodos (Sheinbaum/Trump/2026 a la fecha).
+# =============================================================================
+
+RESCATES_OM_ISO3_PAISES_DESTACADOS = {
+    'HND': 'HONDURAS', 'SLV': 'EL SALVADOR', 'GTM': 'GUATEMALA', 'VEN': 'VENEZUELA',
+    'HTI': 'HAITÍ', 'CUB': 'CUBA', 'ECU': 'ECUADOR', 'COL': 'COLOMBIA',
+}
+
+
+def _rescates_om_paises_region(fecha_inicio, fecha_fin):
+    """Cacheado -- ver _rescates_om_paises_region_calcular. Mismo criterio
+    que _rescates_periodo_gobierno: el JOIN contra la vista materializada
+    mide ~18s para el rango de Sheinbaum, y fecha_inicio es fijo mientras
+    fecha_fin normalmente es "hoy" -- sin cache se paga ese costo en cada
+    carga de pagina."""
+    clave_cache = f"rescates_om_paises_region_{fecha_inicio}_{fecha_fin}"
+    resultado = cache.get(clave_cache)
+    if resultado is None:
+        resultado = _rescates_om_paises_region_calcular(fecha_inicio, fecha_fin)
+        cache.set(clave_cache, resultado, RESCATES_OM_CACHE_TTL_PERIODO)
+    return resultado
+
+
+def _rescates_om_paises_region_calcular(fecha_inicio, fecha_fin):
+    """Un solo GROUP BY por iso3 -- de ahi se reparte en Python hacia los
+    8 paises + Otros (con EM/DIF-Albergue) y hacia region/continente. Un
+    solo query cubre ambos desgloses.
+
+    SOLO PRIMERA VEZ (no reincidentes) -- decision explicita del usuario
+    para este apartado.
+
+    @FADAR -- igual que _rescates_periodo_gobierno_calcular: en vez de JOIN
+    contra la vista materializada, SELECT crudo + set en cache de
+    _rescates_set_duplicados_historicos, clasificando en Python."""
+    array_fechas = _rescates_array_fechas(fecha_inicio, fecha_fin)
+    set_reincidentes = _rescates_set_duplicados_historicos()
+
+    with transaction.atomic():
+        with connection.cursor() as cur:
+            cur.execute("SET LOCAL work_mem = '256MB'")
+            cur.execute("SET LOCAL max_parallel_workers_per_gather = 0")
+            cur.execute(
+                'SELECT iso3, nacionalidad, "oficinaRepre", nombre, apellidos, "numFamilia" '
+                'FROM usuario_rescatepunto WHERE fecha = ANY(%s)',
+                [array_fechas],
+            )
+            filas_crudas = cur.fetchall()
+    connection.close()
+
+    agregado_iso3 = {}
+    for iso3, nacionalidad, oficina, nombre, apellidos, num_familia in filas_crudas:
+        es_primera_vez = oficina != 'CHIAPAS' and (nombre, apellidos, nacionalidad) not in set_reincidentes
+        entrada = agregado_iso3.setdefault(iso3, {"nac_raw": None, "em": 0, "dif": 0})
+        if nacionalidad is not None and (entrada["nac_raw"] is None or nacionalidad > entrada["nac_raw"]):
+            entrada["nac_raw"] = nacionalidad
+        if es_primera_vez:
+            if num_familia:
+                entrada["dif"] += 1
+            else:
+                entrada["em"] += 1
+    filas = [
+        (iso3, e["nac_raw"].upper() if e["nac_raw"] is not None else None, e["em"], e["dif"])
+        for iso3, e in agregado_iso3.items()
+    ]
+
+    paises = {nombre: {"em": 0, "dif": 0} for nombre in RESCATES_OM_ISO3_PAISES_DESTACADOS.values()}
+    paises["OTROS PAÍSES"] = {"em": 0, "dif": 0}
+    regiones = {}
+    # @FADAR -- desglose de TODOS los paises por region, para el cuadro de
+    # referencia junto a la grafica de continente/region (pedido explicito:
+    # "un simple cuadro a lado, a manera de referencia y con numeros").
+    paises_por_region = {}
+
+    for iso3, nacionalidad, em, dif in filas:
+        em, dif = em or 0, dif or 0
+        nombre_pais = RESCATES_OM_ISO3_PAISES_DESTACADOS.get(iso3, "OTROS PAÍSES")
+        paises[nombre_pais]["em"] += em
+        paises[nombre_pais]["dif"] += dif
+
+        region = RESCATES_OM_ISO3_REGION.get(iso3, "Otra región")
+        regiones[region] = regiones.get(region, 0) + em + dif
+        paises_por_region.setdefault(region, []).append(
+            {"nombre": nacionalidad or "DESCONOCIDA", "total": em + dif}
+        )
+
+    orden_paises = list(RESCATES_OM_ISO3_PAISES_DESTACADOS.values()) + ["OTROS PAÍSES"]
+    for region in paises_por_region:
+        paises_por_region[region].sort(key=lambda d: -d["total"])
+
+    return {
+        "paises": [
+            {"nombre": n, "em": paises[n]["em"], "dif": paises[n]["dif"], "total": paises[n]["em"] + paises[n]["dif"]}
+            for n in orden_paises
+        ],
+        "regiones": [
+            {"nombre": r, "total": t, "paises": paises_por_region.get(r, [])}
+            for r, t in sorted(regiones.items(), key=lambda x: -x[1])
+        ],
+    }
+
+
+def _rescates_om_grafico_paises(datos, etiqueta):
+    """Barras clasicas por pais, apiladas EM (Estación Migratoria) / DIF-
+    Albergue -- un solo color por categoria, consistente entre los 3
+    periodos (no por periodo, aqui no aplica el rojo/azul Sheinbaum/Trump)."""
+    nombres = [p["nombre"] for p in datos["paises"]]
+    em = [p["em"] for p in datos["paises"]]
+    dif = [p["dif"] for p in datos["paises"]]
+    source = ColumnDataSource(data=dict(nombres=nombres, em=em, dif=dif))
+    p = figure(
+        x_range=nombres, height=400, sizing_mode="stretch_width", toolbar_location="right", tools="pan,reset",
+        background_fill_color="#f6f3ec", border_fill_color=None, outline_line_color=None,
+        title=f"Por nacionalidad y alojamiento (solo primera vez) — {etiqueta}",
+    )
+    p.vbar_stack(['em', 'dif'], x='nombres', width=0.7, source=source,
+                 color=["#285C4D", "#7030A0"], legend_label=["Estación Migratoria (EM)", "DIF / Albergue"])
+    p.y_range.start = 0
+    p.xaxis.major_label_orientation = 0.9
+    p.yaxis.formatter = NumeralTickFormatter(format="0,0")
+    p.xgrid.grid_line_color = None
+    p.ygrid.grid_line_color = "#22221d"
+    p.ygrid.grid_line_alpha = 0.06
+    p.legend.location = "top_right"
+    p.legend.background_fill_alpha = 0.6
+    p.legend.border_line_color = None
+    p.toolbar.autohide = True
+    p.add_tools(HoverTool(tooltips=[
+        ("Nacionalidad", "@nombres"), ("Estación Migratoria", "@em{0,0}"), ("DIF/Albergue", "@dif{0,0}"),
+    ]))
+    return p
+
+
+def _rescates_om_grafico_regiones(datos, etiqueta):
+    """Barras clasicas por region/continente -- total de rescates, sin
+    desglose EM/DIF (ese detalle ya esta en el grafico por pais)."""
+    nombres = [r["nombre"] for r in datos["regiones"]]
+    valores = [r["total"] for r in datos["regiones"]]
+    source = ColumnDataSource(data=dict(nombres=nombres, valores=valores))
+    p = figure(
+        x_range=nombres, height=360, sizing_mode="stretch_width", toolbar_location="right", tools="pan,reset",
+        background_fill_color="#f6f3ec", border_fill_color=None, outline_line_color=None,
+        title=f"Por continente/región (solo primera vez) — {etiqueta}",
+    )
+    p.vbar(x='nombres', top='valores', width=0.6, color="#4C69B0", source=source)
+    p.y_range.start = 0
+    p.yaxis.formatter = NumeralTickFormatter(format="0,0")
+    p.xgrid.grid_line_color = None
+    p.ygrid.grid_line_color = "#22221d"
+    p.ygrid.grid_line_alpha = 0.06
+    p.toolbar.autohide = True
+    p.add_tools(HoverTool(tooltips=[("Región", "@nombres"), ("Total", "@valores{0,0}")]))
+    return p
+
+
+def _rescates_fecha_larga(fecha_iso):
+    """'2024-10-01' -> '01 de Octubre de 2024', para los subtitulos del
+    apartado de nacionalidad/region (mismo catalogo RESCATES_MESES_ES_LARGO
+    ya usado en los nombres de archivo de otros reportes)."""
+    d = datetime.strptime(fecha_iso, "%Y-%m-%d")
+    return f"{d.day:02d} de {RESCATES_MESES_ES_LARGO[d.month].capitalize()} de {d.year}"
+
+
+@never_cache
+def rescates_reporte_operacion_migratoria(request):
+    if not request.user.is_authenticated:
+        return redirect('/log-in/?next=%s' % request.path)
+
+    # @FADAR -- sin filtro explicito (primera visita, GET vacio), NO se
+    # corre ninguna consulta pesada (mismo patron "sin_filtro" de
+    # ferrocarril). Con los 3 periodos activos esta pagina puede hacer 5
+    # JOINs pesados contra la vista materializada -- verificado: supera el
+    # timeout de nginx/gunicorn (120s), 504 Gateway Time-out real.
+    if not request.GET:
+        return render(request, "Reportes_Analisis/rescates_reporte_operacion_migratoria.html", {"sin_filtro": True})
+
+    # @FADAR -- BUG corregido: si se activa un periodo pero se deja "Fecha
+    # fin" vacia, el navegador manda "fecha_fin=" (llave presente, valor
+    # "") -- antes eso mandaba de vuelta a "sin filtro" SIEMPRE, ignorando
+    # que si se habian marcado periodos ("no se activan los periodos").
+    # Ahora fecha_fin vacia simplemente cae a "hoy", igual que el resto de
+    # los reportes de esta app.
+    fecha_fin = request.GET.get('fecha_fin') or date.today().isoformat()
+    activar_csp = request.GET.get('activar_csp') == 'on'
+    activar_trump = request.GET.get('activar_trump') == 'on'
+    activar_2026 = request.GET.get('activar_2026') == 'on'
+    # @FADAR -- Sheinbaum y Trump usan su fecha real de arranque de
+    # gobierno, fija (no tendria sentido que el usuario la cambiara, eso
+    # falsearia la comparacion). El periodo "2026" es una ventana de
+    # conveniencia (año en curso), asi que su arranque si es ajustable.
+    fecha_inicio_2026 = request.GET.get('fecha_inicio_2026') or RESCATES_OM_2026_START
+
+    if not (activar_csp or activar_trump or activar_2026):
+        return render(request, "Reportes_Analisis/rescates_reporte_operacion_migratoria.html", {
+            "sin_filtro": True, "sin_periodos": True, "fecha_fin": fecha_fin, "fecha_inicio_2026": fecha_inicio_2026,
+        })
+
+    # Secuencial (no ThreadPoolExecutor): cada uno hace JOIN pesado contra
+    # mapa_mv_reincidencia_rescates -- correrlos en paralelo agota la
+    # memoria compartida del contenedor (ya diagnosticado).
+    periodo_csp = _rescates_periodo_gobierno(RESCATES_CSP_START, fecha_fin, "Sheinbaum") if activar_csp else None
+    periodo_trump = _rescates_periodo_gobierno(RESCATES_TRUMP_START, fecha_fin, "Trump") if activar_trump else None
+
+    figuras = []
+    if periodo_csp and periodo_trump:
+        figuras.append(("tendencia", _rescates_grafico_operacion_migratoria(periodo_csp, periodo_trump)))
+        datos_control = _rescates_control_nna_datos(periodo_csp, periodo_trump)
+        figuras.append(("control", _rescates_grafico_control_nna(
+            datos_control, "Gráfico de control — NNA no acompañados por día de gobierno", mostrar_atipicos=False
+        )))
+    if periodo_csp:
+        figuras.append(("nac_csp", _rescates_grafico_nacionalidades(periodo_csp, "#ad2142")))
+    if periodo_trump:
+        figuras.append(("nac_trump", _rescates_grafico_nacionalidades(periodo_trump, "#2b5a8f")))
+
+    # @FADAR -- "Extranjeros identificados..." solo para los periodos
+    # activados -- antes siempre calculaba los 3, ahora solo los que el
+    # usuario pidio (ya con JOIN por el filtro de "solo primera vez", asi
+    # que esto si reduce carga real).
+    om_periodos_posibles = [
+        ("Sheinbaum", RESCATES_CSP_START, activar_csp), ("Trump", RESCATES_TRUMP_START, activar_trump), ("2026", fecha_inicio_2026, activar_2026),
+    ]
+    om_periodos = [(etq, inicio) for etq, inicio, activo in om_periodos_posibles if activo]
+    om_datos = [_rescates_om_paises_region(inicio, fecha_fin) for _, inicio in om_periodos]
+    om_subtitulos = [f"Del {_rescates_fecha_larga(inicio)} a la fecha actual — solo primera vez" for _, inicio in om_periodos]
+    for (etiqueta, _), datos in zip(om_periodos, om_datos):
+        figuras.append((f"om_paises_{etiqueta}", _rescates_om_grafico_paises(datos, etiqueta)))
+        figuras.append((f"om_regiones_{etiqueta}", _rescates_om_grafico_regiones(datos, etiqueta)))
+
+    if figuras:
+        claves, objetos = zip(*figuras)
+        plot_script, divs = components(objetos)
+        divs_por_clave = dict(zip(claves, divs))
+    else:
+        plot_script, divs_por_clave = "", {}
+
+    om_secciones = [
+        {
+            "etiqueta": etiqueta, "subtitulo": sub,
+            "div_paises": divs_por_clave.get(f"om_paises_{etiqueta}"),
+            "div_regiones": divs_por_clave.get(f"om_regiones_{etiqueta}"),
+            "regiones": datos["regiones"],
+        }
+        for (etiqueta, _), sub, datos in zip(om_periodos, om_subtitulos, om_datos)
+    ]
+
+    return render(request, "Reportes_Analisis/rescates_reporte_operacion_migratoria.html", {
+        "fecha_fin": fecha_fin,
+        "activar_csp": activar_csp, "activar_trump": activar_trump, "activar_2026": activar_2026,
+        "fecha_inicio_2026": fecha_inicio_2026,
+        "periodo_csp": periodo_csp,
+        "periodo_trump": periodo_trump,
+        "plot_script": plot_script,
+        "plot_div_tendencia": divs_por_clave.get("tendencia"),
+        "plot_div_nac_csp": divs_por_clave.get("nac_csp"),
+        "plot_div_nac_trump": divs_por_clave.get("nac_trump"),
+        "plot_div_control": divs_por_clave.get("control"),
+        "om_secciones": om_secciones,
+    })
+
+
+# =============================================================================
+# Descargables de Operación_Migratoria (PDF y PPTX) -- portada institucional
+# con los logos de Gobernación/INM que el usuario dejo en Reportes_Analisis/img,
+# fondo solido de tono similar al de referencia (sin el patron decorativo,
+# no se cuenta con ese archivo). Bokeh se queda solo en pantalla; aqui se
+# usa matplotlib para las imagenes estaticas -- mismos datos ya calculados,
+# solo cambia como se dibujan (ver nota de mantenimiento al inicio del
+# bloque de graficas).
+# =============================================================================
+
+RESCATES_OM_COLOR_FONDO_PORTADA = "F3F1EE"
+RESCATES_OM_COLOR_DORADO = "B08D57"
+
+RESCATES_OM_IMG_DIR = os.path.join(os.path.dirname(__file__), "img")
+RESCATES_OM_IMAGENES = {
+    "mujer_bandera": "logo_gobierno.png",
+    "gobernacion": "gobernación.jpg",
+    "inm": "INM.jpg",
+    "margarita_maza": "2026_año.jpg",
+}
+
+
+def _rescates_om_imagen_ruta(clave):
+    return os.path.join(RESCATES_OM_IMG_DIR, RESCATES_OM_IMAGENES[clave])
+
+
+def _rescates_om_imagen_base64(clave):
+    """Data URI de una imagen institucional -- para incrustarla en el PDF
+    (WeasyPrint) sin depender de que Django la sirva como estatico."""
+    ruta = _rescates_om_imagen_ruta(clave)
+    ext = ruta.rsplit(".", 1)[-1].lower()
+    mime = "image/png" if ext == "png" else "image/jpeg"
+    with open(ruta, "rb") as f:
+        b64 = base64.b64encode(f.read()).decode("ascii")
+    return f"data:{mime};base64,{b64}"
+
+
+# -----------------------------------------------------------------------
+# MANTENIMIENTO FUTURO -- estas graficas en matplotlib son una SEGUNDA
+# implementacion de las mismas 5 vistas que ya existen en Bokeh mas arriba
+# (_rescates_grafico_operacion_migratoria, _rescates_grafico_nacionalidades,
+# _rescates_grafico_control_nna, _rescates_om_grafico_paises,
+# _rescates_om_grafico_regiones). Si cambia el diseño (colores, ventana de
+# suavizado, que se muestra en cada grafica), hay que actualizar AMBAS --
+# no hay un solo lugar que las sincronice. Se opto por 2 implementaciones
+# porque Bokeh da hover interactivo en pantalla, pero PDF/PPTX necesitan
+# una imagen estatica -- exportar el Bokeh a imagen requeriria Selenium +
+# navegador headless en Docker (mas pesado, descartado). matplotlib no
+# tiene esa dependencia.
+# -----------------------------------------------------------------------
+
+def _rescates_mpl_png(fig, dpi=150):
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=dpi, facecolor=fig.get_facecolor(), bbox_inches="tight")
+    plt.close(fig)
+    buf.seek(0)
+    return buf
+
+
+def _rescates_mpl_estilo_ejes(ax, quitar=("top", "right")):
+    for s in quitar:
+        ax.spines[s].set_visible(False)
+    for s in ax.spines:
+        if s not in quitar:
+            ax.spines[s].set_color("#6b6255")
+            ax.spines[s].set_alpha(0.4)
+    ax.tick_params(colors="#6b6255", labelsize=7.5)
+
+
+def _rescates_mpl_tendencia(periodo_csp, periodo_trump):
+    dias_csp, val_csp = _rescates_dia_relativo(periodo_csp["serie_diaria"])
+    dias_trump_propio, val_trump = _rescates_dia_relativo(periodo_trump["serie_diaria"])
+    dias_trump = [d + RESCATES_TRUMP_DESFASE_DIAS for d in dias_trump_propio]
+    avg_csp = _rescates_suavizar(val_csp)
+    avg_trump = _rescates_suavizar(val_trump)
+    cruces = _rescates_cruces_notables(dias_csp, avg_csp, dias_trump, avg_trump)
+
+    fig, ax = plt.subplots(figsize=(9.5, 4.2))
+    fig.patch.set_facecolor("#f6f3ec")
+    ax.set_facecolor("#f6f3ec")
+    ax.fill_between(dias_csp, avg_csp, 0, color="#ad2142", alpha=0.12, linewidth=0)
+    ax.fill_between(dias_trump, avg_trump, 0, color="#2b5a8f", alpha=0.12, linewidth=0)
+    ax.scatter(dias_csp, val_csp, s=4, color="#ad2142", alpha=0.25, linewidths=0)
+    ax.scatter(dias_trump, val_trump, s=4, color="#2b5a8f", alpha=0.25, linewidths=0)
+    ax.plot(dias_csp, avg_csp, color="#ad2142", linewidth=2.0, alpha=0.9, label="Sheinbaum")
+    ax.plot(dias_trump, avg_trump, color="#2b5a8f", linewidth=2.0, alpha=0.75, linestyle=(0, (4, 3)), label="Trump")
+    x_max_csp = max(dias_csp) if dias_csp else 0
+    x_max_trump = max(dias_trump) if dias_trump else RESCATES_TRUMP_DESFASE_DIAS
+    ax.plot([0, x_max_csp], [periodo_csp["media_diaria_reincidentes"]] * 2, color="#ad2142", linestyle="dashed", linewidth=1.1, alpha=0.55)
+    ax.plot([RESCATES_TRUMP_DESFASE_DIAS, x_max_trump], [periodo_trump["media_diaria_reincidentes"]] * 2, color="#2b5a8f", linestyle="dashed", linewidth=1.1, alpha=0.55)
+    if cruces:
+        ax.scatter([c[0] for c in cruces], [c[1] for c in cruces], marker="x", s=70, color="#22221d", linewidths=2, zorder=5, label="Cruce Sheinbaum/Trump")
+    ax.set_title("Reincidencia por día de gobierno (eje: días desde el arranque de Sheinbaum)", fontsize=9.5, color="#22221d", loc="left")
+    ax.set_xlabel("Día de gobierno", fontsize=8, color="#4b4438")
+    ax.set_ylabel("Reincidentes", fontsize=8, color="#4b4438")
+    _rescates_mpl_estilo_ejes(ax)
+    ax.grid(axis="both", color="#22221d", alpha=0.06, linewidth=0.8)
+    ax.set_ylim(bottom=0)
+    ax.legend(frameon=False, fontsize=7.5, loc="upper right")
+    fig.tight_layout()
+    return _rescates_mpl_png(fig)
+
+
+def _rescates_mpl_nacionalidades(periodo, color):
+    filas = periodo["nacionalidades_grafico"]
+    nombres = [f["nacionalidad"] for f in filas][::-1]
+    valores = [f["total"] for f in filas][::-1]
+    # @FADAR -- 6.5in de alto (aspecto ~1.46:1) hacia que este bloque (titulo
+    # + grafica) no cupiera completo en 1 sola pagina A4 horizontal ni en 1
+    # sola diapositiva 16:9 -- se partia a la mitad (titulo huerfano en el
+    # PDF, imagen recortada en el pptx). 4.8in (~1.98:1) cabe completo en
+    # ambos formatos.
+    fig, ax = plt.subplots(figsize=(9.5, 4.8))
+    fig.patch.set_facecolor("#f6f3ec")
+    ax.set_facecolor("#f6f3ec")
+    ax.barh(nombres, valores, color=color, height=0.75)
+    ax.set_title(f"Top 20 nacionalidades por reincidencia — {periodo['etiqueta']}", fontsize=10, color="#22221d", loc="left")
+    ax.tick_params(labelsize=6.5, colors="#4b4438")
+    _rescates_mpl_estilo_ejes(ax, quitar=("top", "right", "left"))
+    ax.grid(axis="x", color="#22221d", alpha=0.06)
+    ax.set_xlim(left=0)
+    fig.tight_layout()
+    return _rescates_mpl_png(fig)
+
+
+def _rescates_mpl_control(datos):
+    x_max = max(datos["dias_csp"] + datos["dias_trump"]) if (datos["dias_csp"] or datos["dias_trump"]) else 1
+    fig, ax = plt.subplots(figsize=(9.5, 4.2))
+    fig.patch.set_facecolor("#f6f3ec")
+    ax.set_facecolor("#f6f3ec")
+    ax.plot([0, x_max], [datos["media"]] * 2, color="#374151", linestyle="dashed", linewidth=1.2, label="Media")
+    ax.plot([0, x_max], [datos["ucl"]] * 2, color="#b45309", linestyle="dotted", linewidth=1.2, label="Límite superior (3σ)")
+    ax.plot([0, x_max], [datos["lcl"]] * 2, color="#b45309", linestyle="dotted", linewidth=1.2, label="Límite inferior (3σ)")
+    ax.plot(datos["dias_csp"], datos["val_csp"], color="#ad2142", linewidth=1.3, alpha=0.9, label="Sheinbaum")
+    ax.plot(datos["dias_trump"], datos["val_trump"], color="#2b5a8f", linewidth=1.3, alpha=0.75, linestyle=(0, (4, 3)), label="Trump")
+    ax.set_title("Gráfico de control — NNA no acompañados por día de gobierno", fontsize=9.5, color="#22221d", loc="left")
+    ax.set_xlabel("Día de gobierno", fontsize=8, color="#4b4438")
+    ax.set_ylabel("NNA no acompañados", fontsize=8, color="#4b4438")
+    _rescates_mpl_estilo_ejes(ax)
+    ax.grid(axis="both", color="#22221d", alpha=0.06)
+    ax.set_ylim(bottom=0)
+    ax.legend(frameon=False, fontsize=7, loc="upper right")
+    fig.tight_layout()
+    return _rescates_mpl_png(fig)
+
+
+def _rescates_mpl_paises(datos, etiqueta):
+    nombres = [p["nombre"] for p in datos["paises"]]
+    em = [p["em"] for p in datos["paises"]]
+    dif = [p["dif"] for p in datos["paises"]]
+    fig, ax = plt.subplots(figsize=(9.5, 4.4))
+    fig.patch.set_facecolor("#f6f3ec")
+    ax.set_facecolor("#f6f3ec")
+    ax.bar(nombres, em, color="#285C4D", label="Estación Migratoria (EM)")
+    ax.bar(nombres, dif, bottom=em, color="#7030A0", label="DIF / Albergue")
+    ax.set_title(f"Por nacionalidad y alojamiento (solo primera vez) — {etiqueta}", fontsize=10, color="#22221d", loc="left")
+    ax.tick_params(axis="x", labelrotation=40, labelsize=6.5, colors="#4b4438")
+    ax.tick_params(axis="y", labelsize=7, colors="#4b4438")
+    for lbl in ax.get_xticklabels():
+        lbl.set_ha("right")
+    _rescates_mpl_estilo_ejes(ax)
+    ax.grid(axis="y", color="#22221d", alpha=0.06)
+    ax.legend(frameon=False, fontsize=7.5)
+    fig.tight_layout()
+    return _rescates_mpl_png(fig)
+
+
+def _rescates_mpl_regiones(datos, etiqueta):
+    nombres = [r["nombre"] for r in datos["regiones"]]
+    valores = [r["total"] for r in datos["regiones"]]
+    fig, ax = plt.subplots(figsize=(9.5, 3.6))
+    fig.patch.set_facecolor("#f6f3ec")
+    ax.set_facecolor("#f6f3ec")
+    ax.bar(nombres, valores, color="#4C69B0")
+    ax.set_title(f"Por continente/región (solo primera vez) — {etiqueta}", fontsize=10, color="#22221d", loc="left")
+    ax.tick_params(labelsize=7.5, colors="#4b4438")
+    _rescates_mpl_estilo_ejes(ax)
+    ax.grid(axis="y", color="#22221d", alpha=0.06)
+    fig.tight_layout()
+    return _rescates_mpl_png(fig)
+
+
+def _rescates_om_datos_completos(fecha_fin, activar_csp=True, activar_trump=True, activar_2026=True, fecha_inicio_2026=None):
+    """Recalcula (o reutiliza cache) todo lo que necesitan el PDF y el
+    PPTX -- misma fuente que ya alimenta la pantalla, sin duplicar
+    consultas: _rescates_periodo_gobierno y _rescates_om_paises_region ya
+    estan cacheados por su cuenta.
+
+    Los flags activar_* reflejan EXACTAMENTE los mismos checkboxes de la
+    pantalla -- si no se activa un periodo, no se calcula (mismo motivo
+    que en pantalla: evitar el 504 Gateway Time-out ya diagnosticado).
+    Los defaults en True son solo para no romper llamadas antiguas; las
+    vistas de PDF/PPTX siempre pasan los 4 parametros explicitamente."""
+    fecha_inicio_2026 = fecha_inicio_2026 or RESCATES_OM_2026_START
+    periodo_csp = _rescates_periodo_gobierno(RESCATES_CSP_START, fecha_fin, "Sheinbaum") if activar_csp else None
+    periodo_trump = _rescates_periodo_gobierno(RESCATES_TRUMP_START, fecha_fin, "Trump") if activar_trump else None
+    datos_control = _rescates_control_nna_datos(periodo_csp, periodo_trump) if (periodo_csp and periodo_trump) else None
+
+    om_periodos_posibles = [
+        ("Sheinbaum", RESCATES_CSP_START, activar_csp), ("Trump", RESCATES_TRUMP_START, activar_trump), ("2026", fecha_inicio_2026, activar_2026),
+    ]
+    om_periodos = [(etq, inicio) for etq, inicio, activo in om_periodos_posibles if activo]
+    om_datos = [_rescates_om_paises_region(inicio, fecha_fin) for _, inicio in om_periodos]
+    om_subtitulos = [f"Del {_rescates_fecha_larga(inicio)} a la fecha actual — solo primera vez" for _, inicio in om_periodos]
+
+    return {
+        "periodo_csp": periodo_csp, "periodo_trump": periodo_trump, "datos_control": datos_control,
+        "om_periodos": om_periodos, "om_datos": om_datos, "om_subtitulos": om_subtitulos,
+    }
+
+
+def _rescates_png_a_base64(buf):
+    return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
+
+
+def _rescates_om_leer_activacion(request):
+    """Mismos 4 parametros que la pantalla (activar_csp/trump/2026,
+    fecha_inicio_2026) -- para que PDF/PPTX traigan EXACTAMENTE lo que el
+    usuario tenia activado, no siempre los 3 periodos."""
+    activar_csp = request.GET.get('activar_csp') == 'on'
+    activar_trump = request.GET.get('activar_trump') == 'on'
+    activar_2026 = request.GET.get('activar_2026') == 'on'
+    fecha_inicio_2026 = request.GET.get('fecha_inicio_2026') or RESCATES_OM_2026_START
+    return activar_csp, activar_trump, activar_2026, fecha_inicio_2026
+
+
+def _rescates_om_leyenda_periodos(datos):
+    """Texto explicito de que periodos trae el descargable -- pedido
+    puntual del usuario, para que quede claro en el PDF/PPTX sin tener que
+    adivinar por las secciones presentes."""
+    nombres = [etiqueta for etiqueta, _ in datos["om_periodos"]]
+    if not nombres:
+        return "Ningún periodo activado"
+    return "Periodos incluidos: " + ", ".join(nombres)
+
+
+def rescates_reporte_operacion_migratoria_pdf(request):
+    if not request.user.is_authenticated:
+        return redirect('/log-in/?next=%s' % request.path)
+    # @FADAR -- misma correccion que en la vista de pantalla: se checa el
+    # valor, no solo si la llave esta presente (evita el mismo ValueError
+    # con strptime si llega "fecha_fin=" vacio).
+    fecha_fin = request.GET.get('fecha_fin') or ''
+    if not fecha_fin:
+        return redirect('Reportes_Analisis:rescates_reporte_operacion_migratoria')
+    activar_csp, activar_trump, activar_2026, fecha_inicio_2026 = _rescates_om_leer_activacion(request)
+    datos = _rescates_om_datos_completos(fecha_fin, activar_csp, activar_trump, activar_2026, fecha_inicio_2026)
+
+    secciones = []
+    for (etiqueta, _), sub, om_datos_periodo in zip(datos["om_periodos"], datos["om_subtitulos"], datos["om_datos"]):
+        secciones.append({
+            "etiqueta": etiqueta, "subtitulo": sub,
+            "img_paises": _rescates_png_a_base64(_rescates_mpl_paises(om_datos_periodo, etiqueta)),
+            "img_regiones": _rescates_png_a_base64(_rescates_mpl_regiones(om_datos_periodo, etiqueta)),
+            "regiones": om_datos_periodo["regiones"],
+        })
+
+    periodo_csp, periodo_trump = datos["periodo_csp"], datos["periodo_trump"]
+    contexto = {
+        "fecha_fin": fecha_fin,
+        "anio_portada": datetime.strptime(fecha_fin, "%Y-%m-%d").year,
+        "fecha_fin_larga": _rescates_fecha_larga(fecha_fin),
+        "leyenda_periodos": _rescates_om_leyenda_periodos(datos),
+        "periodo_csp": periodo_csp,
+        "periodo_trump": periodo_trump,
+        "logo_mujer": _rescates_om_imagen_base64("mujer_bandera"),
+        "logo_gobernacion": _rescates_om_imagen_base64("gobernacion"),
+        "logo_inm": _rescates_om_imagen_base64("inm"),
+        "logo_maza": _rescates_om_imagen_base64("margarita_maza"),
+        "img_tendencia": _rescates_png_a_base64(_rescates_mpl_tendencia(periodo_csp, periodo_trump)) if (periodo_csp and periodo_trump) else None,
+        "img_nac_csp": _rescates_png_a_base64(_rescates_mpl_nacionalidades(periodo_csp, "#ad2142")) if periodo_csp else None,
+        "img_nac_trump": _rescates_png_a_base64(_rescates_mpl_nacionalidades(periodo_trump, "#2b5a8f")) if periodo_trump else None,
+        "img_control": _rescates_png_a_base64(_rescates_mpl_control(datos["datos_control"])) if datos["datos_control"] else None,
+        "secciones": secciones,
+    }
+    template = get_template("Reportes_Analisis/_rescates_operacion_migratoria_pdf.html")
+    html_string = template.render(contexto)
+    # @FADAR -- sin base_url: todas las imagenes van embebidas en base64
+    # (logos + graficas matplotlib), no hay ninguna referencia externa que
+    # resolver.
+    pdf_file = HTML(string=html_string).write_pdf()
+    nombre_archivo = f"Operacion Migratoria {fecha_fin}.pdf"
+    response = HttpResponse(pdf_file, content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="{nombre_archivo}"'
+    return response
+
+
+# =============================================================================
+# PPTX -- mismos datos e imagenes matplotlib que el PDF (misma funcion
+# _rescates_om_datos_completos), solo cambia el ensamblado: aqui son
+# diapositivas de python-pptx en vez de paginas HTML/WeasyPrint. La tabla
+# de "paises por region" NO se incluye completa en el pptx (30+ filas por
+# periodo no caben legibles en una diapositiva) -- se deja solo en el PDF;
+# el pptx se queda con las graficas, que es lo que importa para presentar.
+# =============================================================================
+
+RESCATES_OM_PPTX_ANCHO = Inches(13.333)
+RESCATES_OM_PPTX_ALTO = Inches(7.5)
+
+
+def _rescates_om_pptx_fondo(slide, prs):
+    # @FADAR -- se agrega como PRIMERA forma de la diapositiva -- eso ya
+    # la deja al fondo (z-order = orden de insercion), sin necesidad de
+    # manipular el arbol XML interno a mano (se probo, generaba un pptx
+    # invalido que LibreOffice no podia abrir aunque python-pptx si lo
+    # releia sin quejarse).
+    fondo = slide.shapes.add_shape(1, 0, 0, prs.slide_width, prs.slide_height)  # MSO_SHAPE.RECTANGLE = 1
+    fondo.fill.solid()
+    fondo.fill.fore_color.rgb = RGBColor.from_string(RESCATES_OM_COLOR_FONDO_PORTADA)
+    fondo.line.fill.background()
+    fondo.shadow.inherit = False
+    return fondo
+
+
+def _rescates_om_pptx_titulo(slide, texto, top, tam=24, color=RESCATES_OM_COLOR_DORADO, left=Inches(0.5), ancho=None):
+    ancho = ancho or (RESCATES_OM_PPTX_ANCHO - Inches(1))
+    cuadro = slide.shapes.add_textbox(left, top, ancho, Inches(0.7))
+    p = cuadro.text_frame.paragraphs[0]
+    p.text = texto
+    p.font.size = Pt(tam)
+    p.font.bold = True
+    p.font.color.rgb = RGBColor.from_string(color)
+    return cuadro
+
+
+def _rescates_om_pptx_imagen(slide, buf, left, top, ancho=None, alto=None):
+    return slide.shapes.add_picture(buf, left, top, width=ancho, height=alto)
+
+
+def rescates_reporte_operacion_migratoria_pptx(request):
+    if not request.user.is_authenticated:
+        return redirect('/log-in/?next=%s' % request.path)
+    # @FADAR -- misma correccion que en la vista de pantalla/PDF.
+    fecha_fin = request.GET.get('fecha_fin') or ''
+    if not fecha_fin:
+        return redirect('Reportes_Analisis:rescates_reporte_operacion_migratoria')
+    activar_csp, activar_trump, activar_2026, fecha_inicio_2026 = _rescates_om_leer_activacion(request)
+    datos = _rescates_om_datos_completos(fecha_fin, activar_csp, activar_trump, activar_2026, fecha_inicio_2026)
+    periodo_csp, periodo_trump = datos["periodo_csp"], datos["periodo_trump"]
+
+    prs = Presentation()
+    prs.slide_width = RESCATES_OM_PPTX_ANCHO
+    prs.slide_height = RESCATES_OM_PPTX_ALTO
+    layout_blanco = prs.slide_layouts[6]  # layout en blanco
+
+    # --- Diapositiva 1: portada ---
+    slide = prs.slides.add_slide(layout_blanco)
+    _rescates_om_pptx_fondo(slide, prs)
+    slide.shapes.add_picture(_rescates_om_imagen_ruta("gobernacion"), Inches(8.6), Inches(0.35), height=Inches(0.7))
+    slide.shapes.add_picture(_rescates_om_imagen_ruta("inm"), Inches(11.4), Inches(0.35), height=Inches(0.7))
+    slide.shapes.add_picture(_rescates_om_imagen_ruta("mujer_bandera"), Inches(0.5), Inches(1.6), width=Inches(4.2))
+    _rescates_om_pptx_titulo(slide, "OPERACIÓN MIGRATORIA", Inches(2.3), tam=40, left=Inches(5.1), ancho=Inches(7.7))
+    sub = slide.shapes.add_textbox(Inches(5.1), Inches(3.5), Inches(7.7), Inches(0.6))
+    sub.text_frame.paragraphs[0].text = f"Del 01 de enero al {_rescates_fecha_larga(fecha_fin)}"
+    sub.text_frame.paragraphs[0].font.size = Pt(18)
+    sub.text_frame.paragraphs[0].font.color.rgb = RGBColor.from_string(RESCATES_OM_COLOR_DORADO)
+    # @FADAR -- leyenda explicita de que periodos trae este pptx, pedido
+    # puntual del usuario (antes no se distinguia sin abrir cada seccion).
+    leyenda = slide.shapes.add_textbox(Inches(5.1), Inches(4.05), Inches(7.7), Inches(0.5))
+    leyenda.text_frame.paragraphs[0].text = _rescates_om_leyenda_periodos(datos)
+    leyenda.text_frame.paragraphs[0].font.size = Pt(13)
+    leyenda.text_frame.paragraphs[0].font.bold = True
+    leyenda.text_frame.paragraphs[0].font.color.rgb = RGBColor.from_string("6B6255")
+    inst = slide.shapes.add_textbox(Inches(5.1), Inches(5.3), Inches(7.7), Inches(1.2))
+    tf = inst.text_frame
+    tf.paragraphs[0].text = "Instituto Nacional de Migración"
+    tf.paragraphs[0].font.bold = True
+    tf.paragraphs[0].font.size = Pt(13)
+    tf.paragraphs[0].font.color.rgb = RGBColor.from_string(RESCATES_OM_COLOR_DORADO)
+    p2 = tf.add_paragraph()
+    p2.text = "Dirección General de Coordinación de Oficinas de Representación"
+    p2.font.bold = True
+    p2.font.size = Pt(13)
+    p2.font.color.rgb = RGBColor.from_string(RESCATES_OM_COLOR_DORADO)
+    slide.shapes.add_picture(_rescates_om_imagen_ruta("margarita_maza"), Inches(0.5), Inches(6.3), height=Inches(0.9))
+
+    # --- Diapositiva 2: resumen KPI (solo si Sheinbaum y/o Trump activos) ---
+    kpis = []
+    if periodo_csp:
+        kpis += [
+            ("Sheinbaum — Reincidentes", periodo_csp["total_reincidentes"], "#ad2142"),
+            ("Sheinbaum — Media diaria", periodo_csp["media_diaria_reincidentes"], "#ad2142"),
+        ]
+    if periodo_trump:
+        kpis += [
+            ("Trump — Reincidentes", periodo_trump["total_reincidentes"], "#2b5a8f"),
+            ("Trump — Media diaria", periodo_trump["media_diaria_reincidentes"], "#2b5a8f"),
+        ]
+    if kpis:
+        slide = prs.slides.add_slide(layout_blanco)
+        _rescates_om_pptx_fondo(slide, prs)
+        _rescates_om_pptx_titulo(slide, "Resumen — " + _rescates_om_leyenda_periodos(datos), Inches(0.4))
+        for i, (etq, val, color) in enumerate(kpis):
+            left = Inches(0.5 + i * 3.15)
+            caja = slide.shapes.add_textbox(left, Inches(1.6), Inches(2.9), Inches(1.6))
+            tf = caja.text_frame
+            tf.paragraphs[0].text = str(val)
+            tf.paragraphs[0].font.size = Pt(32)
+            tf.paragraphs[0].font.bold = True
+            tf.paragraphs[0].font.color.rgb = RGBColor.from_string(color.lstrip("#").upper())
+            p2 = tf.add_paragraph()
+            p2.text = etq
+            p2.font.size = Pt(12)
+            p2.font.color.rgb = RGBColor.from_string("4B4438")
+
+    # --- Diapositivas de graficas (tendencia, control, nacionalidades) --
+    # solo las que apliquen segun que periodos esten activos.
+    graficas_generales = []
+    if periodo_csp and periodo_trump:
+        graficas_generales.append(("Reincidencia por día de gobierno", _rescates_mpl_tendencia(periodo_csp, periodo_trump)))
+        graficas_generales.append(("Gráfico de control — NNA no acompañados", _rescates_mpl_control(datos["datos_control"])))
+    if periodo_csp:
+        graficas_generales.append(("Top 20 nacionalidades por reincidencia — Sheinbaum", _rescates_mpl_nacionalidades(periodo_csp, "#ad2142")))
+    if periodo_trump:
+        graficas_generales.append(("Top 20 nacionalidades por reincidencia — Trump", _rescates_mpl_nacionalidades(periodo_trump, "#2b5a8f")))
+    for titulo, buf in graficas_generales:
+        slide = prs.slides.add_slide(layout_blanco)
+        _rescates_om_pptx_fondo(slide, prs)
+        _rescates_om_pptx_titulo(slide, titulo, Inches(0.35), tam=20)
+        _rescates_om_pptx_imagen(slide, buf, Inches(0.6), Inches(1.15), ancho=Inches(12.1))
+
+    # --- Diapositivas de "Extranjeros identificados..." (2 por periodo: pais + region) ---
+    for (etiqueta, _), sub, om_datos_periodo in zip(datos["om_periodos"], datos["om_subtitulos"], datos["om_datos"]):
+        for titulo, buf in [
+            (f"Extranjeros por nacionalidad y alojamiento — {etiqueta}", _rescates_mpl_paises(om_datos_periodo, etiqueta)),
+            (f"Extranjeros por continente/región — {etiqueta}", _rescates_mpl_regiones(om_datos_periodo, etiqueta)),
+        ]:
+            slide = prs.slides.add_slide(layout_blanco)
+            _rescates_om_pptx_fondo(slide, prs)
+            _rescates_om_pptx_titulo(slide, titulo, Inches(0.3), tam=18)
+            sub_box = slide.shapes.add_textbox(Inches(0.5), Inches(0.9), Inches(12), Inches(0.4))
+            sub_box.text_frame.paragraphs[0].text = sub
+            sub_box.text_frame.paragraphs[0].font.size = Pt(11)
+            sub_box.text_frame.paragraphs[0].font.color.rgb = RGBColor.from_string("6B7280")
+            _rescates_om_pptx_imagen(slide, buf, Inches(0.6), Inches(1.4), ancho=Inches(12.1))
+
+    salida = io.BytesIO()
+    prs.save(salida)
+    salida.seek(0)
+    nombre_archivo = f"Operacion Migratoria {fecha_fin}.pptx"
+    response = HttpResponse(salida.getvalue(), content_type="application/vnd.openxmlformats-officedocument.presentationml.presentation")
+    response["Content-Disposition"] = f'attachment; filename="{nombre_archivo}"'
+    return response
 
 
 # @FADAR
