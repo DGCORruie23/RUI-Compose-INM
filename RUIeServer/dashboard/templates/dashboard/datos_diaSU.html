@@ -27,192 +27,311 @@ Panel de Control de Administrador
 {% block content %}
 {% comment %} <h1 class="text-xl">Dashboard de {{usuario.0.oficinaR}} </h1> {% endcomment %}
 
-<div class="py-2 flex flex-row center">
-    <input class="px-2 rounded border-2 border-inm-marron-100 text-inm-cafe-200 text-sm text-center mx-3" type="text"
-        id="myInputAG" onkeyup="myFunction(5, 'myInputAG')" placeholder="Buscar por Agente" name="filtro_Agente">
+<!-- Inyectando diccionarios de forma segura para JS para corrección masiva -->
+{{ puntosEstrategicos|json_script:"datosEstrategicos" }}
+{{ puntosInternacion|json_script:"datosInternacion" }}
+{{ municipios|json_script:"datosMunicipios" }}
 
-    <input class="px-2 rounded border-2 border-inm-marron-100 text-inm-cafe-200 text-sm text-center mx-3" type="text"
-        id="myInputOR" onkeyup="myFunction(2, 'myInputOR')" placeholder="Buscar por Oficina" name="filtro_OR">
-
-    <input class="px-2 rounded border-2 border-inm-marron-100 text-inm-cafe-200 text-sm text-center mx-3" type="text"
-        id="myInputHRS" onkeyup="myFunction(4, 'myInputHRS')" placeholder="Buscar por Hora" name="filtro_hora">
-
-    <input class="px-2 rounded border-2 border-inm-marron-100 text-inm-cafe-200 text-sm text-center mx-3" type="text"
-        id="myInputP" onkeyup="myFunction(7, 'myInputP')" placeholder="Buscar por Punto" name="filtro_punto">
-
-    <input class="px-2 rounded border-2 border-inm-marron-100 text-inm-cafe-200 text-sm text-center mx-3" type="text"
-        id="myInputNac" onkeyup="myFunction(8, 'myInputNac')" placeholder="Buscar por Nacionalidad" name="filtro_nacio">
-
-    <label class="px-2 py-2 mx-3 text-inm-rojo-200" id="totales"></label>
-
-    <form action="{% url 'descarga_excel' %}" method="post">
-        {% csrf_token %}
-        <input name="fechaDescarga" type="hidden" value="{{fecha_P}}" id="id_fechaDescarga">
-        <input name="oficina" type="hidden" value="{{usuario.0.oficinaR}}" id="id_oficina">
-        <button type="submit"
-            class="py-2 px-6 bg-blue-400 rounded-xl text-white hover:text-inm-verde-100">Descargar</button>
-    </form>
+<!-- Conteo total de registros centrado en la parte superior -->
+<div class="flex justify-center mb-6">
+    <span class="px-4 py-2 bg-[#F4EFF0] text-[#4E232E] rounded-lg font-bold text-sm shadow-md" id="totales">
+        Registros: 0
+    </span>
 </div>
 
-<form method="post" action="{% url 'eliminar_varios_registros' %}" id="formEliminar">
+<!-- Barra de Herramientas y Filtros (En 2 filas) -->
+<div class="bg-white p-4 rounded-xl shadow-md mb-6 border border-slate-100 flex flex-col gap-4">
+    <!-- Fila 1: Filtros de Búsqueda -->
+    <div class="flex flex-wrap items-center justify-center gap-3 hidden">
+        <div class="relative">
+            <input class="pl-3 pr-3 py-2 rounded-lg border-2 border-[#D4C19C] focus:border-[#4E232E] focus:ring-1 focus:ring-[#4E232E] text-slate-800 outline-none transition-all text-sm w-44 shadow-sm" 
+                   type="text" id="myInputAG" onkeyup="myFunction(5, 'myInputAG')" placeholder="Buscar por Agente">
+        </div>
+
+        <div class="relative">
+            <input class="pl-3 pr-3 py-2 rounded-lg border-2 border-[#D4C19C] focus:border-[#4E232E] focus:ring-1 focus:ring-[#4E232E] text-slate-800 outline-none transition-all text-sm w-44 shadow-sm" 
+                   type="text" id="myInputOR" onkeyup="myFunction(2, 'myInputOR')" placeholder="Buscar por Oficina">
+        </div>
+
+        <div class="relative">
+            <input class="pl-3 pr-3 py-2 rounded-lg border-2 border-[#D4C19C] focus:border-[#4E232E] focus:ring-1 focus:ring-[#4E232E] text-slate-800 outline-none transition-all text-sm w-36 shadow-sm" 
+                   type="text" id="myInputHRS" onkeyup="myFunction(4, 'myInputHRS')" placeholder="Buscar por Hora">
+        </div>
+
+        <div class="relative">
+            <input class="pl-3 pr-3 py-2 rounded-lg border-2 border-[#D4C19C] focus:border-[#4E232E] focus:ring-1 focus:ring-[#4E232E] text-slate-800 outline-none transition-all text-sm w-40 shadow-sm" 
+                   type="text" id="myInputP" onkeyup="myFunction(7, 'myInputP')" placeholder="Buscar por Punto">
+        </div>
+
+        <div class="relative">
+            <input class="pl-3 pr-3 py-2 rounded-lg border-2 border-[#D4C19C] focus:border-[#4E232E] focus:ring-1 focus:ring-[#4E232E] text-slate-800 outline-none transition-all text-sm w-44 shadow-sm" 
+                   type="text" id="myInputNac" onkeyup="myFunction(8, 'myInputNac')" placeholder="Buscar por Nacionalidad">
+        </div>
+    </div>
+
+    <!-- Fila 2: Botones de Acción -->
+    <div class="flex flex-wrap items-center justify-center gap-3">
+        <a href="{% url 'agregar_registro_fecha' year=year_context month=month_context day=day_context %}" class="w-full md:w-auto py-2.5 px-5 bg-[#1F4E5B] hover:bg-[#163740] text-white font-bold rounded-lg transition-colors shadow-md flex items-center justify-center gap-2 text-sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+            </svg>
+            Agregar Rescate
+        </a>
+
+        <!-- Botón Corrección (Llama al modal de corrección masiva) -->
+        <button type="button" onclick="mostrarModalCorreccion()" 
+                class="py-2.5 px-4 bg-[#D4C19C] hover:bg-[#bfae8c] text-[#4E232E] font-bold text-sm rounded-lg transition-colors shadow-md flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+            </svg>
+            Corrección
+        </button>
+
+        <form onsubmit="return descargarExcelOptimizado(event, 'downloadStatus')">
+            {% csrf_token %}
+            <input name="fechaDescarga" type="hidden" value="{{fecha_P}}" id="id_fechaDescarga">
+            <input name="oficina" type="hidden" value="TODAS" id="id_oficina">
+            <button type="submit" class="w-full md:w-auto py-2.5 px-5 bg-[#285C4D] hover:bg-[#1f473b] text-white font-bold rounded-lg transition-colors shadow-md flex items-center justify-center gap-2 text-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                </svg>
+                Descargar Excel
+            </button>
+        </form>
+
+        <!-- Botón Eliminar Seleccionados (Llama al modal que hace submit a formEliminar) -->
+        <button type="button" onclick="mostrarModal()" 
+                class="py-2.5 px-4 bg-[#C30E2E] hover:bg-[#A60B25] text-white font-bold text-sm rounded-lg transition-colors shadow-md flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+            </svg>
+            Eliminar Rescates
+        </button>
+    </div>
+</div>
+
+<div id="downloadStatus" style="display: none;" class="mx-auto max-w-lg mb-6"></div>
+
+<form method="post" action="{% url 'eliminar_varios_registros' %}" id="formEliminar" class="space-y-4">
     {% csrf_token %}
-    <input class="py-1 px-2 bg-inm-rojo-300 rounded-xl text-sm text-white hover:bg-inm-rojo-100" type="button"
-        value="Eliminar" onclick="mostrarModal()">
-    <table id="myTable" class="border-separate border border-slate-200 hover:table-fixed">
-        <thead class="bg-inm-cafe-100 text-white">
-            <tr>
-                <th class="border border-slate-300"><input type="checkbox" id="cboxAll" /></th>
-                <th class="border border-slate-300">#</th>
-                <th class="border border-slate-300 px-3 text-sm">
-                    <div class="flex items-center justify-between">
-                        Oficina
-                        <button type="button" onclick="toggleFilterMenu(event, 2)"
-                            class="filter-btn text-gray-500 hover:text-black">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                                stroke="currentColor" class="w-4 h-4">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z" />
+
+    <!-- Contenedor Responsive para la Tabla -->
+    <div class="overflow-x-auto bg-white rounded-xl shadow-md border border-slate-200">
+        <table id="myTable" class="w-full border-collapse text-left text-sm text-slate-800">
+            <thead class="bg-[#4E232E] text-white">
+                <tr>
+                    <th class="py-3.5 px-4 text-center w-12"><input type="checkbox" id="cboxAll" class="rounded border-slate-300 focus:ring-[#4E232E] h-4 w-4 text-[#4E232E]" /></th>
+                    <th class="py-3.5 px-3 font-semibold text-xs uppercase text-center w-12">#</th>
+                    <th class="py-3.5 px-3 font-semibold text-xs uppercase">
+                        <div class="flex items-center justify-between gap-1">
+                            Oficina
+                            <button type="button" onclick="toggleFilterMenu(event, 2)"
+                                class="filter-btn text-[#D4C19C] hover:text-white transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5"
+                                    stroke="currentColor" class="w-3.5 h-3.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z" />
+                                </svg>
+                            </button>
+                        </div>
+                    </th>
+                    <th class="py-3.5 px-3 font-semibold text-xs uppercase text-center">Fecha</th>
+                    <th class="py-3.5 px-3 font-semibold text-xs uppercase text-center">
+                        <div class="flex items-center justify-between gap-1">
+                            Hora
+                            <button type="button" onclick="toggleFilterMenu(event, 4)"
+                                class="filter-btn text-[#D4C19C] hover:text-white transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5"
+                                    stroke="currentColor" class="w-3.5 h-3.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z" />
+                                </svg>
+                            </button>
+                        </div>
+                    </th>
+                    <th class="py-3.5 px-3 font-semibold text-xs uppercase">Nombre del Agente</th>
+                    <th class="py-3.5 px-3 font-semibold text-xs uppercase">
+                        <div class="flex items-center justify-between gap-1">
+                            Tipo de Punto
+                            <button type="button" onclick="toggleFilterMenu(event, 6)"
+                                class="filter-btn text-[#D4C19C] hover:text-white transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5"
+                                    stroke="currentColor" class="w-3.5 h-3.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z" />
+                                </svg>
+                            </button>
+                        </div>
+                    </th>
+                    <th class="py-3.5 px-3 font-semibold text-xs uppercase">
+                        <div class="flex items-center justify-between gap-1">
+                            Punto Estratégico
+                            <button type="button" onclick="toggleFilterMenu(event, 7)"
+                                class="filter-btn text-[#D4C19C] hover:text-white transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5"
+                                    stroke="currentColor" class="w-3.5 h-3.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z" />
+                                </svg>
+                            </button>
+                        </div>
+                    </th>
+                    <th class="py-3.5 px-3 font-semibold text-xs uppercase">
+                        <div class="flex items-center justify-between gap-1">
+                            Nacionalidad
+                            <button type="button" onclick="toggleFilterMenu(event, 8)"
+                                class="filter-btn text-[#D4C19C] hover:text-white transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5"
+                                    stroke="currentColor" class="w-3.5 h-3.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z" />
+                                </svg>
+                            </button>
+                        </div>
+                    </th>
+                    <th class="py-3.5 px-2 font-semibold text-xs uppercase text-center">ISO</th>
+                    <th class="py-3.5 px-3 font-semibold text-xs uppercase">
+                        <div class="flex items-center justify-between gap-1">
+                            Nombre
+                            <button type="button" onclick="toggleFilterMenu(event, 10)"
+                                class="filter-btn text-[#D4C19C] hover:text-white transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5"
+                                    stroke="currentColor" class="w-3.5 h-3.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z" />
+                                </svg>
+                            </button>
+                        </div>
+                    </th>
+                    <th class="py-3.5 px-3 font-semibold text-xs uppercase">
+                        <div class="flex items-center justify-between gap-1">
+                            Apellidos
+                            <button type="button" onclick="toggleFilterMenu(event, 11)"
+                                class="filter-btn text-[#D4C19C] hover:text-white transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5"
+                                    stroke="currentColor" class="w-3.5 h-3.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z" />
+                                </svg>
+                            </button>
+                        </div>
+                    </th>
+                    <th class="py-3.5 px-3 font-semibold text-xs uppercase">Parentesco</th>
+                    <th class="py-3.5 px-3 font-semibold text-xs uppercase text-center">F. Nac</th>
+                    <th class="py-3.5 px-3 font-semibold text-xs uppercase text-center">
+                        <div class="flex items-center justify-between gap-1">
+                            Edad
+                            <button type="button" onclick="toggleFilterMenu(event, 14)"
+                                class="filter-btn text-[#D4C19C] hover:text-white transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5"
+                                    stroke="currentColor" class="w-3.5 h-3.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z" />
+                                </svg>
+                            </button>
+                        </div>
+                    </th>
+                    <th class="py-3.5 px-3 font-semibold text-xs uppercase text-center">
+                        <div class="flex items-center justify-between gap-1">
+                            Sexo
+                            <button type="button" onclick="toggleFilterMenu(event, 15)"
+                                class="filter-btn text-[#D4C19C] hover:text-white transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5"
+                                    stroke="currentColor" class="w-3.5 h-3.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z" />
+                                </svg>
+                            </button>
+                        </div>
+                    </th>
+                    <th class="py-3.5 px-3 font-semibold text-xs uppercase text-center">Embarazo</th>
+                    <th class="py-3.5 px-3 font-semibold text-xs uppercase text-center">Fami. Num</th>
+                    <th class="py-3.5 px-3 font-semibold text-xs uppercase text-center">Acciones</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                {% for val in values %}
+                <tr class="odd:bg-white even:bg-[#FAF6EC] hover:bg-slate-100 transition-colors duration-150 data-row" id="row-{{ val.idRescate }}">
+                    <td class="py-3 px-4 text-center">
+                        <input type="checkbox" id="cbox{{val.idRescate}}"
+                               name="registros_seleccionados" value="{{val.idRescate}}" class="checkbox rounded border-slate-300 text-[#4E232E] focus:ring-[#4E232E]"
+                               onClick="checkALLT(this)" />
+                    </td>
+                    <td class="py-3 px-3 text-xs text-center font-medium text-slate-500">{{ forloop.counter }}</td>
+                    <td class="py-3 px-3 text-xs font-semibold text-[#4E232E]">{{val.oficinaRepre}}</td>
+                    <td class="py-3 px-3 text-xs text-center whitespace-nowrap">{{val.fecha}}</td>
+                    <td class="py-3 px-3 text-xs text-center font-semibold">{{val.hora}}</td>
+                    <td class="py-3 px-3 text-xs cell-agente">{{val.nombreAgente}}</td>
+                    
+                    <td class="py-3 px-3 text-xs">
+                        {% if val.aeropuerto == True %}
+                            Aeropuerto
+                        {% elif val.carretero == True %}
+                            Carretero
+                        {% elif val.casaSeguridad == True %}
+                            Disuadidos
+                        {% elif val.centralAutobus == True %}
+                            Central de Autobus
+                        {% elif val.ferrocarril == True %}
+                            Ferrocarril
+                        {% elif val.hotel == True %}
+                            Visitas de Verificación
+                        {% elif val.puestosADispo == True %}
+                            Puestos a Disposición
+                        {% elif val.voluntarios == True %}
+                            Voluntarios
+                        {% else %}
+                            Otro
+                        {% endif %}
+                    </td>
+
+                    <td class="py-3 px-3 text-xs">{{val.puntoEstra}}</td>
+                    <td class="py-3 px-3 text-xs">{{val.nacionalidad}}</td>
+                    <td class="py-3 px-2 text-xs text-center font-mono text-slate-500">{{val.iso3}}</td>
+                    <td class="py-3 px-3 text-xs cell-nombre">{{val.nombre}}</td>
+                    <td class="py-3 px-3 text-xs font-medium text-slate-900 cell-apellidos">{{val.apellidos}}</td>
+                    <td class="py-3 px-3 text-xs">{{val.parentesco|default_if_none:""}}</td>
+                    <td class="py-3 px-3 text-xs text-center whitespace-nowrap">{{val.fechaNacimiento}}</td>
+                    <td class="py-3 px-3 text-xs text-center">{{val.edad}}</td>
+                    
+                    <td class="py-3 px-3 text-xs text-center">
+                        {% if val.sexo == True %}
+                            <span class="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full font-semibold">H</span>
+                        {% else %}
+                            <span class="px-2 py-0.5 bg-pink-50 text-pink-700 rounded-full font-semibold">M</span>
+                        {% endif %}
+                    </td>
+
+                    <td class="py-3 px-3 text-xs text-center">
+                        {% if val.embarazo == True %}
+                            <span class="px-2 py-0.5 bg-purple-50 text-purple-700 rounded-full font-semibold">Si</span>
+                        {% else %}
+                            <span class="text-slate-400">No</span>
+                        {% endif %}
+                    </td>
+
+                    <td class="py-3 px-3 text-xs text-center font-medium">
+                        {% if val.numFamilia == 0 %}
+                            -
+                        {% else %}
+                            {{val.numFamilia}}
+                        {% endif %}
+                    </td>
+                    <td class="py-3 px-3 text-center">
+                        <a href="{% url 'editar' val.idRescate %}" 
+                           class="inline-flex items-center gap-1 py-1 px-2.5 bg-[#D4C19C] hover:bg-[#bfae8c] text-[#4E232E] font-bold text-xs rounded transition-colors shadow-sm"
+                           title="Editar Registro">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
                             </svg>
-                        </button>
-                    </div>
-                </th>
-                <th class="border border-slate-300 px-3 text-sm">Fecha</th>
-                <th class="border border-slate-300 px-1 text-sm">Hora</th>
-                <th class="border border-slate-300 text-sm">Nombre del Agente</th>
-
-                <th class="border border-slate-300 text-sm">Tipo de Punto</th>
-
-                {% comment %} <th class="border border-slate-300">Aeropuerto</th>
-                <th class="border border-slate-300">Carretero</th>
-                <th class="border border-slate-300">Casa de seguridad</th>
-                <th class="border border-slate-300">Central de Autobus</th>
-                <th class="border border-slate-300">Ferrocarril</th>
-                <th class="border border-slate-300">Hotel</th>
-                <th class="border border-slate-300">Puestos a Disposicion</th>
-                <th class="border border-slate-300">voluntarios</th> {% endcomment %}
-
-                {% comment %} <th class="border border-slate-300">Municipio</th> {% endcomment %}
-                <th class="border border-slate-300 text-sm">Punto Estrategico</th>
-                <th class="border border-slate-300 text-sm">
-                    <div class="flex items-center justify-between">
-                        Nacionalidad
-                        <button type="button" onclick="toggleFilterMenu(event, 8)"
-                            class="filter-btn text-gray-500 hover:text-black">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                                stroke="currentColor" class="w-4 h-4">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z" />
-                            </svg>
-                        </button>
-                    </div>
-                </th>
-                <th class="border border-slate-300 px-2 text-sm">ISO</th>
-                <th class="border border-slate-300">
-                    <div class="flex items-center justify-between">
-                        Nombre
-                        <button type="button" onclick="toggleFilterMenu(event, 10)"
-                            class="filter-btn text-gray-500 hover:text-black">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                                stroke="currentColor" class="w-4 h-4">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z" />
-                            </svg>
-                        </button>
-                    </div>
-                </th>
-                <th class="border border-slate-300">
-                    <div class="flex items-center justify-between">
-                        Apellidos
-                        <button type="button" onclick="toggleFilterMenu(event, 11)"
-                            class="filter-btn text-gray-500 hover:text-black">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                                stroke="currentColor" class="w-4 h-4">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z" />
-                            </svg>
-                        </button>
-                    </div>
-                </th>
-                <th class="border border-slate-300 text-sm">Parentesco</th>
-                <th class="border border-slate-300 text-xs">Fecha de Nacimiento</th>
-                <th class="border border-slate-300 text-sm">Edad</th>
-                <th class="border border-slate-300 px-2">Sexo</th>
-                <th class="border border-slate-300 text-sm">Embarazo</th>
-                <th class="border border-slate-300 text-sm">Numero de familia</th>
-            </tr>
-        </thead>
-        <tbody class="bg-gray-200">
-            {% for val in values %}
-            <tr>
-                <td class="text-xs text-center"><input type="checkbox" id="cbox{{val.idRescate}}"
-                        name="registros_seleccionados" value="{{val.idRescate}}" class="checkbox"
-                        onClick="checkALLT(this)" /></td>
-                <td class="text-xs text-center">{{ forloop.counter }}</td>
-                <td class="text-xs text-center">{{val.oficinaRepre}}</td>
-                <td class="text-xs text-center">{{val.fecha}}</td>
-                <td class="text-xs text-center">{{val.hora}}</td>
-                <td class="text-xs text-center">{{val.nombreAgente}}</td>
-
-                {% if val.aeropuerto == True %}
-                <td class="text-xs text-center">Aeropuerto</td>
-                {% elif val.carretero == True %}
-                <td class="text-xs text-center">Carretero</td>
-                {% elif val.casaSeguridad == True %}
-                <td class="text-xs text-center">Disuadidos</td>
-                {% elif val.centralAutobus == True %}
-                <td class="text-xs text-center">Central de Autobus</td>
-                {% elif val.ferrocarril == True %}
-                <td class="text-xs text-center">Ferrocarril</td>
-                {% elif val.hotel == True %}
-                <td class="text-xs text-center">Visitas de Verificación</td>
-                {% elif val.puestosADispo == True %}
-                <td class="text-xs text-center">Puestos a Disposición</td>
-                {% elif val.voluntarios == True %}
-                <td class="text-xs text-center">Voluntarios</td>
-                {% else %}
-                <td class="text-xs text-center">Otro</td>
-                {% endif %}
-                {% comment %} <th>{{val.aeropuerto}}</th>
-                <th>{{val.carretero}}</th>
-                <th>{{val.casaSeguridad}}</th>
-                <th>{{val.centralAutobus}}</th>
-                <th>{{val.ferrocarril}}</th>
-                <th>{{val.hotel}}</th>
-                <th>{{val.puestosADispo}}</th>
-                <th>{{val.voluntarios}}</th> {% endcomment %}
-
-
-                {% comment %} <th>{{val.municipio}}</th> {% endcomment %}
-                <td class="text-xs text-center">{{val.puntoEstra}}</td>
-                <td class="text-xs text-center">{{val.nacionalidad}}</td>
-                <td class="text-xs text-center">{{val.iso3}}</td>
-                <td class="text-xs text-center">{{val.nombre}}</td>
-                <td class="text-xs text-blue-500 text-center"><a
-                        href="{% url 'editar' val.idRescate %}">{{val.apellidos}}</a></td>
-                <td class="text-xs text-center">{{val.parentesco}}</td>
-                <td class="text-xs text-center">{{val.fechaNacimiento}}</td>
-                <td class="text-xs text-center">{{val.edad}}</td>
-                {% if val.sexo == True %}
-                <td class="text-xs text-center">Hombre</td>
-                {% else %}
-                <td class="text-xs text-center">Mujer</td>
-                {% endif %}
-
-                {% if val.embarazo == True %}
-                <td class="text-xs text-center">Si</td>
-                {% else %}
-                <td class="text-xs text-center">No</td>
-                {% endif %}
-
-                {% if val.numFamilia == 0 %}
-                <td class="text-xs text-center"> </td>
-                {% else %}
-                <td class="text-xs text-center">{{val.numFamilia}}</td>
-                {% endif %}
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+                            Editar
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </form>
 
 
@@ -238,6 +357,88 @@ Panel de Control de Administrador
                 </button>
                 <button onclick="cerrarModal()"
                     class="mt-3 px-4 py-2 bg-gray-300 text-gray-700 text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300">
+                    Cancelar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Corrección Masiva -->
+<div id="modalCorreccion" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden"
+    style="z-index: 50;">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white text-slate-800">
+        <div class="mt-3 text-center">
+            <h3 class="text-lg leading-6 font-bold text-[#4E232E]">Corrección Masiva</h3>
+            <div class="mt-2 px-3 py-3 text-left space-y-4">
+                <p class="text-xs text-gray-500 font-medium text-center">
+                    Cambiar oficina o punto a los registros seleccionados:
+                </p>
+                
+                <div class="flex flex-col">
+                    <label for="corr_oficinaRepre" class="font-bold text-xs mb-1">Nueva Oficina:</label>
+                    <select id="corr_oficinaRepre"
+                        class="w-full p-2 border-2 border-[#D4C19C] rounded text-sm bg-white text-slate-800 focus:border-[#4E232E] outline-none">
+                        <option value="AGUASCALIENTES">AGUASCALIENTES</option>
+                        <option value="BAJA CALIFORNIA">BAJA CALIFORNIA</option>
+                        <option value="BAJA CALIFORNIA SUR">BAJA CALIFORNIA SUR</option>
+                        <option value="CAMPECHE">CAMPECHE</option>
+                        <option value="CDMX">CDMX</option>
+                        <option value="CHIAPAS">CHIAPAS</option>
+                        <option value="CHIHUAHUA">CHIHUAHUA</option>
+                        <option value="COAHUILA">COAHUILA</option>
+                        <option value="COLIMA">COLIMA</option>
+                        <option value="DURANGO">DURANGO</option>
+                        <option value="EDOMEX">EDOMEX</option>
+                        <option value="GUERRERO">GUERRERO</option>
+                        <option value="GUANAJUATO">GUANAJUATO</option>
+                        <option value="HIDALGO">HIDALGO</option>
+                        <option value="JALISCO">JALISCO</option>
+                        <option value="MICHOACÁN">MICHOACÁN</option>
+                        <option value="MORELOS">MORELOS</option>
+                        <option value="NAYARIT">NAYARIT</option>
+                        <option value="NUEVO LEÓN">NUEVO LEÓN</option>
+                        <option value="OAXACA">OAXACA</option>
+                        <option value="PUEBLA">PUEBLA</option>
+                        <option value="QUERÉTARO">QUERÉTARO</option>
+                        <option value="QUINTANA ROO">QUINTANA ROO</option>
+                        <option value="SAN LUIS POTOSÍ">SAN LUIS POTOSÍ</option>
+                        <option value="SINALOA">SINALOA</option>
+                        <option value="SONORA">SONORA</option>
+                        <option value="TABASCO">TABASCO</option>
+                        <option value="TAMAULIPAS">TAMAULIPAS</option>
+                        <option value="TLAXCALA">TLAXCALA</option>
+                        <option value="VERACRUZ">VERACRUZ</option>
+                        <option value="YUCATÁN">YUCATÁN</option>
+                        <option value="ZACATECAS">ZACATECAS</option>
+                    </select>
+                </div>
+
+                <div class="flex flex-col">
+                    <label for="corr_tipo_punto" class="font-bold text-xs mb-1">Nuevo Tipo de punto:</label>
+                    <select id="corr_tipo_punto"
+                        class="w-full p-2 border-2 border-[#D4C19C] rounded text-sm bg-white text-slate-800 focus:border-[#4E232E] outline-none">
+                        {% for val in tiposPNombre %}
+                        <option value="{{val}}">{{val}}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="flex flex-col">
+                    <label for="corr_puntoEstra" class="font-bold text-xs mb-1">Nuevo Nombre de punto:</label>
+                    <select id="corr_puntoEstra"
+                        class="w-full p-2 border-2 border-[#D4C19C] rounded text-sm bg-white text-slate-800 focus:border-[#4E232E] outline-none">
+                        <!-- Llenado por Javascript -->
+                    </select>
+                </div>
+            </div>
+            <div class="items-center px-4 py-3 space-y-2">
+                <button type="button" onclick="ejecutarCorreccionMasiva()"
+                    class="px-4 py-2 bg-[#285C4D] text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-[#1f473b] focus:outline-none">
+                    Guardar Cambios
+                </button>
+                <button type="button" onclick="cerrarModalCorreccion()"
+                    class="px-4 py-2 bg-gray-300 text-gray-700 text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-400 focus:outline-none">
                     Cancelar
                 </button>
             </div>
@@ -294,7 +495,7 @@ Panel de Control de Administrador
             var id = checkbox.value;
             // var oficina = fila.cells[2].innerText; 
             // var fecha = fila.cells[3].innerText;   
-            var iso3 = fila.cells[8].innerText;
+            var iso3 = fila.cells[9].innerText;
             var nomM = fila.cells[10].innerText;
             var apeM = fila.cells[11].innerText;
 
@@ -326,28 +527,82 @@ Panel de Control de Administrador
             });
         }
 
+        // Conteo inicial de registros
+        var table = document.getElementById("myTable");
+        if (table) {
+            var rows = table.getElementsByTagName("tbody")[0].getElementsByTagName("tr");
+            document.getElementById("totales").innerHTML = "Registros: " + rows.length;
+        }
+
+        // Función para cambiar el color de fondo de una fila según si su checkbox está marcado
+        function actualizarColorSeleccion(row, checkbox) {
+            if (checkbox.checked) {
+                row.style.setProperty('background-color', '#E8DFCD', 'important'); // Crema oscuro / dorado suave
+            } else {
+                row.style.removeProperty('background-color');
+            }
+        }
+
+        // Detectar cambios en checkboxes individuales
+        const checkboxes = document.querySelectorAll('.checkbox');
+        checkboxes.forEach(cb => {
+            cb.addEventListener('change', function() {
+                const row = this.closest('tr');
+                actualizarColorSeleccion(row, this);
+            });
+        });
+
         var checkboxSeleccionarTodo = document.getElementById('cboxAll');
         if (checkboxSeleccionarTodo) {
             checkboxSeleccionarTodo.addEventListener('change', function () {
-                if (checkboxSeleccionarTodo.checked === true) {
-                    var filas = document.querySelectorAll('tbody tr');
-                    filas.forEach(function (fila) {
-                        if (fila.style.display !== 'none') {
-                            var tdCheckbox = fila.cells[0];
-                            var checkbox = tdCheckbox.querySelector('input.checkbox');
-                            if (checkbox) {
-                                checkbox.checked = true;
-                            }
+                const checkedState = checkboxSeleccionarTodo.checked;
+                var filas = document.querySelectorAll('tbody tr');
+                filas.forEach(function (fila) {
+                    if (fila.style.display !== 'none') {
+                        var tdCheckbox = fila.cells[0];
+                        var checkbox = tdCheckbox.querySelector('input.checkbox');
+                        if (checkbox) {
+                            checkbox.checked = checkedState;
+                            actualizarColorSeleccion(fila, checkbox);
                         }
-                    });
-                } else {
-                    var checkboxes = document.querySelectorAll('.checkbox');
-                    checkboxes.forEach(function (checkbox) {
-                        checkbox.checked = checkboxSeleccionarTodo.checked;
-                    });
-                }
+                    }
+                });
             });
         }
+
+        // --- Resaltar Duplicados (Nombre y Apellidos iguales) en Azul ---
+        const filasTabla = document.querySelectorAll('#myTable tbody tr');
+        const combinaciones = {};
+
+        filasTabla.forEach(row => {
+            const elNombre = row.querySelector('.cell-nombre');
+            const elApellidos = row.querySelector('.cell-apellidos');
+            
+            if (elNombre && elApellidos) {
+                const nombreCompleto = (elNombre.textContent.trim() + " " + elApellidos.textContent.trim()).toUpperCase();
+                if (nombreCompleto.length > 2) { // Evitar vacíos
+                    if (!combinaciones[nombreCompleto]) {
+                        combinaciones[nombreCompleto] = [];
+                    }
+                    combinaciones[nombreCompleto].push(row);
+                }
+            }
+        });
+
+        // Pintamos las filas de los duplicados en un azul suave de acento
+        Object.keys(combinaciones).forEach(key => {
+            const filasConMismoNombre = combinaciones[key];
+            if (filasConMismoNombre.length > 1) {
+                filasConMismoNombre.forEach(row => {
+                    // Solo pintamos de azul si la fila no ha sido seleccionada (checkbox)
+                    const checkbox = row.querySelector('input.checkbox');
+                    if (checkbox && !checkbox.checked) {
+                        row.style.setProperty('background-color', '#ffddd7d7', 'important'); // ROJO traslúcido
+                        row.classList.add('border-l-4', 'border-l-cyan-600'); // Pequeño acento lateral
+                    }
+                });
+            }
+        });
     });
 
     // Global state for filters
@@ -410,7 +665,7 @@ Panel de Control de Administrador
             // Let's get all values from the table.
             const cell = row.getElementsByTagName("td")[index];
             if (cell) {
-                values.add(cell.textContent.trim());
+                values.add(cell.textContent.trim().replace(/\s+/g, ' '));
             }
         });
 
@@ -532,7 +787,7 @@ Panel de Control de Administrador
             for (const [colIdx, allowedVals] of Object.entries(activeFilters)) {
                 const cell = row.cells[colIdx];
                 if (!cell) continue;
-                const val = cell.textContent.trim();
+                const val = cell.textContent.trim().replace(/\s+/g, ' ');
                 if (!allowedVals.includes(val)) {
                     show = false;
                     break;
@@ -586,6 +841,244 @@ Panel de Control de Administrador
 
         rows.forEach(row => tbody.appendChild(row));
         closeFilter();
+    }
+
+    function mostrarModalCorreccion() {
+        var checkboxes = document.querySelectorAll('input[name="registros_seleccionados"]:checked');
+        if (checkboxes.length === 0) {
+            alert("Por favor selecciona al menos un registro para corregir.");
+            return;
+        }
+        document.getElementById('modalCorreccion').classList.remove('hidden');
+        onCorreccionSelectChange();
+    }
+
+    function cerrarModalCorreccion() {
+        document.getElementById('modalCorreccion').classList.add('hidden');
+    }
+
+    function onCorreccionSelectChange() {
+        const elEstra = document.getElementById('datosEstrategicos');
+        const elInter = document.getElementById('datosInternacion');
+        const elMun = document.getElementById('datosMunicipios');
+
+        const estraAll = elEstra ? JSON.parse(elEstra.textContent) : {};
+        const interAll = elInter ? JSON.parse(elInter.textContent) : {};
+        const munAll = elMun ? JSON.parse(elMun.textContent) : {};
+
+        const selectOficina = document.getElementById('corr_oficinaRepre');
+        const selectTipo = document.getElementById('corr_tipo_punto');
+        const selectPunto = document.getElementById('corr_puntoEstra');
+
+        if (!selectOficina || !selectTipo || !selectPunto) return;
+
+        const oficina = selectOficina.value;
+        const tipoSeleccionado = selectTipo.value;
+        
+        let opciones = [];
+
+        if (tipoSeleccionado === "aeropuerto") {
+            const est = (estraAll[oficina] && estraAll[oficina]['Aeropuerto']) || [];
+            const int = (interAll[oficina] && interAll[oficina]['AEREOS']) || [];
+            opciones = [...est, ...int];
+        }
+        else if (tipoSeleccionado === "carretero") {
+            const est = (estraAll[oficina] && estraAll[oficina]['Carretero']) || [];
+            const int = (interAll[oficina] && interAll[oficina]['TERRESTRES']) || [];
+            opciones = [...est, ...int];
+        }
+        else if (tipoSeleccionado === "central de autobus") {
+            opciones = (estraAll[oficina] && estraAll[oficina]['Central de autobús']) || [];
+        }
+        else if (tipoSeleccionado === "disuadidos" || tipoSeleccionado === "visitas de verificación") {
+            opciones = munAll[oficina] || [];
+        }
+        else if (tipoSeleccionado === "ferrocarril") {
+            opciones = (estraAll[oficina] && estraAll[oficina]['Ferroviario']) || [];
+        }
+        else if (tipoSeleccionado === "puestos a disposición" || tipoSeleccionado === "voluntarios") {
+            opciones = ["Sin Información"];
+        }
+
+        const uniqueOpciones = [...new Set(opciones)];
+        selectPunto.innerHTML = "";
+
+        if (uniqueOpciones.length === 0) {
+            const opt = document.createElement('option');
+            opt.value = "Sin Información";
+            opt.text = "Sin Información";
+            selectPunto.add(opt);
+        } else {
+            uniqueOpciones.forEach(val => {
+                const opt = document.createElement('option');
+                opt.value = val;
+                opt.text = val;
+                selectPunto.add(opt);
+            });
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const selectOficina = document.getElementById('corr_oficinaRepre');
+        const selectTipo = document.getElementById('corr_tipo_punto');
+        if (selectOficina && selectTipo) {
+            selectOficina.addEventListener('change', onCorreccionSelectChange);
+            selectTipo.addEventListener('change', onCorreccionSelectChange);
+        }
+    });
+
+    function ejecutarCorreccionMasiva() {
+        const form = document.getElementById('formEliminar');
+        form.action = "{% url 'corregir_registros_masivo' %}";
+        
+        const existingCorrInputs = form.querySelectorAll('.corr-input-masivo');
+        existingCorrInputs.forEach(input => input.remove());
+
+        const nuevaOficina = document.getElementById('corr_oficinaRepre').value;
+        const nuevoTipoPunto = document.getElementById('corr_tipo_punto').value;
+        const nuevoPunto = document.getElementById('corr_puntoEstra').value;
+        const fechaRedirect = "{{ fecha_P }}";
+
+        const inputOficina = document.createElement('input');
+        inputOficina.type = 'hidden';
+        inputOficina.name = 'nueva_oficina';
+        inputOficina.value = nuevaOficina;
+        inputOficina.className = 'corr-input-masivo';
+
+        const inputTipoPunto = document.createElement('input');
+        inputTipoPunto.type = 'hidden';
+        inputTipoPunto.name = 'nuevo_tipo_punto';
+        inputTipoPunto.value = nuevoTipoPunto;
+        inputTipoPunto.className = 'corr-input-masivo';
+
+        const inputPunto = document.createElement('input');
+        inputPunto.type = 'hidden';
+        inputPunto.name = 'nuevo_punto';
+        inputPunto.value = nuevoPunto;
+        inputPunto.className = 'corr-input-masivo';
+
+        const inputRedirect = document.createElement('input');
+        inputRedirect.type = 'hidden';
+        inputRedirect.name = 'fecha_redirect';
+        inputRedirect.value = fechaRedirect;
+        inputRedirect.className = 'corr-input-masivo';
+
+        form.appendChild(inputOficina);
+        form.appendChild(inputTipoPunto);
+        form.appendChild(inputPunto);
+        form.appendChild(inputRedirect);
+
+        form.submit();
+    }
+</script>
+
+<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+<script>
+    async function descargarExcelOptimizado(event, statusId) {
+        event.preventDefault();
+        
+        const fechaInicio = "{{fecha_inicio_api}}";
+        const fechaFin = "{{fecha_fin_api}}";
+        const oficinaR = document.getElementById('id_oficina').value || 'TODAS';
+
+        const statusDiv = document.getElementById(statusId);
+        statusDiv.style.display = 'block';
+        statusDiv.className = 'mt-4 p-4 bg-blue-100 text-blue-800 rounded-xl text-center border-2 border-blue-300 shadow-md';
+        statusDiv.innerHTML = '<strong>Iniciando descarga optimizada...</strong>';
+
+        const start = new Date(fechaInicio + 'T00:00:00');
+        const end = new Date(fechaFin + 'T00:00:00');
+        const totalDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+
+        let allRecords = [];
+        let totalRowsAccumulated = 0;
+        let chunkPart = 1;
+        const MAX_CHUNK_ROWS = 100000;
+
+        const headers = [
+            "Oficina Representación", "Fecha", "Hora", "Nombre Agente", "Aeropuerto", "Carretero", 
+            "Tipo Vehículo", "Línea Autobús", "Número Económico", "Placas", "Vehículo Asegurado", 
+            "Casa Seguridad", "Central Autobús", "Ferrocarril", "Empresa", "Hotel", 
+            "Nombre Hotel", "Puestos a Disposición", "Juez Calificador", "Reclusorio", 
+            "Policía Federal", "DIF", "Policía Estatal", "Policía Municipal", 
+            "Guardia Nacional", "Fiscalía", "Otras Autoridades", "Voluntarios", 
+            "Otro", "Presuntos Delincuentes", "Num Presuntos Delincuentes", "Municipio", 
+            "Punto Estratégico", "Nacionalidad", "ISO3", "Nombre", "Apellidos", 
+            "No Identidad", "Parentesco", "Fecha Nacimiento", "Sexo", "Embarazo", 
+            "Num Familia", "Edad"
+        ];
+
+        for (let d = 0; d < totalDays; d++) {
+            const currentDate = new Date(start);
+            currentDate.setDate(currentDate.getDate() + d);
+            const dateStr = currentDate.toISOString().split('T')[0];
+
+            statusDiv.innerHTML = `<strong>Procesando descarga:</strong><br>Día ${d + 1} de ${totalDays} (${dateStr})`;
+
+            try {
+                const params = new URLSearchParams({ fecha: dateStr, oficinaR: oficinaR });
+                const response = await fetch(`/info/api/rescates_json?${params.toString()}`);
+                const data = await response.json();
+
+                if (data.error) {
+                    console.error("Error en fecha " + dateStr + ":", data.error);
+                    continue;
+                }
+
+                if (Array.isArray(data) && data.length > 0) {
+                    const formattedRecords = data.map(v => [
+                        v.oficinaRepre, v.fecha, v.hora, v.nombreAgente,
+                        v.aeropuerto ? "1" : "", v.carretero ? "1" : "",
+                        v.tipoVehic, v.lineaAutobus, v.numeroEcono, v.placas,
+                        v.vehiculoAseg ? "1" : "", v.casaSeguridad ? "1" : "",
+                        v.centralAutobus ? "1" : "", v.ferrocarril ? "1" : "",
+                        v.empresa, v.hotel ? "1" : "", v.nombreHotel,
+                        v.puestosADispo ? "1" : "", v.juezCalif ? "1" : "",
+                        v.reclusorio ? "1" : "", v.policiaFede ? "1" : "",
+                        v.dif ? "1" : "", v.policiaEsta ? "1" : "",
+                        v.policiaMuni ? "1" : "", v.guardiaNaci ? "1" : "",
+                        v.fiscalia ? "1" : "", v.otrasAuto ? "1" : "",
+                        v.voluntarios ? "1" : "", v.otro ? "1" : "",
+                        v.presuntosDelincuentes ? "1" : "", 
+                        v.numPresuntosDelincuentes !== 0 ? v.numPresuntosDelincuentes : "",
+                        v.municipio, v.puntoEstra, v.nacionalidad, v.iso3,
+                        v.nombre, v.apellidos, v.noIdentidad, v.parentesco,
+                        v.fechaNacimiento, v.sexo ? "Hombre" : "Mujer",
+                        v.embarazo ? "1" : "",
+                        v.numFamilia !== 0 ? v.numFamilia : "",
+                        v.edad
+                    ]);
+
+                    allRecords = allRecords.concat(formattedRecords);
+                    totalRowsAccumulated += formattedRecords.length;
+
+                    if (allRecords.length >= MAX_CHUNK_ROWS) {
+                        downloadChunkXLSX(allRecords, headers, `Rescates_${oficinaR}_${fechaInicio}_${fechaFin}_Parte${chunkPart}.xlsx`);
+                        chunkPart++;
+                        allRecords = [];
+                    }
+                }
+            } catch (error) {
+                console.error("Error de red en fecha " + dateStr + ":", error);
+            }
+        }
+
+        if (allRecords.length > 0) {
+            downloadChunkXLSX(allRecords, headers, `Rescates_${oficinaR}_${fechaInicio}_${fechaFin}${chunkPart > 1 ? '_Parte' + chunkPart : ''}.xlsx`);
+        }
+
+        statusDiv.innerHTML = `<strong>¡Descarga completada!</strong><br>Se procesaron ${totalRowsAccumulated.toLocaleString()} registros.`;
+        statusDiv.className = "mt-4 p-4 bg-green-100 text-green-800 rounded-xl text-center border-2 border-green-300 shadow-md";
+        setTimeout(() => { statusDiv.style.display = 'none'; }, 8000);
+        
+        return false;
+    }
+
+    function downloadChunkXLSX(data, headers, fileName) {
+        const worksheet = XLSX.utils.aoa_to_sheet([headers, ...data]);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Rescates");
+        XLSX.writeFile(workbook, fileName);
     }
 </script>
 

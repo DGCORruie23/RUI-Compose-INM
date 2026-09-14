@@ -162,16 +162,16 @@
             </h3>
             <h5 class="text-lg md:text-sm text-inm-marron-200"> <strong>RESCATE-CAPTURA</strong></h3> -->
               <a href="/">
-                <img src="{% static 'icons/logo3.png' %}" alt="Logo Completo" class="scale-[0.6]">
+                <img src="{% static 'icons/LOGO3.png' %}" alt="Logo Completo" class="scale-[0.6]">
               </a>
         </div>
-        
         <!-- Columna C: Logo -->
-        <!-- <div class="w-1/4 flex justify-end p-2">
-            {% comment %} <img src="{% static 'icons/LOGO3.png' %}" alt="Logo G" class="h-16"> {% endcomment %}
-            <img src="{% static 'icons/logo2.png' %}" alt="Logo C" class="h-16 scale-60">
+        {% comment %}
+        <div class="w-1/4 flex justify-end p-2">
+            <img src="{% static 'icons/logo2.jpg' %}" alt="Logo C" class="h-16 scale-60">
         </div>
-    </div> -->
+        {% endcomment %}
+    </div>
 </header>
    
   {% if request.user.is_authenticated %}
@@ -183,7 +183,7 @@
     <a href="{% url 'logout' %}" class="bg-inm-rojo-300 text-white px-6 py-3 rounded-xl hover:bg-inm-rojo-100">Cerrar sesión</a>
   </div>
 
-  <br class="hidden">
+  <br>
 
   {% else %}
 

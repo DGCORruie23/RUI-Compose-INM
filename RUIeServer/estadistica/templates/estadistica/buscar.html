@@ -479,84 +479,78 @@
 
     });
 
-    function generarExcel() {
-        const diccionario = infoExcel;
+    function exportarDatosMemoria(datos, nombreArchivo) {
+        if (!datos || datos.length === 0) {
+            alert("No hay datos para exportar.");
+            return;
+        }
 
-        let datosConvertidos = diccionario.map(item => ({
+        // Si los datos sobrepasan los 100,000 registros, el navegador puede quedarse sin memoria
+        // intentando crear el archivo XLSX. Es mucho más eficiente generar un archivo CSV continuo.
+        if (datos.length > 100000) {
+            const separador = ",";
+            const claves = Object.keys(datos[0]);
+
+            // Añadimos BOM para que Excel detecte correctamente la codificación UTF-8
+            const partes = ["\uFEFF" + claves.map(c => `"${c}"`).join(separador) + "\n"];
+
+            for (let i = 0; i < datos.length; i++) {
+                let fila = claves.map(clave => {
+                    let valor = datos[i][clave];
+                    if (valor === null || valor === undefined) valor = '';
+                    else valor = String(valor).replace(/"/g, '""');
+                    return `"${valor}"`;
+                }).join(separador) + "\n";
+                partes.push(fila);
+            }
+
+            const blob = new Blob(partes, { type: 'text/csv;charset=utf-8;' });
+            const enlace = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            enlace.setAttribute("href", url);
+            enlace.setAttribute("download", nombreArchivo + ".csv");
+            document.body.appendChild(enlace);
+            enlace.click();
+            document.body.removeChild(enlace);
+            URL.revokeObjectURL(url);
+
+            console.log("Archivo exportado como CSV debido a que supera los registros recomendados.");
+        } else {
+            const workbook = XLSX.utils.book_new();
+            const worksheet = XLSX.utils.json_to_sheet(datos);
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Datos");
+            XLSX.writeFile(workbook, nombreArchivo + ".xlsx");
+        }
+    }
+
+    function generarDatosConvertidos(diccionario) {
+        if (!diccionario || !diccionario.length) return [];
+        return diccionario.map(item => ({
             ...item,
             fecha: convertirFecha(item.fecha),
             sexo: (item.sexo == 1) ? "H" : "M",
             edad: calcularEdad(item.fechaNacimiento),
         }));
+    }
 
-        const workbook = XLSX.utils.book_new();
-        const worksheet = XLSX.utils.json_to_sheet(datosConvertidos);
-
-        // Añadir la hoja al libro
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Datos");
-
-        // Descargar el archivo Excel
-        XLSX.writeFile(workbook, "Reincidentes_" + fechaArchivo + ".xlsx");
+    function generarExcel() {
+        let datosConvertidos = generarDatosConvertidos(infoExcel);
+        exportarDatosMemoria(datosConvertidos, "Reincidentes_" + fechaArchivo);
     }
 
     function generarExcel1() {
-        const diccionario = infoExcel1;
-
-        let datosConvertidos = diccionario.map(item => ({
-            ...item,
-            fecha: convertirFecha(item.fecha),
-            sexo: (item.sexo == 1) ? "H" : "M",
-            edad: calcularEdad(item.fechaNacimiento),
-        }));
-
-        const workbook = XLSX.utils.book_new();
-        const worksheet = XLSX.utils.json_to_sheet(datosConvertidos);
-
-        // Añadir la hoja al libro
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Datos");
-
-        // Descargar el archivo Excel
-        XLSX.writeFile(workbook, "Reincidentes_" + fechaArchivo1 + ".xlsx");
+        let datosConvertidos = generarDatosConvertidos(infoExcel1);
+        exportarDatosMemoria(datosConvertidos, "Reincidentes_" + fechaArchivo1);
     }
 
     function generarExcelNuevos() {
-        const diccionario = infoExcelN;
-
-        let datosConvertidos = diccionario.map(item => ({
-            ...item,
-            fecha: convertirFecha(item.fecha),
-            sexo: (item.sexo == 1) ? "H" : "M",
-            edad: calcularEdad(item.fechaNacimiento),
-        }));
-
-        const workbook = XLSX.utils.book_new();
-        const worksheet = XLSX.utils.json_to_sheet(datosConvertidos);
-
-        // Añadir la hoja al libro
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Datos");
-
-        // Descargar el archivo Excel
-        XLSX.writeFile(workbook, "Rescates_Nuevos_" + fechaArchivo + ".xlsx");
+        let datosConvertidos = generarDatosConvertidos(infoExcelN);
+        exportarDatosMemoria(datosConvertidos, "Rescates_Nuevos_" + fechaArchivo);
     }
 
     function generarExcelNuevos1() {
-        const diccionario = infoExcelN1;
-
-        let datosConvertidos = diccionario.map(item => ({
-            ...item,
-            fecha: convertirFecha(item.fecha),
-            sexo: (item.sexo == 1) ? "H" : "M",
-            edad: calcularEdad(item.fechaNacimiento),
-        }));
-
-        const workbook = XLSX.utils.book_new();
-        const worksheet = XLSX.utils.json_to_sheet(datosConvertidos);
-
-        // Añadir la hoja al libro
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Datos");
-
-        // Descargar el archivo Excel
-        XLSX.writeFile(workbook, "Rescates_Nuevos_" + fechaArchivo1 + ".xlsx");
+        let datosConvertidos = generarDatosConvertidos(infoExcelN1);
+        exportarDatosMemoria(datosConvertidos, "Rescates_Nuevos_" + fechaArchivo1);
     }
 </script>
 

@@ -1,5 +1,5 @@
 from django.shortcuts import render, get_object_or_404, redirect
-from django.db.models import Max, Count
+from django.db.models import Max, Count, Case, Value, When, IntegerField   
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.parsers import JSONParser
 from django.http import JsonResponse, HttpResponseRedirect, HttpResponse
@@ -694,8 +694,58 @@ def infoPaises(request):
 
 @csrf_exempt
 def infoMunicipios(request):
-    if request.method == 'GET':
-        snippets = Municipios.objects.all()
+    if request.method == "GET":                                                                                                                                  
+        # 1. Definimos la lista con el orden deseado de los estados                                                                                              
+        custom_order = [                                                                                                                                         
+            "AGUASCALIENTES",                                                                                                                                    
+            "BAJA CALIFORNIA",                                                                                                                                   
+            "BAJA CALIFORNIA SUR",                                                                                                                               
+            "CAMPECHE",                                                                                                                                          
+            "COAHUILA",                                                                                                                                          
+            "COLIMA",                                                                                                                                            
+            "CHIAPAS",                                                                                                                                           
+            "CHIHUAHUA",                                                                                                                                         
+            "CDMX",                                                                                                                                              
+            "DURANGO",                                                                                                                                           
+            "GUANAJUATO",                                                                                                                                        
+            "GUERRERO",                                                                                                                                          
+            "HIDALGO",                                                                                                                                           
+            "JALISCO",                                                                                                                                           
+            "EDOMEX",                                                                                                                                            
+            "MICHOACÁN",                                                                                                                                         
+            "MORELOS",                                                                                                                                           
+            "NAYARIT",                                                                                                                                           
+            "NUEVO LEÓN",                                                                                                                                        
+            "OAXACA",                                                                                                                                            
+            "PUEBLA",                                                                                                                                            
+            "QUERÉTARO",                                                                                                                                         
+            "QUINTANA ROO",                                                                                                                                      
+            "SAN LUIS POTOSÍ",                                                                                                                                   
+            "SINALOA",                                                                                                                                           
+            "SONORA",                                                                                                                                            
+            "TABASCO",                                                                                                                                           
+            "TAMAULIPAS",                                                                                                                                        
+            "TLAXCALA",                                                                                                                                          
+            "VERACRUZ",                                                                                                                                          
+            "YUCATÁN",                                                                                                                                           
+            "ZACATECAS",                                                                                                                                         
+        ]                                                                                                                                                        
+
+        # 2. Generamos las condiciones de ordenamiento para Django
+        preserved_order = [
+            When(estado=estado_name, then=Value(i))
+            for i, estado_name in enumerate(custom_order)
+        ]
+
+        # 3. Hacemos la consulta anotando el índice dinámico y ordenando por él
+        snippets = Municipios.objects.annotate(
+            order_index=Case(
+                *preserved_order,
+                default=Value(len(custom_order)),
+                output_field=IntegerField(),
+            )
+        ).order_by("order_index")
+
         serializer = MunicipiosGetSerializer(snippets, many=True)
         return JsonResponse(serializer.data, safe=False)
     
@@ -718,6 +768,31 @@ def infoFrases(request):
     if request.method == 'GET':
         snippets = Frases.objects.all()
         serializer = FrasesGetSerializer(snippets, many=True)
+        return JsonResponse(serializer.data, safe=False)
+
+@csrf_exempt
+def get_rescates_json(request):
+    if request.method == 'GET':
+        fecha = request.GET.get('fecha')
+        oficinaR = request.GET.get('oficinaR')
+        
+        if not fecha or not oficinaR:
+            return JsonResponse({'error': 'Faltan parámetros'}, status=400)
+        
+        try:
+            # Convertir fecha de YYYY-MM-DD a dd-mm-yy que es como se guarda en la DB
+            fecha_dt = datetime.strptime(fecha, "%Y-%m-%d")
+            fecha_str = fecha_dt.strftime("%d-%m-%y")
+        except ValueError:
+            return JsonResponse({'error': 'Formato de fecha inválido'}, status=400)
+
+        if oficinaR == "TODAS":
+            snippets = RescatePunto.objects.filter(fecha=fecha_str)
+        else: 
+            snippets = RescatePunto.objects.filter(fecha=fecha_str, oficinaRepre=oficinaR)
+
+
+        serializer = RescatePuntoSerializer(snippets, many=True)
         return JsonResponse(serializer.data, safe=False)
 
 @csrf_exempt 

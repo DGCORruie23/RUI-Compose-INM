@@ -22,6 +22,7 @@ services:
       - ./RUIeServer/usuarioL:/src/backendRUIe/usuarioL
       - ./RUIeServer/serverRUI:/src/backendRUIe/serverRUI
       - ./RUIeServer/Reportes_Analisis:/src/backendRUIe/Reportes_Analisis
+      - ./RUIeServer/vehiculos:/src/backendRUIe/vehiculos
 
   # @FADAR -- refresca mapa_mv_reincidencia_rescates cada 20 min, aparte de
   # cualquier request. Reusa la imagen de postgres solo por el cliente psql,

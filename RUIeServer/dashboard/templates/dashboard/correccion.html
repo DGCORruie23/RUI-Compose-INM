@@ -1,0 +1,330 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}
+    Corrección Masiva de Puntos Estratégicos
+{% endblock title %}
+
+{% block navigation %}
+    Corrección de Puntos Estratégicos
+{% endblock navigation %}
+
+{% block styles %}
+    <style>
+        .correction-container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1.5rem;
+        }
+        .filter-card {
+            background-color: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            margin-bottom: 2rem;
+        }
+        .data-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            background-color: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        .data-table th {
+            background-color: #6b21a8;
+            color: white;
+            padding: 1rem;
+            font-weight: 600;
+            text-align: left;
+        }
+        .data-table td {
+            padding: 1rem;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        .data-table tr:last-child td {
+            border-bottom: none;
+        }
+        .data-table tr:hover {
+            background-color: #f9fafb;
+        }
+        .btn-action {
+            background-color: #d97706;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.2s;
+            border: none;
+            cursor: pointer;
+        }
+        .btn-action:hover {
+            background-color: #b45309;
+        }
+        .progress-bar-container {
+            display: none;
+            background-color: #e5e7eb;
+            border-radius: 9999px;
+            height: 1.5rem;
+            overflow: hidden;
+            position: relative;
+            margin-top: 1rem;
+        }
+        .progress-bar-fill {
+            background-color: #10b981;
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        .progress-text {
+            position: absolute;
+            width: 100%;
+            text-align: center;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #1f2937;
+            line-height: 1.5rem;
+        }
+    </style>
+{% endblock styles %}
+
+{% block content %}
+<div class="correction-container grow">
+    <!-- Panel de Filtro -->
+    <div class="filter-card">
+        <h2 class="text-xl font-bold text-gray-800 mb-4">Filtrar Puntos por Oficina de Representación</h2>
+        <form method="get" action="{% url 'correccion_puntos' %}" class="flex flex-wrap items-center gap-4">
+            <div class="flex flex-col">
+                <label for="oficina" class="text-sm font-medium text-gray-700 mb-1">Oficina</label>
+                <select name="oficina" id="oficina" class="border border-gray-300 rounded-lg p-2 bg-white min-w-[250px]">
+                    <option value="">-- Todas las Oficinas --</option>
+                    {% for ofi in oficinas %}
+                        <option value="{{ ofi }}" {% if oficina_seleccionada == ofi %}selected{% endif %}>{{ ofi }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="flex items-end mt-4">
+                <button type="submit" class="bg-purple-700 hover:bg-purple-800 text-white font-bold py-2 px-6 rounded-lg">
+                    Filtrar
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Sección de Procesamiento Masivo -->
+    <div class="filter-card">
+        <h2 class="text-xl font-bold text-gray-800 mb-2">Unificar Puntos Estratégicos</h2>
+        <p class="text-sm text-gray-600 mb-4">Selecciona los puntos erróneos de la tabla inferior, escribe el nombre correcto y haz clic en "Ejecutar Unificación Masiva".</p>
+        
+        <div class="flex flex-col md:flex-row items-center gap-4 mb-4">
+            <div class="w-full md:w-1/2">
+                <label for="valor_correcto" class="block text-sm font-medium text-gray-700 mb-1">Nuevo Nombre del Punto (Destino Correcto)</label>
+                <input type="text" id="valor_correcto" placeholder="Ej. A. I. CDMX" class="w-full border border-gray-300 rounded-lg p-2">
+            </div>
+            <div class="w-full md:w-auto mt-4 md:mt-0">
+                <button type="button" onclick="iniciarUnificacion()" class="btn-action w-full md:w-auto">
+                    Ejecutar Unificación Masiva
+                </button>
+            </div>
+        </div>
+
+        <!-- Barra de Progreso -->
+        <div id="progreso-container" class="progress-bar-container">
+            <div id="progreso-texto" class="progress-text">Procesando lote...</div>
+            <div id="progreso-relleno" class="progress-bar-fill"></div>
+        </div>
+        <div id="status-message" class="mt-2 text-sm font-medium text-center"></div>
+    </div>
+
+    <!-- Listado de Puntos -->
+    <div class="mb-4 flex gap-4 items-center">
+        <input type="text" id="buscador-puntos" placeholder="🔍 Buscar por Punto Estratégico..." onkeyup="filtrarTabla()" class="border border-gray-300 rounded-lg p-2 w-full md:w-80">
+    </div>
+
+    <div class="overflow-x-auto">
+        <table class="data-table" id="tabla-puntos">
+            <thead>
+                <tr>
+                    <th style="width: 50px;" class="text-center">
+                        <input type="checkbox" id="select-all" onclick="toggleTodos(this)">
+                    </th>
+                    <th class="cursor-pointer select-none" onclick="ordenarColumna(1)">
+                        Punto Estratégico (`puntoEstra`) <span id="sort-icon-1" class="ml-1 text-xs">↕</span>
+                    </th>
+                    <th class="text-right cursor-pointer select-none" onclick="ordenarColumna(2)">
+                        Cantidad de Registros <span id="sort-icon-2" class="ml-1 text-xs">↕</span>
+                    </th>
+                </tr>
+            </thead>
+            <tbody id="tabla-puntos-body">
+                {% for punto in puntos %}
+                    <tr>
+                        <td class="text-center">
+                            <input type="checkbox" name="punto_origen" value="{{ punto.puntoEstra }}">
+                        </td>
+                        <td class="font-medium text-gray-900 punto-nombre">{{ punto.puntoEstra }}</td>
+                        <td class="text-right font-bold text-purple-700" data-value="{{ punto.total }}">{{ punto.total }}</td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="3" class="text-center py-8 text-gray-500">No se encontraron puntos estratégicos con este filtro.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    let sortDirections = { 1: true, 2: true }; // true = ASC/De menor a mayor, false = DESC/De mayor a menor
+
+    function toggleTodos(master) {
+        const checkboxes = document.getElementsByName('punto_origen');
+        checkboxes.forEach(cb => {
+            if (cb.closest('tr').style.display !== 'none') {
+                cb.checked = master.checked;
+            }
+        });
+    }
+
+    function filtrarTabla() {
+        const query = document.getElementById('buscador-puntos').value.toLowerCase();
+        const filas = document.querySelectorAll('#tabla-puntos-body tr');
+        
+        filas.forEach(fila => {
+            const nombreCell = fila.querySelector('.punto-nombre');
+            if (nombreCell) {
+                const nombreText = nombreCell.textContent.toLowerCase();
+                if (nombreText.includes(query)) {
+                    fila.style.display = '';
+                } else {
+                    fila.style.display = 'none';
+                    // Desmarcar si queda oculto
+                    const cb = fila.querySelector('input[type="checkbox"]');
+                    if (cb) cb.checked = false;
+                }
+            }
+        });
+    }
+
+    function ordenarColumna(colIndex) {
+        const body = document.getElementById('tabla-puntos-body');
+        const filas = Array.from(body.querySelectorAll('tr'));
+        if (filas.length === 0 || filas[0].querySelector('td').colSpan > 1) return;
+
+        const ascendente = sortDirections[colIndex];
+        sortDirections[colIndex] = !ascendente;
+
+        // Resetear iconos de ordenamiento
+        document.getElementById('sort-icon-1').textContent = '↕';
+        document.getElementById('sort-icon-2').textContent = '↕';
+        document.getElementById(`sort-icon-${colIndex}`).textContent = ascendente ? '▲' : '▼';
+
+        filas.sort((a, b) => {
+            let valA, valB;
+            if (colIndex === 1) {
+                valA = a.querySelector('.punto-nombre').textContent.trim().toLowerCase();
+                valB = b.querySelector('.punto-nombre').textContent.trim().toLowerCase();
+                return ascendente ? valA.localeCompare(valB) : valB.localeCompare(valA);
+            } else {
+                valA = parseInt(a.querySelector('td:nth-child(3)').getAttribute('data-value') || 0, 10);
+                valB = parseInt(b.querySelector('td:nth-child(3)').getAttribute('data-value') || 0, 10);
+                return ascendente ? valA - valB : valB - valA;
+            }
+        });
+
+        // Volver a insertar las filas ordenadas
+        filas.forEach(row => body.appendChild(row));
+    }
+
+    async function iniciarUnificacion() {
+        const checkboxes = document.getElementsByName('punto_origen');
+        const seleccionados = Array.from(checkboxes)
+                                   .filter(cb => cb.checked)
+                                   .map(cb => cb.value);
+        
+        const valorDestino = document.getElementById('valor_correcto').value.trim();
+        const oficina = document.getElementById('oficina').value;
+
+        if (seleccionados.length === 0) {
+            alert('Por favor, selecciona al menos un punto de origen para corregir.');
+            return;
+        }
+
+        if (!valorDestino) {
+            alert('Por favor, ingresa el nombre correcto de destino.');
+            return;
+        }
+
+        if (!confirm(`¿Estás seguro de que deseas unificar los ${seleccionados.length} puntos seleccionados a "${valorDestino}"? Esto modificará todos los registros asociados en la base de datos.`)) {
+            return;
+        }
+
+        // Mostrar barra de progreso
+        const progresoContainer = document.getElementById('progreso-container');
+        const progresoRelleno = document.getElementById('progreso-relleno');
+        const progresoTexto = document.getElementById('progreso-texto');
+        const statusMessage = document.getElementById('status-message');
+
+        progresoContainer.style.display = 'block';
+        progresoRelleno.style.width = '0%';
+        statusMessage.textContent = 'Iniciando corrección en lotes...';
+        statusMessage.className = 'mt-2 text-sm font-medium text-center text-blue-600';
+
+        let terminados = false;
+        let totalModificados = 0;
+        let iteracion = 0;
+
+        while (!terminados) {
+            iteracion++;
+            statusMessage.textContent = `Procesando lote ${iteracion}...`;
+            
+            try {
+                const response = await fetch("{% url 'ejecutar_correccion' %}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: JSON.stringify({
+                        valores_origen: seleccionados,
+                        valor_destino: valorDestino,
+                        oficina: oficina
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (!data.success) {
+                    throw new Error(data.error || 'Error desconocido del servidor.');
+                }
+
+                totalModificados += data.afectados;
+                statusMessage.textContent = `Lote ${iteracion} completado. Modificados hasta ahora: ${totalModificados}`;
+
+                // Al ser por lotes continuos de tamaño desconocido, simulamos progreso
+                progresoRelleno.style.width = data.quedan_pendientes ? '50%' : '100%';
+
+                if (!data.quedan_pendientes || data.afectados === 0) {
+                    terminados = true;
+                }
+            } catch (error) {
+                statusMessage.textContent = `Error en el lote ${iteracion}: ${error.message}`;
+                statusMessage.className = 'mt-2 text-sm font-medium text-center text-red-600';
+                return;
+            }
+        }
+
+        progresoRelleno.style.width = '100%';
+        progresoTexto.textContent = '¡Completado!';
+        statusMessage.textContent = `¡Proceso completado exitosamente! Total de registros unificados: ${totalModificados}.`;
+        statusMessage.className = 'mt-2 text-sm font-medium text-center text-green-600';
+
+        // Recargar página después de 2 segundos para actualizar el listado
+        setTimeout(() => {
+            window.location.reload();
+        }, 2500);
+    }
+</script>
+{% endblock content %}

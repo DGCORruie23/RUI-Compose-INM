@@ -1,0 +1,77 @@
+{% extends "vehiculos/base.html" %}
+{% load static %}
+
+{% block title %}Listado de vehículos{% endblock %}
+{% block header %}Listado de vehículos{% endblock %}
+{% block header_actions %}
+<a href="{% url 'vehiculos:dashboard' %}" class="text-sm text-guinda hover:underline font-medium">← Vista general</a>
+{% endblock %}
+
+{% block content %}
+<div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 mb-6">
+  <div class="grid sm:grid-cols-4 gap-4">
+    <div>
+      <label class="text-xs font-medium text-slate-500 mb-1 block">Tipo de vehículo</label>
+      <select id="filtroTipoListado" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-guinda">
+        <option value="">Todos</option>
+        {% for tipo in tipos_opciones %}<option value="{{ tipo }}">{{ tipo }}</option>{% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="text-xs font-medium text-slate-500 mb-1 block">Situación</label>
+      <select id="filtroSituacion" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-guinda">
+        <option value="">Todas</option>
+        {% for s in situacion_opciones %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="text-xs font-medium text-slate-500 mb-1 block">Asignación</label>
+      <select id="filtroAsignacion" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-guinda">
+        <option value="">Todas</option>
+        {% for a in asignacion_opciones %}<option value="{{ a }}">{{ a }}</option>{% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="text-xs font-medium text-slate-500 mb-1 block">Estado</label>
+      <select id="filtroEstado" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-guinda">
+        <option value="">Todos</option>
+        {% for e in estado_opciones %}<option value="{{ e }}">{{ e }}</option>{% endfor %}
+      </select>
+    </div>
+  </div>
+</div>
+
+<div class="flex items-center justify-between mb-3">
+  <p id="contadorListado" class="text-sm text-slate-500">Selecciona un filtro o espera a que cargue</p>
+  {% comment %}
+  Comentado a propósito: el reporte de descarga se activará más adelante.
+  <a id="descargarExcel" href="{% url 'vehiculos:exportar_excel' %}"
+     class="inline-flex items-center gap-2 bg-institverde hover:bg-institverde-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+    ⬇ Descargar Excel
+  </a>
+  {% endcomment %}
+</div>
+
+<div class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+  <table class="w-full text-sm">
+    <thead class="bg-institverde text-white text-xs uppercase tracking-wide">
+      <tr>
+        <th class="text-left px-4 py-3">Placa</th>
+        <th class="text-left px-4 py-3">Marca / Modelo</th>
+        <th class="text-left px-4 py-3">Tipo</th>
+        <th class="text-left px-4 py-3">Situación</th>
+        <th class="text-left px-4 py-3">Asignación</th>
+        <th class="text-left px-4 py-3">Estado</th>
+        <th class="px-4 py-3"></th>
+      </tr>
+    </thead>
+    <tbody id="filasListado" data-filtrar-url="{% url 'vehiculos:filtrar_listado' %}">
+      {% include "vehiculos/_listado_filas.html" %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'vehiculos/js/listado.js' %}?v=2.1"></script>
+{% endblock %}

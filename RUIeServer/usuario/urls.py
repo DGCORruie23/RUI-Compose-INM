@@ -18,6 +18,7 @@ urlpatterns = [
     
     path('fechas', views.generarExcelFechas, name="fechas_descarga"),
     path('fechasOR', views.generarExcelFechasOR, name="fechas_OR"),
+    path('api/rescates_json', views.get_rescates_json, name="rescates_json"),
 
     path('descargaN', views.generarExcelNombres),
     path('descargaC', views.generarExcelConteo),
