@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer
 
-from usuario.models import Usuario, Paises, EstadoFuerza, Frases, Municipios, PuntosInternacion, RescatePunto, ConteoRapidoPunto, MsgUpdate, DisuadidosPunto
+from usuario.models import Usuario, Paises, EstadoFuerza, Frases, Municipios, PuntosInternacion, RescatePunto, ConteoRapidoPunto, MsgUpdate, DisuadidosPunto, ValidacionServidor
 
 class UserGetSerializer(ModelSerializer):
 	class Meta:
@@ -249,3 +249,16 @@ class ConteoDisuadidosSerializer(ModelSerializer):
 	
 	def create(self, validated_data):
 		return DisuadidosPunto.objects.create(**validated_data)
+
+class ValidacionServidorGetSerializer(ModelSerializer):
+	class Meta:
+		model = ValidacionServidor
+		fields = [
+			'idValidacion',
+			'servidor_url',
+			'servidor_backup_url',
+			'activo',
+			'version_minima_app',
+			'mensaje',
+			'actualizado_en',
+		]

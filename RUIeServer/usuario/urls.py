@@ -32,6 +32,7 @@ urlpatterns = [
     path('descargaExcelPuntosI', views.generarExcelPuntosI, name="descarga_excelPuntosI"),
 
     path('updateApp', views.msgUpdateUrl, name="info_app"),
+    path('validacionL', views.validacionL, name="info_validacion_l"),
 
     path('politica_privacidad', views.politica_privacidad, name="info_politica_privacidad"),
 

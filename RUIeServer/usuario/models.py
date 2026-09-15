@@ -376,3 +376,16 @@ class DisuadidosPunto(models.Model):
             cuantos = self.numDisiadidos
             )
         return(stringReturn)
+
+class ValidacionServidor(models.Model):
+    idValidacion = models.AutoField(primary_key=True)
+    servidor_url = models.URLField(max_length=255, help_text="URL base del servidor a consultar")
+    servidor_backup_url = models.URLField(max_length=255, blank=True, null=True, help_text="URL del servidor de respaldo")
+    activo = models.BooleanField(default=True, help_text="Indica si el servidor está activo")
+    version_minima_app = models.CharField(max_length=20, default="1.0.0", help_text="Versión mínima requerida de la app móvil")
+    mensaje = models.CharField(max_length=500, blank=True, null=True, help_text="Mensaje informativo para la app")
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.servidor_url} ({'Activo' if self.activo else 'Inactivo'})"
+

@@ -4,9 +4,9 @@ from django.views.decorators.csrf import csrf_exempt
 from rest_framework.parsers import JSONParser
 from django.http import JsonResponse, HttpResponseRedirect, HttpResponse
 from django.contrib.auth.hashers import make_password, check_password
-from .serializers import UserGetSerializer, UserGetSerializerC, PaisesGetSerializer, EstadoFuerzaGetSerializer, FrasesGetSerializer, ListRescatePuntoSerializer, RescatePuntoSerializer
+from .serializers import UserGetSerializer, UserGetSerializerC, PaisesGetSerializer, EstadoFuerzaGetSerializer, FrasesGetSerializer, ListRescatePuntoSerializer, RescatePuntoSerializer, ValidacionServidorGetSerializer
 from .serializers import MunicipiosGetSerializer, PuntosInterGetSerializer, ConteoRapidoSerializer, MsgUpdateGetSerializer, ConteoDisuadidosSerializer
-from .models import Usuario, Paises, EstadoFuerza, Frases, Municipios, PuntosInternacion, RescatePunto, ConteoRapidoPunto, MsgUpdate, Inadmitido
+from .models import Usuario, Paises, EstadoFuerza, Frases, Municipios, PuntosInternacion, RescatePunto, ConteoRapidoPunto, MsgUpdate, Inadmitido, ValidacionServidor
 from .forms import CargarArchivoForm, ExcelForm, ExcelFormOr, ExcelFormOrs 
 import openpyxl as opxl
 from openpyxl.writer.excel import save_virtual_workbook
@@ -684,6 +684,19 @@ def msgUpdateUrl(request):
         snippets = MsgUpdate.objects.last()
         serializer = MsgUpdateGetSerializer(snippets, many=False)
         return JsonResponse(serializer.data, safe=False)
+
+@csrf_exempt
+def validacionL(request):
+    if request.method == 'GET':
+        servidor_info = ValidacionServidor.objects.filter(activo=True).last()
+        if not servidor_info:
+            servidor_info = ValidacionServidor.objects.last()
+        if servidor_info:
+            serializer = ValidacionServidorGetSerializer(servidor_info, many=False)
+            return JsonResponse(serializer.data, safe=False, status=200)
+        else:
+            return JsonResponse({"error": "No hay información de servidor disponible"}, status=404)
+    return JsonResponse({"error": "Método no permitido"}, status=405)
 
 @csrf_exempt
 def infoPaises(request):
