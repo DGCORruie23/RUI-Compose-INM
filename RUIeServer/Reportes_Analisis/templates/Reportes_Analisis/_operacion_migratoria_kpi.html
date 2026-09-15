@@ -1,0 +1,25 @@
+{% load static %}
+<div class="om-kpi-top">
+    <div><span class="l">Mayores de Edad</span><span class="n">{{ p.mayores_edad }}</span></div>
+    <div><span class="l">Menores de Edad</span><span class="n">{{ p.menores_edad }}</span></div>
+</div>
+<div class="om-kpi-row">
+    <div class="om-kpi-item">
+        <svg class="om-icon om-icon-mujeres"><use href="#om-icon-persona"></use></svg>
+        <div class="om-kpi-item-txt"><span class="om-kpi-item-l">Mujeres</span><span class="om-kpi-item-n">{{ p.mujeres }}</span></div>
+    </div>
+    <div class="om-kpi-item">
+        <svg class="om-icon om-icon-hombres"><use href="#om-icon-persona"></use></svg>
+        <div class="om-kpi-item-txt"><span class="om-kpi-item-l">Hombres</span><span class="om-kpi-item-n">{{ p.hombres }}</span></div>
+    </div>
+</div>
+<div class="om-kpi-row">
+    <div class="om-kpi-item">
+        <svg class="om-icon om-icon-nna-a"><use href="#om-icon-persona"></use></svg>
+        <div class="om-kpi-item-txt"><span class="om-kpi-item-l">Menores Acompañados</span><span class="om-kpi-item-n">{{ p.nna_acompanados }}</span></div>
+    </div>
+    <div class="om-kpi-item">
+        <svg class="om-icon om-icon-nna-s"><use href="#om-icon-persona"></use></svg>
+        <div class="om-kpi-item-txt"><span class="om-kpi-item-l">NNA (No Acompañados)</span><span class="om-kpi-item-n">{{ p.nna_no_acompanados }}</span></div>
+    </div>
+</div>

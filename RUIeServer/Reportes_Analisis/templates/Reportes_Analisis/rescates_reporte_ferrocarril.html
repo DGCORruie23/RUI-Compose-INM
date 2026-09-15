@@ -1,0 +1,274 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}Rescates vía ferrocarril{% endblock title %}
+
+{% block styles %}
+<style>
+    .rescates-tarjeta {
+        background: #ffffff; border-radius: 1rem; border: 1px solid #e5e7eb;
+        padding: 1rem 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .ferro-stat { text-align: center; }
+    .ferro-stat .n { font-size: 1.7rem; font-weight: 800; color: #9A0A38; }
+    .ferro-stat .l { font-size: 0.72rem; color: #6b7280; text-transform: uppercase; letter-spacing: 0.04em; margin-top: 0.15rem; }
+    .ranklist { list-style: none; margin: 0; padding: 0; }
+    .ranklist li {
+        display: grid; grid-template-columns: 10rem 1fr 4rem; align-items: center; gap: 0.6rem;
+        padding: 0.35rem 0; border-bottom: 1px solid #f0ede6; font-size: 0.85rem;
+    }
+    .ranklist li:last-child { border-bottom: none; }
+    .ranklist .bar-track { display: block; background: #f3f4f6; border-radius: 3px; height: 9px; overflow: hidden; }
+    .ranklist .bar-fill { display: block; height: 100%; border-radius: 3px; background: #9A0A38; }
+    .ranklist .val { text-align: right; color: #6b7280; font-size: 0.8rem; }
+    .region-bar-track { background: #f3f4f6; border-radius: 4px; height: 14px; overflow: hidden; }
+    .region-bar-fill { height: 100%; }
+    #chartsvg { width: 100%; height: auto; display: block; }
+    .axis text { font-size: 9.5px; fill: #6b7280; }
+    .gridline { stroke: #f0ede6; stroke-width: 1; }
+    .dot-reinc { fill: #9A0A38; fill-opacity: 0.72; }
+    .dot-primera { fill: #2f5f7d; fill-opacity: 0.72; }
+</style>
+{% endblock styles %}
+
+{% block content %}
+<main class="max-w-6xl mx-auto px-4 py-6">
+
+    <div class="flex items-center justify-between mb-4">
+        <h1 class="text-2xl font-bold text-[#9A0A38]">Rescates vía ferrocarril</h1>
+        <a href="{% url 'Reportes_Analisis:rescates_dashboard' %}" class="text-sm font-semibold text-gray-500 hover:text-[#9A0A38] transition">← Volver al dashboard</a>
+    </div>
+    <p class="text-sm text-gray-500 mb-6">Migrantes rescatados usando la red de carga ferroviaria del centro y norte de México. Histórico de <code>usuario_rescatepunto</code>, campo <code>ferrocarril</code>.</p>
+
+    <form method="get" class="rescates-tarjeta mb-8 flex flex-wrap items-end gap-4">
+        <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-1">Fecha inicio</label>
+            <input type="date" name="fecha_inicio" value="{{ fecha_inicio }}" class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm">
+        </div>
+        <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-1">Fecha fin</label>
+            <input type="date" name="fecha_fin" value="{{ fecha_fin }}" class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm">
+        </div>
+        <button type="submit" class="bg-[#9A0A38] hover:bg-[#7d0830] text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
+            Generar
+        </button>
+        <a href="{{ request.path }}" class="inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition">Limpiar filtros</a>
+        <div class="flex-1"></div>
+        {% if not sin_filtro %}
+        <a href="{% url 'Reportes_Analisis:rescates_reporte_ferrocarril_pdf' %}?fecha_inicio={{ fecha_inicio }}&fecha_fin={{ fecha_fin }}"
+           class="inline-flex items-center gap-2 bg-gray-700 hover:bg-gray-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+            ⬇ Descargar PDF
+        </a>
+        <a href="{% url 'Reportes_Analisis:rescates_reporte_ferrocarril_excel' %}?fecha_inicio={{ fecha_inicio }}&fecha_fin={{ fecha_fin }}"
+           class="inline-flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+            ⬇ Descargar Excel
+        </a>
+        {% endif %}
+    </form>
+
+    {% if sin_filtro %}
+    <div class="rescates-tarjeta text-center py-10 text-gray-500">
+        Selecciona un rango de fechas y da clic en <strong>Generar</strong> para cargar el reporte.
+    </div>
+    {% else %}
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+        <div class="rescates-tarjeta ferro-stat"><div class="n">{{ total_ferro }}</div><div class="l">Vía ferrocarril</div></div>
+        <div class="rescates-tarjeta ferro-stat"><div class="n">{{ porcentaje }}%</div><div class="l">Del rango ({{ total_rango }})</div></div>
+        <div class="rescates-tarjeta ferro-stat"><div class="n">{{ total_menores }}</div><div class="l">Menores de edad</div></div>
+        <div class="rescates-tarjeta ferro-stat"><div class="n">{{ total_mayores }}</div><div class="l">Mayores de edad</div></div>
+    </div>
+
+    <h2 class="text-lg font-semibold text-[#9A0A38] mb-3">Quiénes</h2>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+        <div class="rescates-tarjeta ferro-stat"><div class="n">{{ hombres }}</div><div class="l">Hombres</div></div>
+        <div class="rescates-tarjeta ferro-stat"><div class="n">{{ mujeres }}</div><div class="l">Mujeres</div></div>
+        <div class="rescates-tarjeta ferro-stat"><div class="n">{{ ninos }}</div><div class="l">Niños</div></div>
+        <div class="rescates-tarjeta ferro-stat"><div class="n">{{ ninas }}</div><div class="l">Niñas</div></div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <div>
+            <h2 class="text-lg font-semibold text-[#9A0A38] mb-3">Las 3 regiones</h2>
+            <div class="rescates-tarjeta">
+                {% for r in regiones %}
+                <div class="mb-3">
+                    <div class="flex justify-between text-sm mb-1">
+                        <span class="font-semibold" style="color:{{ r.color }};">● {{ r.nombre }}</span>
+                        <span class="text-gray-500">{{ r.total }}</span>
+                    </div>
+                    <div class="region-bar-track">
+                        <div class="region-bar-fill" style="width:{% widthratio r.total total_ferro 100 %}%;background:{{ r.color }};"></div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        <div>
+            <h2 class="text-lg font-semibold text-[#9A0A38] mb-3">Top nacionalidades</h2>
+            <div class="rescates-tarjeta">
+                <ul class="ranklist">
+                    {% for nac in top_nacionalidades %}
+                    <li>
+                        <span>{{ nac.nombre }}</span>
+                        <div class="bar-track"><div class="bar-fill" style="width:{% widthratio nac.total top_nacionalidades.0.total 100 %}%;background:{{ nac.color }};"></div></div>
+                        <span class="val">{{ nac.total }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <h2 class="text-lg font-semibold text-[#9A0A38] mb-3">Puntos más frecuentes, por región</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        {% for r in regiones %}
+        <div class="rescates-tarjeta">
+            <div class="text-xs font-bold uppercase mb-2" style="color:{{ r.color }};">{{ r.nombre }}</div>
+            <ul class="ranklist">
+                {% for punto, total in r.puntos %}
+                <li>
+                    <span style="font-size:0.78rem;">{{ punto }}</span>
+                    <div class="bar-track"><div class="bar-fill" style="width:{% widthratio total r.puntos.0.1 100 %}%;background:{{ r.color }};"></div></div>
+                    <span class="val">{{ total }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Reincidencia: graficas de pastel (SVG con pathLength, sin dependencias externas) @FADAR -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+        <div class="rescates-tarjeta">
+            <div class="text-xs uppercase text-gray-500 mb-3">Vía ferrocarril (Ferromex) ({{ total_ferro }})</div>
+            <div class="flex items-center gap-5">
+                <svg viewBox="0 0 42 42" width="120" height="120" class="flex-shrink-0">
+                    <circle cx="21" cy="21" r="15.91" fill="transparent" stroke="#2f5f7d" stroke-width="8"></circle>
+                    <circle cx="21" cy="21" r="15.91" fill="transparent" stroke="#9A0A38" stroke-width="8"
+                            pathLength="100" stroke-dasharray="{% widthratio ferro_reinc total_ferro 100 %} 100"
+                            transform="rotate(-90 21 21)"></circle>
+                    <text x="21" y="21" text-anchor="middle" dy="0.35em" style="font-size:6px;font-weight:700;fill:#211c18;">{% widthratio ferro_reinc total_ferro 100 %}%</text>
+                </svg>
+                <div class="flex flex-col gap-2 text-xs text-gray-500">
+                    <span><i style="background:#9A0A38;width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:4px;"></i>Reincidentes — {{ ferro_reinc }}</span>
+                    <span><i style="background:#2f5f7d;width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:4px;"></i>Primera vez — {{ ferro_primera }}</span>
+                </div>
+            </div>
+        </div>
+        <div class="rescates-tarjeta">
+            <div class="text-xs uppercase text-gray-500 mb-3">Resto de las vías</div>
+            <div class="flex items-center gap-5">
+                <svg viewBox="0 0 42 42" width="120" height="120" class="flex-shrink-0">
+                    <circle cx="21" cy="21" r="15.91" fill="transparent" stroke="#2f5f7d" stroke-width="8"></circle>
+                    <circle cx="21" cy="21" r="15.91" fill="transparent" stroke="#9A0A38" stroke-width="8"
+                            pathLength="100" stroke-dasharray="{% widthratio resto_reinc resto_reinc|add:resto_primera 100 %} 100"
+                            transform="rotate(-90 21 21)"></circle>
+                    <text x="21" y="21" text-anchor="middle" dy="0.35em" style="font-size:6px;font-weight:700;fill:#211c18;">{% widthratio resto_reinc resto_reinc|add:resto_primera 100 %}%</text>
+                </svg>
+                <div class="flex flex-col gap-2 text-xs text-gray-500">
+                    <span><i style="background:#9A0A38;width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:4px;"></i>Reincidentes — {{ resto_reinc }}</span>
+                    <span><i style="background:#2f5f7d;width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:4px;"></i>Primera vez — {{ resto_primera }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <h2 class="text-lg font-semibold text-[#9A0A38] mb-3">Comportamiento diario en el rango seleccionado</h2>
+    <div class="rescates-tarjeta mb-10">
+        <div class="flex flex-wrap items-center gap-4 text-xs text-gray-500 mb-3">
+            <span><i style="background:#9A0A38;width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:4px;"></i>Reincidentes</span>
+            <span><i style="background:#2f5f7d;width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:4px;"></i>Primera vez</span>
+            <div class="flex items-center gap-2 ml-auto">
+                <label>Desde <input type="date" id="chart-start" class="border border-gray-300 rounded px-2 py-1"></label>
+                <label>Hasta <input type="date" id="chart-end" class="border border-gray-300 rounded px-2 py-1"></label>
+                <button type="button" id="chart-reset" class="text-[#9A0A38] font-semibold">Ver todo</button>
+            </div>
+        </div>
+        <svg id="chartsvg" viewBox="0 0 900 360" preserveAspectRatio="xMidYMid meet"></svg>
+    </div>
+    {% endif %}
+
+</main>
+
+{% if not sin_filtro %}
+<script>
+    const SERIE = {{ serie_diaria_json|safe }};
+    (function () {
+        const svg = document.getElementById('chartsvg');
+        const startInput = document.getElementById('chart-start');
+        const endInput = document.getElementById('chart-end');
+        const resetBtn = document.getElementById('chart-reset');
+        if (!SERIE.length) {
+            svg.outerHTML = '<p class="text-sm text-gray-400">Sin registros en este rango.</p>';
+            startInput.closest('.flex').style.display = 'none';
+            return;
+        }
+        const W = 900, H = 360, M = {top: 14, right: 16, bottom: 30, left: 34};
+        const plotW = W - M.left - M.right, plotH = H - M.top - M.bottom;
+        const allRows = SERIE.map(([f, r, p]) => ({date: new Date(f + 'T00:00:00'), reinc: r, primera: p}));
+        const fullMin = allRows[0].date, fullMax = allRows[allRows.length - 1].date;
+        const toISO = d => d.toISOString().slice(0, 10);
+        startInput.value = toISO(fullMin); startInput.min = toISO(fullMin); startInput.max = toISO(fullMax);
+        endInput.value = toISO(fullMax); endInput.min = toISO(fullMin); endInput.max = toISO(fullMax);
+
+        function draw(min, max) {
+            const rows = allRows.filter(r => r.date >= min && r.date <= max);
+            if (!rows.length) { svg.innerHTML = ''; return; }
+            const x = d => M.left + (max - min === 0 ? plotW / 2 : (d - min) / (max - min) * plotW);
+            const rawMax = Math.max(1, ...rows.map(r => Math.max(r.reinc, r.primera)));
+
+            // --- ticks "redondos" (0, 50, 100... segun la escala), no
+            // fracciones arbitrarias del maximo real. ---
+            function pasoRedondo(bruto) {
+                const exp = Math.floor(Math.log10(bruto));
+                const frac = bruto / Math.pow(10, exp);
+                const fracRedonda = frac <= 1 ? 1 : frac <= 2 ? 2 : frac <= 5 ? 5 : 10;
+                return fracRedonda * Math.pow(10, exp);
+            }
+            const paso = pasoRedondo(rawMax / 4) || 1;
+            const maxY = Math.ceil(rawMax / paso) * paso;
+            const y = v => M.top + plotH - (v / maxY) * plotH;
+
+            let gridSvg = '';
+            for (let val = 0; val <= maxY; val += paso) {
+                const yy = y(val);
+                gridSvg += `<line class="gridline" x1="${M.left}" x2="${W-M.right}" y1="${yy}" y2="${yy}"/>`;
+                gridSvg += `<text class="axis" x="${M.left-8}" y="${yy+3}" text-anchor="end">${val}</text>`;
+            }
+
+            // --- eje X: fechas, con paso adaptable segun el ancho del rango elegido ---
+            const monthTicks = [];
+            const cur = new Date(min.getFullYear(), min.getMonth(), 1);
+            while (cur <= max) { monthTicks.push(new Date(cur)); cur.setMonth(cur.getMonth() + 1); }
+            const step = monthTicks.length > 24 ? 4 : (monthTicks.length > 12 ? 2 : 1);
+            let axisSvg = `<line x1="${M.left}" x2="${W-M.right}" y1="${M.top+plotH}" y2="${M.top+plotH}" stroke="#e5d9c8"/>`;
+            monthTicks.filter((t, i) => i % step === 0).forEach(t => {
+                const xx = x(t);
+                if (xx < M.left || xx > W - M.right) return;
+                axisSvg += `<text class="axis" x="${xx}" y="${M.top+plotH+16}" text-anchor="middle">${t.toLocaleDateString('es-MX',{month:'short',year:'2-digit'})}</text>`;
+            });
+
+            let dots = '';
+            rows.forEach(r => {
+                const xx = x(r.date).toFixed(1);
+                if (r.reinc > 0) dots += `<circle class="dot-reinc" cx="${xx}" cy="${y(r.reinc).toFixed(1)}" r="3"><title>${r.date.toLocaleDateString('es-MX')} — Reincidentes: ${r.reinc}</title></circle>`;
+                if (r.primera > 0) dots += `<circle class="dot-primera" cx="${xx}" cy="${y(r.primera).toFixed(1)}" r="3"><title>${r.date.toLocaleDateString('es-MX')} — Primera vez: ${r.primera}</title></circle>`;
+            });
+            svg.innerHTML = `<g>${gridSvg}${axisSvg}</g><g>${dots}</g>`;
+        }
+
+        function redraw() {
+            const a = new Date(startInput.value + 'T00:00:00');
+            const b = new Date(endInput.value + 'T00:00:00');
+            if (a > b) return;
+            draw(a, b);
+        }
+        startInput.addEventListener('change', redraw);
+        endInput.addEventListener('change', redraw);
+        resetBtn.addEventListener('click', () => { startInput.value = toISO(fullMin); endInput.value = toISO(fullMax); redraw(); });
+
+        draw(fullMin, fullMax);
+    })();
+</script>
+{% endif %}
+{% endblock content %}

@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     'dashboard',
     'estadistica',
     'mapa',
+    'Reportes_Analisis',  # @FADAR
 ]
 
 MIDDLEWARE = [

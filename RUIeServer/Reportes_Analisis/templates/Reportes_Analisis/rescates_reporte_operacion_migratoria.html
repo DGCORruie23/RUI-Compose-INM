@@ -1,0 +1,271 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}Operación_Migratoria{% endblock title %}
+
+{% block styles %}
+<style>
+    .rescates-tarjeta {
+        background: #ffffff; border-radius: 1rem; border: 1px solid #e5e7eb;
+        padding: 1rem 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .om-stat { text-align: center; }
+    .om-stat .n { font-size: 1.5rem; font-weight: 800; }
+    .om-stat .l { font-size: 0.72rem; color: #6b7280; text-transform: uppercase; letter-spacing: 0.04em; margin-top: 0.15rem; }
+    .om-columna { border-top: 3px solid; border-radius: 0.75rem 0.75rem 0 0; }
+    .om-csp { border-color: #ad2142; }
+    .om-trump { border-color: #2b5a8f; }
+    .om-csp .n { color: #ad2142; }
+    .om-trump .n { color: #2b5a8f; }
+    .om-titulo-periodo { font-weight: 700; font-size: 0.95rem; }
+    .om-csp-titulo { color: #ad2142; }
+    .om-trump-titulo { color: #2b5a8f; }
+    .om-tabla { width: 100%; font-size: 0.82rem; border-collapse: collapse; }
+    .om-tabla th { text-align: left; color: #6b7280; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.03em; padding-bottom: 0.4rem; }
+    .om-tabla td { padding: 0.28rem 0; border-top: 1px solid #f0ede6; }
+    .om-tabla td.val { text-align: right; font-variant-numeric: tabular-nums; color: #374151; }
+
+    .om-kpi-top { display: flex; justify-content: space-between; gap: 1rem; padding-bottom: 0.75rem; margin-bottom: 0.75rem; border-bottom: 1px solid #f0ede6; }
+    .om-kpi-top .l { font-size: 0.95rem; font-weight: 700; color: #374151; }
+    .om-kpi-top .n { font-size: 1.6rem; font-weight: 800; color: #1f2937; margin-left: 0.35rem; }
+    .om-kpi-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 0.6rem; }
+    .om-kpi-item { display: flex; align-items: center; gap: 0.6rem; border: 1px solid #f0ede6; border-radius: 0.6rem; padding: 0.45rem 0.6rem; }
+    .om-icon { width: 1.6rem; height: 1.6rem; flex: none; fill: currentColor; }
+    .om-kpi-item .om-icon-mujeres { color: #c2467a; }
+    .om-kpi-item .om-icon-hombres { color: #1f5f4a; }
+    .om-kpi-item .om-icon-nna-a { color: #ad2142; }
+    .om-kpi-item .om-icon-nna-s { color: #2b2b2b; }
+    .om-kpi-item .om-kpi-item-txt { display: flex; flex-direction: column; line-height: 1.15; }
+    .om-kpi-item .om-kpi-item-l { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; color: #6b7280; }
+    .om-kpi-item .om-kpi-item-n { font-size: 1.15rem; font-weight: 800; color: #1f2937; }
+
+    .om-nac-tabla { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .om-nac-tabla thead th { text-align: left; font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #9ca3af; padding-bottom: 0.55rem; border-bottom: 2px solid; }
+    .om-nac-tabla.om-csp thead th { border-bottom-color: #ad2142; }
+    .om-nac-tabla.om-trump thead th { border-bottom-color: #2b5a8f; }
+    .om-nac-tabla thead th.val, .om-nac-tabla td.val { text-align: right; }
+    .om-nac-tabla thead th.rank { width: 1.75rem; }
+    .om-nac-tabla tbody td { padding: 0.42rem 0.15rem; border-bottom: 1px solid #f0ede6; }
+    .om-nac-tabla tbody tr:last-child td { border-bottom: none; }
+    .om-nac-tabla tbody tr:nth-child(even) { background: #faf9f6; }
+    .om-nac-tabla td.rank { color: #b3aa9c; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .om-nac-tabla td.val { font-variant-numeric: tabular-nums; color: #374151; }
+    .om-nac-tabla tbody tr:nth-child(-n+3) td.rank,
+    .om-nac-tabla tbody tr:nth-child(-n+3) td.nombre { font-weight: 700; color: #1f2937; }
+
+    .om-tag { display: inline-block; font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; padding: 0.15rem 0.5rem; border-radius: 999px; margin-left: 0.5rem; vertical-align: middle; }
+    .om-tag-csp { background: rgba(173,33,66,0.12); color: #ad2142; }
+    .om-tag-trump { background: rgba(43,90,143,0.12); color: #2b5a8f; }
+    .om-tag-otro { background: #f0ede6; color: #6b7280; }
+    .om-region-ref { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    .om-region-ref th { text-align: left; font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: #9ca3af; padding-bottom: 0.4rem; border-bottom: 1px solid #e5e7eb; }
+    .om-region-ref th.val, .om-region-ref td.val { text-align: right; }
+    .om-region-ref td { padding: 0.28rem 0.1rem; border-bottom: 1px solid #f0ede6; font-variant-numeric: tabular-nums; }
+    .om-region-ref td.region { color: #9ca3af; font-size: 0.72rem; }
+</style>
+{% endblock styles %}
+
+{% block content %}
+<main class="max-w-6xl mx-auto px-4 py-6">
+
+    <div class="flex items-center justify-between mb-4">
+        <h1 class="text-2xl font-bold text-[#9A0A38]">Operación_Migratoria</h1>
+        <a href="{% url 'Reportes_Analisis:rescates_reporte_cuadro' %}" class="text-sm font-semibold text-blue-500 hover:text-[#9A0A38] transition">← Volver al Cuadro de Datos</a>
+    </div>
+    <p class="text-sm text-gray-500 mb-6">
+        Reincidencia de rescates comparada entre periodos de gobierno, alineados por día relativo desde el arranque de cada uno.
+        Elige qué periodos activar y una fecha fin, luego da clic en <strong>Generar</strong>.
+    </p>
+
+    <form method="get" class="rescates-tarjeta mb-8">
+        <div class="flex flex-wrap items-end gap-4 mb-4">
+            <div>
+                <label class="block text-xs font-semibold text-gray-500 mb-1">Fecha inicio (solo Año en curso)</label>
+                <input type="date" name="fecha_inicio_2026" value="{{ fecha_inicio_2026|default:'' }}" class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm" title="Arranque del periodo 'Año en curso' -- Sheinbaum y Trump usan su fecha real de gobierno, fija">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-gray-500 mb-1">Fecha fin</label>
+                <input type="date" name="fecha_fin" value="{{ fecha_fin|default:'' }}" class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm">
+            </div>
+            <button type="submit" class="bg-[#9A0A38] hover:bg-[#7d0830] text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
+                Generar
+            </button>
+            <a href="{{ request.path }}" class="inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition">Limpiar filtros</a>
+        </div>
+        <div class="flex flex-wrap items-center gap-4 pt-3 border-t border-gray-100">
+            <span class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Periodos a activar:</span>
+            <label class="inline-flex items-center gap-2 text-sm font-medium om-csp-titulo">
+                <input type="checkbox" name="activar_csp" {% if activar_csp %}checked{% endif %}> Sheinbaum (desde {{ periodo_csp.fecha_inicio|default:"2024-10-01" }})
+            </label>
+            <label class="inline-flex items-center gap-2 text-sm font-medium om-trump-titulo">
+                <input type="checkbox" name="activar_trump" {% if activar_trump %}checked{% endif %}> Trump (desde {{ periodo_trump.fecha_inicio|default:"2025-01-20" }})
+            </label>
+            <label class="inline-flex items-center gap-2 text-sm font-medium text-gray-600">
+                <input type="checkbox" name="activar_2026" {% if activar_2026 %}checked{% endif %}> Año en curso 2026
+            </label>
+        </div>
+    </form>
+
+    {% if sin_filtro %}
+    <div class="rescates-tarjeta text-center py-10 text-gray-500">
+        {% if sin_periodos %}
+        Selecciona al menos un periodo (Sheinbaum, Trump o 2026) y da clic en <strong>Generar</strong>.
+        {% else %}
+        Elige los periodos y una fecha fin, y da clic en <strong>Generar</strong> para cargar el reporte.
+        {% endif %}
+    </div>
+    {% else %}
+
+    <div class="flex flex-wrap items-center gap-3 mb-6">
+        <a href="{% url 'Reportes_Analisis:rescates_reporte_operacion_migratoria_pdf' %}?fecha_fin={{ fecha_fin }}&activar_csp={% if activar_csp %}on{% endif %}&activar_trump={% if activar_trump %}on{% endif %}&activar_2026={% if activar_2026 %}on{% endif %}&fecha_inicio_2026={{ fecha_inicio_2026 }}"
+           class="inline-flex items-center gap-2 bg-gray-700 hover:bg-gray-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+            ⬇ Descargar PDF
+        </a>
+        <a href="{% url 'Reportes_Analisis:rescates_reporte_operacion_migratoria_pptx' %}?fecha_fin={{ fecha_fin }}&activar_csp={% if activar_csp %}on{% endif %}&activar_trump={% if activar_trump %}on{% endif %}&activar_2026={% if activar_2026 %}on{% endif %}&fecha_inicio_2026={{ fecha_inicio_2026 }}"
+           class="inline-flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+            ⬇ Descargar PPTX
+        </a>
+        <span class="text-xs text-gray-500">Trae exactamente los periodos activados arriba.</span>
+    </div>
+
+    {% if periodo_csp or periodo_trump %}
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+        {% if periodo_csp %}
+        <div class="rescates-tarjeta om-columna om-csp">
+            <div class="om-titulo-periodo om-csp-titulo mb-2">Sheinbaum · {{ periodo_csp.fecha_inicio }} a {{ periodo_csp.fecha_fin }}</div>
+            <div class="grid grid-cols-3 gap-2">
+                <div class="om-stat"><div class="n">{{ periodo_csp.total_reincidentes }}</div><div class="l">Reincidentes</div></div>
+                <div class="om-stat"><div class="n">{{ periodo_csp.total_primera_vez }}</div><div class="l">Primera vez</div></div>
+                <div class="om-stat"><div class="n">{{ periodo_csp.media_diaria_reincidentes }}</div><div class="l">Media diaria</div></div>
+            </div>
+        </div>
+        {% endif %}
+        {% if periodo_trump %}
+        <div class="rescates-tarjeta om-columna om-trump">
+            <div class="om-titulo-periodo om-trump-titulo mb-2">Trump · {{ periodo_trump.fecha_inicio }} a {{ periodo_trump.fecha_fin }}</div>
+            <div class="grid grid-cols-3 gap-2">
+                <div class="om-stat"><div class="n">{{ periodo_trump.total_reincidentes }}</div><div class="l">Reincidentes</div></div>
+                <div class="om-stat"><div class="n">{{ periodo_trump.total_primera_vez }}</div><div class="l">Primera vez</div></div>
+                <div class="om-stat"><div class="n">{{ periodo_trump.media_diaria_reincidentes }}</div><div class="l">Media diaria</div></div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if plot_div_tendencia %}
+    <div class="rescates-tarjeta mb-8">
+        {{ plot_div_tendencia|safe }}
+    </div>
+    {% else %}
+    <div class="rescates-tarjeta mb-8 text-center py-6 text-sm text-gray-500">
+        Activa Sheinbaum y Trump juntos para ver la gráfica comparativa de tendencia.
+    </div>
+    {% endif %}
+    {% endif %}
+
+    <svg width="0" height="0" style="position:absolute">
+        <symbol id="om-icon-persona" viewBox="0 0 24 24">
+            <circle cx="12" cy="6.5" r="4.5"/>
+            <path d="M12 13c-5 0-8.5 2.7-8.5 7.2V22h17v-1.8C20.5 15.7 17 13 12 13Z"/>
+        </symbol>
+    </svg>
+
+    {% if periodo_csp or periodo_trump %}
+    <h2 class="text-lg font-semibold text-[#9A0A38] mb-3">Quiénes y acompañamiento</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+        {% if periodo_csp %}
+        <div class="rescates-tarjeta om-columna om-csp om-kpi-block">
+            <div class="om-titulo-periodo om-csp-titulo mb-2">Sheinbaum · {{ periodo_csp.fecha_inicio }} a {{ periodo_csp.fecha_fin }}</div>
+            {% include "Reportes_Analisis/_operacion_migratoria_kpi.html" with p=periodo_csp %}
+        </div>
+        {% endif %}
+        {% if periodo_trump %}
+        <div class="rescates-tarjeta om-columna om-trump om-kpi-block">
+            <div class="om-titulo-periodo om-trump-titulo mb-2">Trump · {{ periodo_trump.fecha_inicio }} a {{ periodo_trump.fecha_fin }}</div>
+            {% include "Reportes_Analisis/_operacion_migratoria_kpi.html" with p=periodo_trump %}
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% if plot_div_control %}
+    <h2 class="text-lg font-semibold text-[#9A0A38] mb-3">Gráfico de control — NNA no acompañados por día</h2>
+    <p class="text-sm text-gray-500 mb-3">Media y límites de control a 3σ (individuos/rango móvil), calculados sobre ambos periodos combinados. Los puntos en rojo están fuera de esos límites — señal visual de un día atípico, no una alerta automática.</p>
+    <div class="rescates-tarjeta mb-8">
+        {{ plot_div_control|safe }}
+    </div>
+    {% endif %}
+
+    {% if plot_div_nac_csp or plot_div_nac_trump %}
+    <h2 class="text-lg font-semibold text-[#9A0A38] mb-3">Top 20 nacionalidades por reincidencia</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+        {% if plot_div_nac_csp %}<div class="rescates-tarjeta">{{ plot_div_nac_csp|safe }}</div>{% endif %}
+        {% if plot_div_nac_trump %}<div class="rescates-tarjeta">{{ plot_div_nac_trump|safe }}</div>{% endif %}
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+        {% if periodo_csp %}
+        <div class="rescates-tarjeta">
+            <table class="om-nac-tabla om-csp">
+                <thead><tr><th class="rank">#</th><th>Nacionalidad</th><th class="val">Reincidentes</th></tr></thead>
+                <tbody>
+                {% for n in periodo_csp.top_nacionalidades %}
+                    <tr><td class="rank">{{ forloop.counter }}</td><td class="nombre">{{ n.nacionalidad }}</td><td class="val">{{ n.total }}</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+        {% if periodo_trump %}
+        <div class="rescates-tarjeta">
+            <table class="om-nac-tabla om-trump">
+                <thead><tr><th class="rank">#</th><th>Nacionalidad</th><th class="val">Reincidentes</th></tr></thead>
+                <tbody>
+                {% for n in periodo_trump.top_nacionalidades %}
+                    <tr><td class="rank">{{ forloop.counter }}</td><td class="nombre">{{ n.nacionalidad }}</td><td class="val">{{ n.total }}</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% for s in om_secciones %}
+    <h2 class="text-lg font-semibold text-[#9A0A38] mb-1">
+        Extranjeros Identificados en Acciones de Control y Verificación Migratoria por Nacionalidad
+        {% if s.etiqueta == "Sheinbaum" %}<span class="om-tag om-tag-csp">Sheinbaum</span>
+        {% elif s.etiqueta == "Trump" %}<span class="om-tag om-tag-trump">Trump</span>
+        {% else %}<span class="om-tag om-tag-otro">Año en curso 2026 — ambos gobiernos</span>{% endif %}
+    </h2>
+    <p class="text-sm text-gray-500 mb-3">{{ s.subtitulo }}</p>
+    <div class="rescates-tarjeta mb-4">
+        {{ s.div_paises|safe }}
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
+        <div class="rescates-tarjeta lg:col-span-2">
+            {{ s.div_regiones|safe }}
+        </div>
+        <div class="rescates-tarjeta" style="max-height: 380px; overflow-y: auto;">
+            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Países por región (referencia)</p>
+            <table class="om-region-ref">
+                <thead><tr><th>País</th><th class="val">Total</th></tr></thead>
+                <tbody>
+                {% for r in s.regiones %}
+                    <tr><td colspan="2" class="region"><strong>{{ r.nombre }}</strong> — {{ r.total }}</td></tr>
+                    {% for p in r.paises %}
+                    <tr><td>{{ p.nombre }}</td><td class="val">{{ p.total }}</td></tr>
+                    {% endfor %}
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endfor %}
+
+    {% endif %}
+
+</main>
+
+<script src="https://cdn.bokeh.org/bokeh/release/bokeh-3.4.3.min.js"></script>
+{{ plot_script|safe }}
+{% endblock content %}

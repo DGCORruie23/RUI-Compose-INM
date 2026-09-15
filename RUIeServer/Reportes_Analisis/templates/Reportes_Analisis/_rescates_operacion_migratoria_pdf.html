@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Operación Migratoria</title>
+<style>
+    @page { size: A4 landscape; margin: 0; }
+    @page contenido { size: A4 landscape; margin: 12mm 14mm; }
+    body { font-family: sans-serif; padding: 0; margin: 0; color: #221d16; }
+
+    /* ---- Portada (horizontal, igual proporcion que la referencia original) ---- */
+    .portada {
+        width: 297mm; height: 210mm;
+        background-color: #F3F1EE;
+        page-break-after: always;
+        position: relative;
+        box-sizing: border-box;
+        padding: 12mm;
+    }
+    .portada .logos-top { display: flex; justify-content: flex-end; align-items: center; gap: 6mm; }
+    .portada .logos-top img.gobernacion { height: 14mm; }
+    .portada .logos-top img.inm { height: 12mm; }
+    .portada .ilustracion { position: absolute; left: 10mm; top: 45mm; width: 85mm; }
+    .portada .titulo-bloque { margin-left: 110mm; margin-top: 42mm; }
+    .portada .titulo-bloque h1 {
+        font-size: 30pt; font-weight: 800; color: #B08D57; margin: 0; line-height: 1.15;
+    }
+    .portada .titulo-bloque .subtitulo {
+        font-size: 14pt; color: #B08D57; margin-top: 6mm;
+    }
+    .portada .linea-dorada { border-top: 1px solid #B08D57; margin: 28mm 14mm 0 110mm; }
+    .portada .institucional {
+        margin-left: 110mm; margin-top: 12mm; font-size: 11pt; font-weight: 700; color: #B08D57; line-height: 1.6;
+    }
+    .portada .maza { position: absolute; left: 14mm; bottom: 12mm; height: 22mm; }
+
+    /* ---- Contenido ---- */
+    .contenido { page: contenido; page-break-before: always; }
+    .titulo-inm { text-align: center; font-size: 9pt; margin: 0 0 8px; }
+    .colorFondo { background-color: #9A0A38; color: #fff; text-align: center; padding: 6px 0; border-radius: 4px; font-weight: bold; font-size: 12pt; margin-bottom: 10px; }
+    h2.seccion { font-size: 10.5pt; margin: 14px 0 6px; color: #9A0A38; page-break-after: avoid; }
+    /* @FADAR -- titulo + grafica como un solo bloque: si no caben juntos en
+    lo que resta de la pagina, se mueven juntos a la siguiente en vez de
+    dejar el titulo huerfano y la grafica sola en la pagina de despues. */
+    .bloque-grafica { page-break-inside: avoid; }
+    .om-tag { font-size: 8pt; font-weight: bold; padding: 1px 6px; border-radius: 8px; margin-left: 6px; }
+    .om-tag-csp { background: #f3dde3; color: #ad2142; }
+    .om-tag-trump { background: #dde6f0; color: #2b5a8f; }
+    .om-tag-otro { background: #f0ede6; color: #6b7280; }
+
+    table.resumen { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+    table.resumen td { border: 1px solid #e5d9c8; padding: 6px 8px; text-align: center; font-size: 8.5pt; }
+    table.resumen .etiqueta { background-color: #4472C4; color: #fff; font-weight: bold; }
+    table.resumen .valor { font-weight: bold; font-size: 12pt; color: #1F3864; }
+
+    table.tabla { width: 100%; border-collapse: collapse; margin-bottom: 14px; font-size: 8pt; }
+    table.tabla th, table.tabla td { border: 1px solid #e5d9c8; padding: 3px 6px; }
+    table.tabla thead th { background-color: #4472C4; color: #fff; font-weight: bold; text-align: left; }
+    table.tabla td.num { text-align: right; }
+    table.tabla tbody tr.region td { background: #f3f0e8; font-weight: bold; color: #6b6255; }
+
+    .grafica { width: 100%; margin-bottom: 12px; page-break-inside: avoid; }
+    .grafica img { width: 100%; display: block; }
+</style>
+</head>
+<body>
+
+<div class="portada">
+    <div class="logos-top">
+        <img class="gobernacion" src="{{ logo_gobernacion }}">
+        <img class="inm" src="{{ logo_inm }}">
+    </div>
+    <img class="ilustracion" src="{{ logo_mujer }}">
+    <div class="titulo-bloque">
+        <h1>OPERACIÓN<br>MIGRATORIA</h1>
+        <div class="subtitulo">Del 01 de enero al {{ fecha_fin_larga }}</div>
+    </div>
+    <div class="linea-dorada"></div>
+    <div class="institucional">
+        Instituto Nacional de Migración<br>
+        Dirección General de Coordinación de Oficinas de Representación
+    </div>
+    <img class="maza" src="{{ logo_maza }}">
+</div>
+
+<div class="contenido">
+    <p class="titulo-inm">INSTITUTO NACIONAL DE MIGRACIÓN<br>DIRECCIÓN GENERAL DE COORDINACIÓN DE OFICINAS DE REPRESENTACION</p>
+    <div class="colorFondo">Operación Migratoria — al {{ fecha_fin }}</div>
+    <p style="text-align:center; font-size:9.5pt; font-weight:bold; color:#6b6255; margin:-4px 0 10px;">{{ leyenda_periodos }}</p>
+
+    {% if periodo_csp or periodo_trump %}
+    <table class="resumen">
+        <tr>
+            {% if periodo_csp %}<td class="etiqueta">Sheinbaum — Reincidentes</td><td class="etiqueta">Sheinbaum — Media diaria</td>{% endif %}
+            {% if periodo_trump %}<td class="etiqueta">Trump — Reincidentes</td><td class="etiqueta">Trump — Media diaria</td>{% endif %}
+        </tr>
+        <tr>
+            {% if periodo_csp %}<td class="valor">{{ periodo_csp.total_reincidentes }}</td><td class="valor">{{ periodo_csp.media_diaria_reincidentes }}</td>{% endif %}
+            {% if periodo_trump %}<td class="valor">{{ periodo_trump.total_reincidentes }}</td><td class="valor">{{ periodo_trump.media_diaria_reincidentes }}</td>{% endif %}
+        </tr>
+    </table>
+    {% endif %}
+
+    {% if img_tendencia %}
+    <div class="bloque-grafica">
+        <h2 class="seccion">Reincidencia por día de gobierno</h2>
+        <div class="grafica"><img src="{{ img_tendencia }}"></div>
+    </div>
+    {% endif %}
+
+    {% if img_control %}
+    <div class="bloque-grafica">
+        <h2 class="seccion">Gráfico de control — NNA no acompañados</h2>
+        <div class="grafica"><img src="{{ img_control }}"></div>
+    </div>
+    {% endif %}
+
+    {% if img_nac_csp %}
+    <div class="bloque-grafica">
+        <h2 class="seccion">Top 20 nacionalidades por reincidencia — Sheinbaum</h2>
+        <div class="grafica"><img src="{{ img_nac_csp }}"></div>
+    </div>
+    {% endif %}
+
+    {% if img_nac_trump %}
+    <div class="bloque-grafica">
+        <h2 class="seccion">Top 20 nacionalidades por reincidencia — Trump</h2>
+        <div class="grafica"><img src="{{ img_nac_trump }}"></div>
+    </div>
+    {% endif %}
+
+    {% for s in secciones %}
+    <div class="bloque-grafica">
+    <h2 class="seccion">
+        Extranjeros Identificados en Acciones de Control y Verificación Migratoria por Nacionalidad
+        {% if s.etiqueta == "Sheinbaum" %}<span class="om-tag om-tag-csp">Sheinbaum</span>
+        {% elif s.etiqueta == "Trump" %}<span class="om-tag om-tag-trump">Trump</span>
+        {% else %}<span class="om-tag om-tag-otro">Año en curso 2026</span>{% endif %}
+    </h2>
+    <p style="font-size:8pt;color:#6b7280;margin:0 0 6px;">{{ s.subtitulo }}</p>
+    <div class="grafica"><img src="{{ s.img_paises }}"></div>
+    </div>
+    <div class="grafica"><img src="{{ s.img_regiones }}"></div>
+    <table class="tabla">
+        <thead><tr><th>País</th><th class="num">Total</th></tr></thead>
+        <tbody>
+        {% for r in s.regiones %}
+            <tr class="region"><td colspan="2">{{ r.nombre }} — {{ r.total }}</td></tr>
+            {% for p in r.paises %}
+            <tr><td>{{ p.nombre }}</td><td class="num">{{ p.total }}</td></tr>
+            {% endfor %}
+        {% endfor %}
+        </tbody>
+    </table>
+    {% endfor %}
+</div>
+
+</body>
+</html>
