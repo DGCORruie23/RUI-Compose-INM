@@ -177,7 +177,9 @@
   {% if request.user.is_authenticated %}
 
   <div class="flex justify-center mt-4 space-x-2">
-    <a href="{% url 'dashboard' %}" class="bg-inm-gris-100 text-white px-6 py-3 rounded-xl hover:bg-inm-verde-200">Panel de Control</a>
+    {% if request.user.username|slice:":5" != "MAPA_" %}
+      <a href="{% url 'dashboard' %}" class="bg-inm-gris-100 text-white px-6 py-3 rounded-xl hover:bg-inm-verde-200">Panel de Control</a>
+    {% endif %}
     {% block estadistica %} 
     {% endblock estadistica %}
     <a href="{% url 'logout' %}" class="bg-inm-rojo-300 text-white px-6 py-3 rounded-xl hover:bg-inm-rojo-100">Cerrar sesión</a>

@@ -4,7 +4,7 @@ from django.http import JsonResponse
 from django.db.models import Count
 from usuarioL.models import usuarioL
 from .forms import ExcelForm, RegistroForm, RegistroNewForm, puntosIForm, RegistroCreateForm
-from usuario.models import RescatePunto, EstadoFuerza, PuntosInternacion, Municipios, Paises, Usuario
+from usuario.models import RescatePunto, EstadoFuerza, PuntosInternacion, Municipios, Paises, Usuario, Inadmitido
 from django.contrib import messages
 from datetime import *
 
@@ -62,7 +62,35 @@ def dashboard(request):
         return render(request, "dashboard/dashboard.html", context=data) 
 
 @login_required
+def datos_inadmitidos(request):
+    if request.method == 'POST':
+        fecha_str = request.POST.get('fechaDescarga') or request.POST.get('fechaInadmitidos')
+        if fecha_str:
+            try:
+                fecha_obj = datetime.strptime(fecha_str, "%Y-%m-%d").date()
+            except ValueError:
+                fecha_obj = date.today()
+        else:
+            fecha_obj = date.today()
 
+        user_profile = getattr(request.user, 'usuarioL', None)
+        userDataI = [user_profile] if user_profile else []
+
+        valores = Inadmitido.objects.filter(fecha_hora__date=fecha_obj)
+        if not request.user.is_superuser and user_profile:
+            valores = valores.filter(oficina=user_profile.oficinaR)
+
+        context = {
+            'usuario': userDataI,
+            'values': valores,
+            'fecha_seleccionada': fecha_obj.strftime("%Y-%m-%d"),
+            'fecha_formateada': fecha_obj.strftime("%d/%m/%Y"),
+        }
+        return render(request, "dashboard/datos_inadmitidos.html", context=context)
+
+    return redirect('/dashboard')
+
+@login_required
 def datos_fecha(request):
     if request.method == 'POST':
         form = ExcelForm(request.POST)
@@ -1088,9 +1116,9 @@ def eliminarUsuario(request, id_usuario):
 def correccion_puntos(request):
     oficina_filtro = request.GET.get('oficina', '')
     
-    # Obtener todas las oficinas únicas para el filtro dropdown
-    oficinas = RescatePunto.objects.values_list('oficinaRepre', flat=True).distinct().order_by('oficinaRepre')
-    oficinas = [o for o in oficinas if o]  # Limpiar vacíos
+    # Obtener todas las oficinas únicas y su conteo de registros para el módulo de unificación por oficina
+    oficinas_con_conteo = RescatePunto.objects.values('oficinaRepre').annotate(total=Count('idRescate')).exclude(oficinaRepre='').order_by('oficinaRepre')
+    oficinas = [item['oficinaRepre'] for item in oficinas_con_conteo]
     
     # Agrupar puntos por puntoEstra y contar registros
     puntos_query = RescatePunto.objects.values('puntoEstra').annotate(total=Count('idRescate'))
@@ -1103,6 +1131,7 @@ def correccion_puntos(request):
     context = {
         'puntos': puntos_query,
         'oficinas': oficinas,
+        'oficinas_con_conteo': oficinas_con_conteo,
         'oficina_seleccionada': oficina_filtro,
     }
     return render(request, 'dashboard/correccion.html', context)
@@ -1128,6 +1157,39 @@ def ejecutar_correccion(request):
             # Al hacer update directo en base de datos, PostgreSQL realiza el cambio en milisegundos 
             # sin importar si son 5 o miles de registros, sin sobrecargar la memoria de Python
             cantidad_actualizada = queryset.update(puntoEstra=valor_destino)
+            
+            return JsonResponse({
+                'success': True,
+                'afectados': cantidad_actualizada,
+                'quedan_pendientes': False
+            })
+                
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=500)
+            
+    return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+
+
+@user_passes_test(lambda u: u.is_superuser)
+def ejecutar_unificacion_oficinas(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            puntos_origen = data.get('puntos_origen', [])
+            oficinas_origen = data.get('oficinas_origen', [])
+            oficina_destino = data.get('oficina_destino', '').strip()
+            
+            if not oficina_destino:
+                return JsonResponse({'success': False, 'error': 'Falta indicar la oficina destino.'}, status=400)
+                
+            if puntos_origen:
+                queryset = RescatePunto.objects.filter(puntoEstra__in=puntos_origen)
+            elif oficinas_origen:
+                queryset = RescatePunto.objects.filter(oficinaRepre__in=oficinas_origen)
+            else:
+                return JsonResponse({'success': False, 'error': 'Faltan elementos origen a modificar.'}, status=400)
+
+            cantidad_actualizada = queryset.update(oficinaRepre=oficina_destino)
             
             return JsonResponse({
                 'success': True,

@@ -91,7 +91,7 @@
 
 {% block content %}
 <div class="correction-container grow">
-    <!-- Panel de Filtro -->
+    <!-- Panel de Filtro 1: Filtrar Puntos por Oficina -->
     <div class="filter-card">
         <h2 class="text-xl font-bold text-gray-800 mb-4">Filtrar Puntos por Oficina de Representación</h2>
         <form method="get" action="{% url 'correccion_puntos' %}" class="flex flex-wrap items-center gap-4">
@@ -112,7 +112,7 @@
         </form>
     </div>
 
-    <!-- Sección de Procesamiento Masivo -->
+    <!-- Panel 2 (filter-card): Unificar Nombre de Puntos Estratégicos -->
     <div class="filter-card">
         <h2 class="text-xl font-bold text-gray-800 mb-2">Unificar Puntos Estratégicos</h2>
         <p class="text-sm text-gray-600 mb-4">Selecciona los puntos erróneos de la tabla inferior, escribe el nombre correcto y haz clic en "Ejecutar Unificación Masiva".</p>
@@ -135,6 +135,36 @@
             <div id="progreso-relleno" class="progress-bar-fill"></div>
         </div>
         <div id="status-message" class="mt-2 text-sm font-medium text-center"></div>
+    </div>
+
+    <!-- Panel 3 (filter-card): Cambiar Oficina de Representación del Punto -->
+    <div class="filter-card">
+        <h2 class="text-xl font-bold text-gray-800 mb-2">Cambiar Oficina de Representación</h2>
+        <p class="text-sm text-gray-600 mb-4">Selecciona los puntos estratégicos de la tabla inferior, elige o escribe la nueva Oficina de Representación a la que pertenecerán y haz clic en "Reasignar Oficina".</p>
+        
+        <div class="flex flex-col md:flex-row items-center gap-4 mb-4">
+            <div class="w-full md:w-1/2">
+                <label for="nueva_oficina_destino" class="block text-sm font-medium text-gray-700 mb-1">Nueva Oficina de Representación</label>
+                <input type="text" id="nueva_oficina_destino" list="lista-oficinas" placeholder="Ej. CHIAPAS" class="w-full border border-gray-300 rounded-lg p-2">
+                <datalist id="lista-oficinas">
+                    {% for ofi in oficinas %}
+                        <option value="{{ ofi }}"></option>
+                    {% endfor %}
+                </datalist>
+            </div>
+            <div class="w-full md:w-auto mt-4 md:mt-0">
+                <button type="button" onclick="iniciarCambioOficina()" class="btn-action bg-blue-700 hover:bg-blue-800 w-full md:w-auto">
+                    Reasignar Oficina
+                </button>
+            </div>
+        </div>
+
+        <!-- Barra de Progreso Cambio Oficina -->
+        <div id="progreso-container-ofi" class="progress-bar-container">
+            <div id="progreso-texto-ofi" class="progress-text">Procesando reasignación...</div>
+            <div id="progreso-relleno-ofi" class="progress-bar-fill"></div>
+        </div>
+        <div id="status-message-ofi" class="mt-2 text-sm font-medium text-center"></div>
     </div>
 
     <!-- Listado de Puntos -->
@@ -200,7 +230,6 @@
                     fila.style.display = '';
                 } else {
                     fila.style.display = 'none';
-                    // Desmarcar si queda oculto
                     const cb = fila.querySelector('input[type="checkbox"]');
                     if (cb) cb.checked = false;
                 }
@@ -216,7 +245,6 @@
         const ascendente = sortDirections[colIndex];
         sortDirections[colIndex] = !ascendente;
 
-        // Resetear iconos de ordenamiento
         document.getElementById('sort-icon-1').textContent = '↕';
         document.getElementById('sort-icon-2').textContent = '↕';
         document.getElementById(`sort-icon-${colIndex}`).textContent = ascendente ? '▲' : '▼';
@@ -234,7 +262,6 @@
             }
         });
 
-        // Volver a insertar las filas ordenadas
         filas.forEach(row => body.appendChild(row));
     }
 
@@ -261,7 +288,6 @@
             return;
         }
 
-        // Mostrar barra de progreso
         const progresoContainer = document.getElementById('progreso-container');
         const progresoRelleno = document.getElementById('progreso-relleno');
         const progresoTexto = document.getElementById('progreso-texto');
@@ -302,8 +328,6 @@
 
                 totalModificados += data.afectados;
                 statusMessage.textContent = `Lote ${iteracion} completado. Modificados hasta ahora: ${totalModificados}`;
-
-                // Al ser por lotes continuos de tamaño desconocido, simulamos progreso
                 progresoRelleno.style.width = data.quedan_pendientes ? '50%' : '100%';
 
                 if (!data.quedan_pendientes || data.afectados === 0) {
@@ -321,10 +345,74 @@
         statusMessage.textContent = `¡Proceso completado exitosamente! Total de registros unificados: ${totalModificados}.`;
         statusMessage.className = 'mt-2 text-sm font-medium text-center text-green-600';
 
-        // Recargar página después de 2 segundos para actualizar el listado
         setTimeout(() => {
             window.location.reload();
         }, 2500);
+    }
+
+    async function iniciarCambioOficina() {
+        const checkboxes = document.getElementsByName('punto_origen');
+        const seleccionados = Array.from(checkboxes)
+                                   .filter(cb => cb.checked)
+                                   .map(cb => cb.value);
+        
+        const nuevaOficina = document.getElementById('nueva_oficina_destino').value.trim().toUpperCase();
+
+        if (seleccionados.length === 0) {
+            alert('Por favor, selecciona al menos un punto estratégico para reasignar su oficina.');
+            return;
+        }
+
+        if (!nuevaOficina) {
+            alert('Por favor, ingresa o selecciona la nueva Oficina de Representación.');
+            return;
+        }
+
+        if (!confirm(`¿Estás seguro de que deseas reasignar la oficina de los ${seleccionados.length} puntos seleccionados a "${nuevaOficina}"?`)) {
+            return;
+        }
+
+        const progresoContainer = document.getElementById('progreso-container-ofi');
+        const progresoRelleno = document.getElementById('progreso-relleno-ofi');
+        const progresoTexto = document.getElementById('progreso-texto-ofi');
+        const statusMessage = document.getElementById('status-message-ofi');
+
+        progresoContainer.style.display = 'block';
+        progresoRelleno.style.width = '0%';
+        statusMessage.textContent = 'Reasignando oficina...';
+        statusMessage.className = 'mt-2 text-sm font-medium text-center text-blue-600';
+
+        try {
+            const response = await fetch("{% url 'ejecutar_unificacion_oficinas' %}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({
+                    puntos_origen: seleccionados,
+                    oficina_destino: nuevaOficina
+                })
+            });
+
+            const data = await response.json();
+            
+            if (!data.success) {
+                throw new Error(data.error || 'Error desconocido del servidor.');
+            }
+
+            progresoRelleno.style.width = '100%';
+            progresoTexto.textContent = '¡Completado!';
+            statusMessage.textContent = `¡Reasignación completada! Total de registros actualizados a "${nuevaOficina}": ${data.afectados}.`;
+            statusMessage.className = 'mt-2 text-sm font-medium text-center text-green-600';
+
+            setTimeout(() => {
+                window.location.reload();
+            }, 2500);
+        } catch (error) {
+            statusMessage.textContent = `Error en el proceso: ${error.message}`;
+            statusMessage.className = 'mt-2 text-sm font-medium text-center text-red-600';
+        }
     }
 </script>
 {% endblock content %}

@@ -455,79 +455,121 @@ def cargarInadmitidos(request):
     if(request.method == "POST"):
         form = CargarArchivoForm(request.POST, request.FILES)
         if(form.is_valid()):
-            # Nota: "archivo" este campo se llama como se llama en el form  
             excel_file = request.FILES["archivo"]
             nombreA = str(excel_file.name)
             extensionA = (nombreA.split(".")[-1]).lower()
-            # print((nombreA.split(".")[-1]).lower())
-            if( extensionA == "xlsx" 
-               or extensionA == ".xlsm" 
-               or extensionA == ".xlsb" 
-               or extensionA == ".xltx" 
-               or extensionA == ".xltm" 
-               or extensionA == ".xls"):
+            if( extensionA in ["xlsx", "xlsm", "xlsb", "xltx", "xltm", "xls"]):
                 dataWB = opxl.load_workbook(excel_file, data_only=True)
-
                 data = dataWB.worksheets[0]
 
-                # print(data.cell(4,2).value)
-
-                # Se leen los datos del excel
-                municipio = []
-                auxL = []
-            
                 i = 2
-                # dataInad = {}
-                oficina = ""
-                puntoIn = ""
-                fecha_hora = datetime.strptime("2024/02/02", "%Y/%m/%d").date()
-                nacionalidad = ""
-                nombre = ""
-                while not(i == 0):
-                    if(data.cell(i, 1).value == None or data.cell( i, 2).value == None):
-                        i = 0
+                while True:
+                    cell_val = data.cell(i, 1).value
+                    if cell_val is None:
                         break
-                        # print(edoFuerza)
-                    else:
-                        print("i: ", i)
-                        oficina = str(data.cell( i, 1).value).upper()
-                        fecha_excel = str(data.cell( i, 2).value)
-                        hora_excel = str(data.cell( i, 3).value)
-                        fecha = datetime.strptime(fecha_excel, "%Y-%m-%d %H:%M:%S").date()
-                        hora = datetime.strptime(hora_excel, "%H:%M:%S").time()
 
-                        fecha_hora = datetime.combine(fecha, hora)
+                    try:
+                        raw_fecha = data.cell(i, 1).value
+                        raw_hora = data.cell(i, 2).value
+                        puntoIn = str(data.cell(i, 3).value or "").strip().upper()
+                        nacionalidad = str(data.cell(i, 4).value or "").strip().upper()
+                        nombre = str(data.cell(i, 5).value or "").strip().upper()
+                        raw_nacimiento = data.cell(i, 6).value
+                        raw_sexo = str(data.cell(i, 7).value or "").strip().upper()
+                        raw_edad = data.cell(i, 8).value
+                        oficina = str(data.cell(i, 9).value or "").strip().upper()
 
-                        puntoIn = str(data.cell( i, 4).value).upper()
-                        nacionalidad = str(data.cell(i, 5).value).upper()
-                        nombre = str(data.cell(i, 6).value).upper()
+                        # Parse Fecha
+                        if isinstance(raw_fecha, (datetime, date)):
+                            fecha_obj = raw_fecha if isinstance(raw_fecha, date) else raw_fecha.date()
+                        else:
+                            fecha_str = str(raw_fecha).split(" ")[0]
+                            fecha_obj = datetime.strptime(fecha_str, "%Y-%m-%d").date()
 
-                        valor_excel = str(data.cell(i, 7).value)
-                        nacimiento = datetime.strptime(valor_excel, "%Y-%m-%d %H:%M:%S").date()
-                        genero = "H" if(str(data.cell(i, 8).value).upper() == "H") else "M"
-                        edad = int(data.cell(i, 9).value)
+                        # Parse Hora
+                        if isinstance(raw_hora, time):
+                            hora_obj = raw_hora
+                        elif isinstance(raw_hora, datetime):
+                            hora_obj = raw_hora.time()
+                        else:
+                            hora_str = str(raw_hora).strip()
+                            if len(hora_str.split(":")) == 2:
+                                hora_obj = datetime.strptime(hora_str, "%H:%M").time()
+                            else:
+                                hora_obj = datetime.strptime(hora_str, "%H:%M:%S").time()
 
-                        if( (oficina != None or oficina != "") and 
-                            (fecha_hora != None or fecha_hora != "") and 
-                            (puntoIn != None or puntoIn != "") and 
-                            (nacionalidad != None or nacionalidad != "") and 
-                            (nombre != None or nombre != "") and 
-                            (nacimiento != None or nacimiento != "") and 
-                            (genero != None or genero != "") and 
-                            (edad != None or edad != "")):
-                            Inadmitido.objects.create(
-                            fecha_hora= fecha_hora,
-                            oficina= oficina,
-                            puntoInter= puntoIn,
-                            nac= nacionalidad,
-                            nombreCompleto= nombre,
-                            nacimiento= nacimiento,
-                            genero= genero,
-                            edad= edad
-                            )
+                        fecha_hora = datetime.combine(fecha_obj, hora_obj)
 
-                    i+=1
-                
+                        # Parse Nacimiento
+                        if isinstance(raw_nacimiento, (datetime, date)):
+                            nacimiento = raw_nacimiento if isinstance(raw_nacimiento, date) else raw_nacimiento.date()
+                        else:
+                            nac_str = str(raw_nacimiento).split(" ")[0]
+                            nacimiento = datetime.strptime(nac_str, "%Y-%m-%d").date()
+
+                        # Genero
+                        genero = "H" if raw_sexo in ["H", "HOMBRE"] else ("M" if raw_sexo in ["M", "MUJER"] else "X")
+
+                        # Edad
+                        edad = int(raw_edad) if raw_edad is not None else None
+
+                        Inadmitido.objects.create(
+                            fecha_hora=fecha_hora,
+                            oficina=oficina,
+                            puntoInter=puntoIn,
+                            nac=nacionalidad,
+                            nombreCompleto=nombre,
+                            nacimiento=nacimiento,
+                            genero=genero,
+                            edad=edad
+                        )
+                    except Exception as e:
+                        print(f"Error procesando fila {i} de Inadmitidos: {e}")
+
+                    i += 1
+
+    return redirect("dashboard")
+
+@csrf_exempt
+def generarExcelInadmitidos(request):
+    if request.method == "POST":
+        fechaI = request.POST.get("fechaInicio")
+        fechaF = request.POST.get("fechaFin")
+
+        if not fechaI or not fechaF:
+            return redirect("dashboard")
+
+        fechaIN = datetime.strptime(fechaI, "%Y-%m-%d")
+        fechaFN = datetime.strptime(fechaF, "%Y-%m-%d") + timedelta(days=1) - timedelta(seconds=1)
+
+        valores = Inadmitido.objects.filter(fecha_hora__range=(fechaIN, fechaFN)).order_by("fecha_hora")
+
+        workbook = opxl.Workbook()
+        worksheet = workbook.active
+        worksheet.title = "Inadmitidos"
+
+        # Encabezados
+        headers = ["Fecha", "Hora", "Punto de internacion", "Pais", "Nombre completo", "Fecha de nacimiento", "Sexo", "Edad", "OR"]
+        worksheet.append(headers)
+
+        for v in valores:
+            sexo_str = "Hombre" if v.genero == "H" else ("Mujer" if v.genero == "M" else "No especificado")
+            worksheet.append([
+                v.fecha_hora.strftime("%Y-%m-%d"),
+                v.fecha_hora.strftime("%H:%M:%S"),
+                v.puntoInter,
+                v.nac,
+                v.nombreCompleto,
+                v.nacimiento.strftime("%Y-%m-%d") if v.nacimiento else "",
+                sexo_str,
+                v.edad,
+                v.oficina
+            ])
+
+        response = HttpResponse(content=save_virtual_workbook(workbook), content_type='application/vnd.ms-excel')
+        response['Content-Disposition'] = f'attachment; filename="Inadmitidos_{fechaI}_a_{fechaF}.xlsx"'
+        return response
+
     return redirect("dashboard")
 
 @csrf_exempt
@@ -1003,68 +1045,68 @@ def pagDuplicados(request):
     if request.method == 'GET':
         return render(request, "descargas/descargar_duplicados.html", {})
         
-@csrf_exempt
-def downloadDuplicados(request):
-    if request.method == 'GET':
+# @csrf_exempt
+# def downloadDuplicados(request):
+#     if request.method == 'GET':
 
-        workbook = opxl.load_workbook('tmp/rec.xlsm', read_only=False, keep_vba=True)
-        worksheet = workbook.active
+#         workbook = opxl.load_workbook('tmp/rec.xlsm', read_only=False, keep_vba=True)
+#         worksheet = workbook.active
 
-        fechaR = datetime.today().strftime('%d-%m-%y')
+#         fechaR = datetime.today().strftime('%d-%m-%y')
         
-        # duplicados = RescatePunto.objects.all()
+#         # duplicados = RescatePunto.objects.all()
 
-        register3 = RescatePunto.objects.values("iso3", "nombre", "apellidos", "fechaNacimiento").annotate(records=Count("*")).filter(records__gt=1)
-        duplicados = []
-        for reg in register3:
-            for registro in RescatePunto.objects.filter(iso3=reg['iso3'], nombre=reg['nombre'], apellidos = reg['apellidos'], fechaNacimiento=reg['fechaNacimiento']):
-                duplicados.append(registro)
+#         register3 = RescatePunto.objects.values("iso3", "nombre", "apellidos", "fechaNacimiento").annotate(records=Count("*")).filter(records__gt=1)
+#         duplicados = []
+#         for reg in register3:
+#             for registro in RescatePunto.objects.filter(iso3=reg['iso3'], nombre=reg['nombre'], apellidos = reg['apellidos'], fechaNacimiento=reg['fechaNacimiento']):
+#                 duplicados.append(registro)
                 
-        for valor in duplicados:
-            puntoR = ""
-            if valor.aeropuerto:
-                puntoR = 'aeropuerto'
-            elif valor.carretero:
-                puntoR = 'carretero'
-            elif valor.centralAutobus:
-                puntoR = 'central de autobus'
-            elif valor.casaSeguridad:
-                puntoR = 'casa de seguridad'
-            elif valor.ferrocarril:
-                puntoR = 'ferrocarril'
-            elif valor.hotel:
-                puntoR = 'hotel'
-            elif valor.puestosADispo:
-                puntoR = 'puestos a disposicion'
-            elif valor.voluntarios:
-                puntoR = 'voluntarios'
-            else: 
-                puntoR = ''
-            worksheet.append([valor.oficinaRepre, 
-                              valor.fecha,
-                              valor.hora,
-                              valor.nombreAgente.upper(),
-                              puntoR.upper(),
-                              valor.puntoEstra.upper(),
-                              valor.nacionalidad.upper(),
-                              valor.iso3,
-                              valor.nombre.upper(),
-                              valor.apellidos.upper(),
-                              valor.parentesco.upper(),
-                              valor.fechaNacimiento,
-                              valor.edad,
-                              "Hombre" if valor.sexo else "Mujer",
-                              "1" if valor.embarazo else "",
-                              valor.numFamilia if valor.numFamilia != 0 else "",
-                              ])
+#         for valor in duplicados:
+#             puntoR = ""
+#             if valor.aeropuerto:
+#                 puntoR = 'aeropuerto'
+#             elif valor.carretero:
+#                 puntoR = 'carretero'
+#             elif valor.centralAutobus:
+#                 puntoR = 'central de autobus'
+#             elif valor.casaSeguridad:
+#                 puntoR = 'casa de seguridad'
+#             elif valor.ferrocarril:
+#                 puntoR = 'ferrocarril'
+#             elif valor.hotel:
+#                 puntoR = 'hotel'
+#             elif valor.puestosADispo:
+#                 puntoR = 'puestos a disposicion'
+#             elif valor.voluntarios:
+#                 puntoR = 'voluntarios'
+#             else: 
+#                 puntoR = ''
+#             worksheet.append([valor.oficinaRepre, 
+#                               valor.fecha,
+#                               valor.hora,
+#                               valor.nombreAgente.upper(),
+#                               puntoR.upper(),
+#                               valor.puntoEstra.upper(),
+#                               valor.nacionalidad.upper(),
+#                               valor.iso3,
+#                               valor.nombre.upper(),
+#                               valor.apellidos.upper(),
+#                               valor.parentesco.upper(),
+#                               valor.fechaNacimiento,
+#                               valor.edad,
+#                               "Hombre" if valor.sexo else "Mujer",
+#                               "1" if valor.embarazo else "",
+#                               valor.numFamilia if valor.numFamilia != 0 else "",
+#                               ])
             
-        worksheet['F1'] = 'Total Registros'
-        worksheet['G1'] = str(RescatePunto.objects.count())
+#         worksheet['F1'] = 'Total Registros'
+#         worksheet['G1'] = str(RescatePunto.objects.count())
 
-        response = HttpResponse(content = save_virtual_workbook(workbook), content_type='application/vnd.ms-excel.sheet.macroEnabled.12')
-        response['Content-Disposition'] = 'attachment; filename=Reincidentes_a_{fecha}.xlsm'.format(fecha = fechaR)
+#         response = HttpResponse(content = save_virtual_workbook(workbook), content_type='application/vnd.ms-excel.sheet.macroEnabled.12')
+#         response['Content-Disposition'] = 'attachment; filename=Reincidentes_a_{fecha}.xlsm'.format(fecha = fechaR)
 
-        return response
+#         return response
 
 
 @csrf_exempt

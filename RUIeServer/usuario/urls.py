@@ -18,13 +18,14 @@ urlpatterns = [
     
     path('fechas', views.generarExcelFechas, name="fechas_descarga"),
     path('fechasOR', views.generarExcelFechasOR, name="fechas_OR"),
+    path('descargaInadmitidos', views.generarExcelInadmitidos, name="generar_excel_inadmitidos"),
     path('api/rescates_json', views.get_rescates_json, name="rescates_json"),
 
     path('descargaN', views.generarExcelNombres),
     path('descargaC', views.generarExcelConteo),
     path('descargaD', views.pagDuplicados),
 
-    path('descargaD_a', views.downloadDuplicados, name="descarga_duplicados"),
+    # path('descargaD_a', views.downloadDuplicados, name="descarga_duplicados"),
     path('descargaTab22', views.generarExcelTab),
     path('descargaExcel', views.generarExcelORs, name="descarga_excel"),
     path('descargaExcelUsuarios', views.generarExcelUsuarios, name="descarga_excelUsuarios"),
