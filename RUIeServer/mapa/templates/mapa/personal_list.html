@@ -1,0 +1,1105 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}Personal INM - RUIE{% endblock title %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+    function excelSerialToDateString(serial) {
+        if (isNaN(serial) || serial === null || serial === undefined || serial === '') return null;
+        const s = parseFloat(serial);
+        const baseDate = new Date(Date.UTC(1899, 11, 30));
+        const date = new Date(baseDate.getTime() + s * 86400000);
+        const yyyy = date.getUTCFullYear();
+        const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
+        const dd = String(date.getUTCDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+    }
+
+    function normalizar_nombre(text) {
+        if (!text) return "";
+        return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+    }
+
+    function openPersonalModal() {
+        const modal = document.getElementById('personalModal');
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function openCargaRapidaModal() {
+        const modal = document.getElementById('cargaRapidaModal');
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeCargaRapidaModal() {
+        const modal = document.getElementById('cargaRapidaModal');
+        modal.classList.add('hidden');
+        document.body.style.overflow = 'auto';
+        resetUploadModal();
+    }
+
+    function updateFastFileName(input) {
+        const label = document.getElementById('upload-label');
+        const filename = document.getElementById('upload-filename');
+        if (input.files && input.files.length > 0) {
+            label.innerText = 'Archivo seleccionado';
+            filename.innerText = input.files[0].name;
+            filename.classList.remove('text-gray-400');
+            filename.classList.add('text-emerald-600', 'font-bold');
+        } else {
+            label.innerText = 'Seleccionar Plantilla Excel';
+            filename.innerText = 'Formatos permitidos: .xlsx, .xls';
+            filename.classList.remove('text-emerald-600', 'font-bold');
+            filename.classList.add('text-gray-400');
+        }
+    }
+
+    function closePersonalModal() {
+        const modal = document.getElementById('personalModal');
+        modal.classList.add('hidden');
+        document.body.style.overflow = 'auto';
+    }
+
+    let allInmueblesOptions = null;
+
+    function filterLugarAsignadoByEstado(forceValue) {
+        const form = document.getElementById('personalForm');
+        if (!form) return;
+        const estadoSelect = form.querySelector('[name="estado_id"]');
+        const lugarSelect = form.querySelector('[name="lugar_asignado_id"]');
+        if (!estadoSelect || !lugarSelect) return;
+        
+        // Cargar y cachear todas las opciones la primera vez
+        if (!allInmueblesOptions) {
+            allInmueblesOptions = [];
+            const options = lugarSelect.querySelectorAll('option');
+            options.forEach(opt => {
+                allInmueblesOptions.push({
+                    value: opt.value,
+                    text: opt.innerText,
+                    estadoId: opt.getAttribute('data-estado')
+                });
+            });
+        }
+        
+        const selectedEstadoId = estadoSelect.value;
+        const currentValue = (forceValue !== undefined) ? forceValue : lugarSelect.value;
+        
+        // Limpiar select
+        lugarSelect.innerHTML = '';
+        
+        let hasSelectedStillAvailable = false;
+        let firstMatchValue = '';
+        
+        allInmueblesOptions.forEach(opt => {
+            // Opción vacía por defecto
+            if (opt.value === '') {
+                const el = document.createElement('option');
+                el.value = opt.value;
+                el.innerText = opt.text;
+                lugarSelect.appendChild(el);
+                return;
+            }
+            
+            // Filtrar por estado seleccionado
+            if (opt.estadoId == selectedEstadoId) {
+                const el = document.createElement('option');
+                el.value = opt.value;
+                el.innerText = opt.text;
+                lugarSelect.appendChild(el);
+                
+                if (!firstMatchValue) {
+                    firstMatchValue = opt.value;
+                }
+                if (opt.value == currentValue) {
+                    hasSelectedStillAvailable = true;
+                }
+            }
+        });
+        
+        // Restaurar valor anterior si sigue disponible, de lo contrario primer match o vacío
+        if (hasSelectedStillAvailable) {
+            lugarSelect.value = currentValue;
+        } else {
+            lugarSelect.value = firstMatchValue || '';
+        }
+    }
+
+    function resetPersonalForm() {
+        const form = document.getElementById('personalForm');
+        if (form) form.reset();
+        
+        document.getElementById('personal_id').value = '';
+        document.getElementById('personal-modal-title').innerText = 'Registrar Personal';
+        document.getElementById('personal-modal-subtitle').innerText = 'Registro';
+        
+        const jefeChk = form.querySelector('[name="jefe_oficina"]');
+        if (jefeChk) jefeChk.checked = false;
+        
+        const lugarSel = form.querySelector('[name="lugar_asignado_id"]');
+        if (lugarSel) lugarSel.value = '';
+        
+        // Limpiar checkboxes de dependencias
+        form.querySelectorAll('input[name="actividad_ids[]"]').forEach(cb => cb.checked = false);
+        updatePersonalActividadesDisplay();
+        
+        filterLugarAsignadoByEstado();
+    }
+
+    function togglePersonalActividadSelector() {
+        const dropdown = document.getElementById('personal-actividad-dropdown');
+        if (dropdown) dropdown.classList.toggle('hidden');
+    }
+
+    function updatePersonalActividadesDisplay() {
+        const checkboxes = document.querySelectorAll('input[name="actividad_ids[]"]');
+        const label = document.getElementById('personal-actividades-label');
+        if (!label) return;
+        const selected = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.dataset.nombre);
+        label.innerText = selected.length > 0 ? selected.join(', ') : 'Seleccionar Dependencias...';
+        label.className = selected.length > 0
+            ? 'text-sm font-bold text-gray-700 overflow-hidden text-ellipsis whitespace-nowrap'
+            : 'text-sm font-medium text-gray-400 overflow-hidden text-ellipsis whitespace-nowrap';
+    }
+
+    async function editPersonal(id) {
+        try {
+            const response = await fetch(`/mapa/api/get-personal/${id}`);
+            const result = await response.json();
+            
+            if (result.status === 'success') {
+                resetPersonalForm();
+                
+                document.getElementById('personal-modal-title').innerText = 'Editar Personal';
+                document.getElementById('personal-modal-subtitle').innerText = 'Actualización';
+                
+                const data = result.data;
+                const form = document.getElementById('personalForm');
+                if (!form) return;
+                
+                form.querySelector('[name="personal_id"]').value = data.id;
+                form.querySelector('[name="estado_id"]').value = data.estado_id;
+                form.querySelector('[name="estatus_id"]').value = data.estatus_id || '';
+                form.querySelector('[name="tipo_plaza_id"]').value = data.tipo_plaza_id || '';
+                form.querySelector('[name="codigo_plaza"]').value = data.codigo_plaza;
+                form.querySelector('[name="nivel"]').value = data.nivel;
+                form.querySelector('[name="num_empleado"]').value = data.num_empleado;
+                form.querySelector('[name="nombre"]').value = data.nombre;
+                form.querySelector('[name="apellido"]').value = data.apellido;
+                form.querySelector('[name="curp"]').value = data.curp || '';
+                form.querySelector('[name="fecha_nacimiento"]').value = data.fecha_nacimiento || '';
+                form.querySelector('[name="sexo"]').value = data.sexo || '';
+                form.querySelector('[name="tipo_movimiento"]').checked = data.tipo_movimiento;
+                form.querySelector('[name="fecha_ingreso_inm"]').value = data.fecha_ingreso_inm || '';
+                form.querySelector('[name="fecha_ingreso_plaza"]').value = data.fecha_ingreso_plaza || '';
+                form.querySelector('[name="vig_inicio_mov"]').value = data.vig_inicio_mov || '';
+                form.querySelector('[name="vig_termino_mov"]').value = data.vig_termino_mov || '';
+                form.querySelector('[name="puesto_especifico"]').value = data.puesto_especifico;
+                form.querySelector('[name="sueldo_bruto"]').value = data.sueldo_bruto || '';
+                form.querySelector('[name="sueldo_neto"]').value = data.sueldo_neto || '';
+                // Marcar checkboxes de actividades
+                form.querySelectorAll('input[name="actividad_ids[]"]').forEach(cb => cb.checked = false);
+                if (data.actividad_ids && data.actividad_ids.length > 0) {
+                    data.actividad_ids.forEach(actId => {
+                        const cb = form.querySelector(`input[name="actividad_ids[]"][value="${actId}"]`);
+                        if (cb) cb.checked = true;
+                    });
+                }
+                updatePersonalActividadesDisplay();
+                
+                const jefeChk = form.querySelector('[name="jefe_oficina"]');
+                if (jefeChk) jefeChk.checked = data.jefe_oficina || false;
+                
+                filterLugarAsignadoByEstado(data.lugar_asignado_id || '');
+                openPersonalModal();
+            } else {
+                alert('Error al cargar datos: ' + result.message);
+            }
+        } catch (err) {
+            alert('Error de conexión al servidor: ' + err.message);
+        }
+    }
+
+
+
+    async function handleCargaRapidaSubmit(event) {
+        event.preventDefault();
+        
+        const fileInput = document.getElementById('excel_file');
+        if (!fileInput.files || fileInput.files.length === 0) {
+            alert('Por favor seleccione un archivo Excel.');
+            return;
+        }
+        
+        const file = fileInput.files[0];
+        
+        // Hide upload form content, show progress container
+        document.getElementById('uploadFormContent').classList.add('hidden');
+        const progressContent = document.getElementById('progressContent');
+        progressContent.classList.remove('hidden');
+        
+        const statusText = document.getElementById('progressStatusText');
+        const percentText = document.getElementById('progressPercent');
+        const progressFill = document.getElementById('progressBarFill');
+        
+        statusText.innerText = 'Leyendo y preparando el archivo Excel...';
+        
+        const reader = new FileReader();
+        reader.onload = async function(e) {
+            try {
+                const data = new Uint8Array(e.target.result);
+                // Parse Excel sheets including cell dates as JS Date objects where formatted as such in Excel
+                const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+                const sheetName = workbook.SheetNames[0];
+                const sheet = workbook.Sheets[sheetName];
+                
+                // Get range of sheet to iterate cells directly, preventing empty column index shifting!
+                const range = XLSX.utils.decode_range(sheet['!ref']);
+                const allRows = [];
+                for (let r = range.s.r; r <= range.e.r; r++) {
+                    const rowCells = [];
+                    for (let c = range.s.c; c <= range.e.c; c++) {
+                        const cellRef = XLSX.utils.encode_cell({ r: r, c: c });
+                        const cell = sheet[cellRef];
+                        rowCells.push(cell || null);
+                    }
+                    allRows.push(rowCells);
+                }
+                
+                if (allRows.length === 0) {
+                    alert('El archivo Excel está vacío.');
+                    resetUploadModal();
+                    return;
+                }
+                
+                // Find headers (first 20 rows, checking for STATUS or CODIGO-PLAZA)
+                let headers = [];
+                let headerRowIdx = -1;
+                
+                for (let r = 0; r < Math.min(20, allRows.length); r++) {
+                    const rowCells = allRows[r];
+                    if (!rowCells) continue;
+                    const rowVals = rowCells.map(cell => {
+                        const val = cell ? (cell.w !== undefined ? cell.w : cell.v) : '';
+                        return String(val || '').trim().toUpperCase();
+                    });
+                    if (rowVals.includes('STATUS') || rowVals.some(v => v.includes('CODIGO'))) {
+                        headers = rowCells.map(cell => {
+                            const val = cell ? (cell.w !== undefined ? cell.w : cell.v) : '';
+                            return String(val || '').trim();
+                        });
+                        headerRowIdx = r;
+                        break;
+                    }
+                }
+                
+                if (headerRowIdx === -1) {
+                    // Fallback to row 8 (index 7)
+                    headerRowIdx = Math.min(7, allRows.length - 1);
+                    const rowCells = allRows[headerRowIdx];
+                    if (rowCells) {
+                        headers = rowCells.map(cell => {
+                            const val = cell ? (cell.w !== undefined ? cell.w : cell.v) : '';
+                            return String(val || '').trim();
+                        });
+                    } else {
+                        headers = [];
+                    }
+                }
+                
+                // Create column mapping
+                const colMapping = {};
+                headers.forEach((h, idx) => {
+                    const hNorm = normalizar_nombre(h).replace(/\n/g, ' ').trim();
+                    if (hNorm.includes('STATUS')) colMapping['status'] = idx;
+                    else if (hNorm.includes('TIPO DE PLAZA')) colMapping['tipo_plaza'] = idx;
+                    else if (hNorm.includes('ADSCRIPCION') || hNorm.includes('ESTADO')) colMapping['adscripcion'] = idx;
+                    else if (hNorm.includes('CODIGO')) colMapping['codigo_plaza'] = idx;
+                    else if (hNorm.includes('NIVEL')) colMapping['nivel'] = idx;
+                    else if (hNorm.includes('NUM EMP') || hNorm.includes('NUM_EMP') || hNorm.includes('EMPLEADO')) colMapping['num_empleado'] = idx;
+                    else if (hNorm.includes('NOMBRE')) colMapping['nombre'] = idx;
+                    else if (hNorm.includes('MOVIMIENTO')) colMapping['tipo_movimiento'] = idx;
+                    else if (hNorm.includes('FECHA DE ING. INM') || hNorm.includes('FECHA ING INM') || hNorm.includes('ING. INM')) colMapping['fecha_ingreso_inm'] = idx;
+                    else if (hNorm.includes('FECHA DE ING A LA PLAZA') || hNorm.includes('FECHA ING PLAZA') || hNorm.includes('ING A LA PLAZA') || hNorm.includes('FECHA_INGRESO_PLAZA') || hNorm.includes('FECHA INGRESO PLAZA')) colMapping['fecha_ingreso_plaza'] = idx;
+                    else if (hNorm.includes('VIG. DE INICIO') || hNorm.includes('INICIO MOV')) colMapping['vig_inicio_mov'] = idx;
+                    else if (hNorm.includes('VIG. DE TERMINO') || hNorm.includes('TERMINO MOV')) colMapping['vig_termino_mov'] = idx;
+                    else if (hNorm.includes('PUESTO')) colMapping['puesto_especifico'] = idx;
+                    else if (hNorm.includes('SUELDO BRUTO')) colMapping['sueldo_bruto'] = idx;
+                    else if (hNorm.includes('SUELDO NETO')) colMapping['sueldo_neto'] = idx;
+                    else if (hNorm.includes('JEFE')) colMapping['jefe_oficina'] = idx;
+                    else if (hNorm.includes('LUGAR') || hNorm.includes('INMUEBLE') || hNorm.includes('UBICACION') || hNorm.includes('ASIGNADO')) colMapping['lugar_asignado'] = idx;
+                });
+                
+                // Clean and format all data rows using cell object raw/formatted properties
+                const cleanDataRows = [];
+                for (let r = headerRowIdx + 1; r < allRows.length; r++) {
+                    const rowCells = allRows[r];
+                    if (!rowCells) continue;
+                    
+                    // Skip completely empty rows
+                    const hasVal = rowCells.some(cell => cell && cell.v !== null && cell.v !== undefined && cell.v !== '');
+                    if (!hasVal) continue;
+                    
+                    const cleanRow = [];
+                    for (let c = 0; c < rowCells.length; c++) {
+                        const cell = rowCells[c];
+                        if (!cell) {
+                            cleanRow.push(null);
+                            continue;
+                        }
+                        
+                        // Find if this column has a key
+                        const colKey = Object.keys(colMapping).find(key => colMapping[key] === c);
+                        
+                        if (colKey === 'codigo_plaza') {
+                            // ALWAYS use the formatted text 'w' if available to prevent date conversion, e.g. "12-05-89"
+                            const plazaStr = cell.w !== undefined ? String(cell.w).trim() : String(cell.v).trim();
+                            cleanRow.push(plazaStr);
+                        } else if (colKey === 'sueldo_bruto' || colKey === 'sueldo_neto') {
+                            // ALWAYS extract raw number from 'v' if it is numeric
+                            if (typeof cell.v === 'number') {
+                                cleanRow.push(cell.v);
+                            } else {
+                                // Fallback: strip currency formatting from formatted text 'w'
+                                const cleanNumStr = String(cell.w || cell.v || '').replace(/[^0-9.-]/g, '');
+                                const parsedNum = parseFloat(cleanNumStr);
+                                cleanRow.push(isNaN(parsedNum) ? null : parsedNum);
+                            }
+                        } else if (colKey === 'fecha_ingreso_inm' || colKey === 'fecha_ingreso_plaza' || colKey === 'vig_inicio_mov' || colKey === 'vig_termino_mov') {
+                            // For date columns, format JS Date objects to YYYY-MM-DD
+                            if (cell.v instanceof Date) {
+                                const d = cell.v;
+                                const yyyy = d.getUTCFullYear();
+                                const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+                                const dd = String(d.getUTCDate()).padStart(2, '0');
+                                cleanRow.push(`${yyyy}-${mm}-${dd}`);
+                            } else {
+                                // Fallback: use formatted text
+                                cleanRow.push(cell.w !== undefined ? String(cell.w).trim() : String(cell.v).trim());
+                            }
+                        } else {
+                            // Standard columns: use raw value 'v'
+                            cleanRow.push(cell.v !== undefined ? cell.v : null);
+                        }
+                    }
+                    cleanDataRows.push(cleanRow);
+                }
+                
+                if (cleanDataRows.length === 0) {
+                    alert('No se encontraron registros de datos válidos para cargar.');
+                    resetUploadModal();
+                    return;
+                }
+                
+                // Split cleanDataRows into chunks of 50
+                const chunkSize = 50;
+                const chunks = [];
+                for (let i = 0; i < cleanDataRows.length; i += chunkSize) {
+                    chunks.push(cleanDataRows.slice(i, i + chunkSize));
+                }
+                
+                const totalChunks = chunks.length;
+                let processedRows = 0;
+                let totalCreados = 0;
+                let totalActualizados = 0;
+                let totalOmitidos = 0;
+                let allEstatusIncorrectas = [];
+                let allPlazasIncorrectas = [];
+                
+                const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+                
+                for (let c = 0; c < totalChunks; c++) {
+                    const chunkRows = chunks[c];
+                    statusText.innerText = `Procesando bloque ${c + 1} de ${totalChunks} (Registros ${processedRows + 1} a ${Math.min(processedRows + chunkRows.length, cleanDataRows.length)})...`;
+                    
+                    try {
+                        const response = await fetch("{% url 'carga_rapida_personal' %}", {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json",
+                                "X-CSRFToken": csrfToken
+                            },
+                            body: JSON.stringify({
+                                is_ajax_chunk: true,
+                                headers: headers,
+                                rows: chunkRows
+                            })
+                        });
+                        
+                        const result = await response.json();
+                        
+                        if (result.status === 'success') {
+                            totalCreados += result.creados;
+                            totalActualizados += result.actualizados;
+                            totalOmitidos += result.omitidos;
+                            
+                            if (result.lineas_estatus_incorrectas && result.lineas_estatus_incorrectas.length > 0) {
+                                allEstatusIncorrectas.push(...result.lineas_estatus_incorrectas);
+                            }
+                            if (result.lineas_plaza_incorrectas && result.lineas_plaza_incorrectas.length > 0) {
+                                allPlazasIncorrectas.push(...result.lineas_plaza_incorrectas);
+                            }
+                            
+                            // Update dynamic stats
+                            document.getElementById('statCreados').innerText = totalCreados;
+                            document.getElementById('statActualizados').innerText = totalActualizados;
+                            document.getElementById('statOmitidos').innerText = totalOmitidos;
+                            
+                            processedRows += chunkRows.length;
+                            
+                            // Calculate percentage
+                            const progressPercentage = Math.round((processedRows / cleanDataRows.length) * 100);
+                            percentText.innerText = `${progressPercentage}%`;
+                            progressFill.style.width = `${progressPercentage}%`;
+                        } else {
+                            throw new Error(result.message || 'Error del servidor.');
+                        }
+                    } catch (chunkError) {
+                        console.error('Error in chunk:', chunkError);
+                        alert(`Error al procesar bloque: ${chunkError.message}. Se abortó la carga.`);
+                        resetUploadModal();
+                        return;
+                    }
+                }
+                
+                let warningMsg = '';
+                if (allEstatusIncorrectas.length > 0) {
+                    warningMsg += `\n- Líneas con Estatus incorrecto (se guardaron como NULL): ${allEstatusIncorrectas.join(', ')}`;
+                }
+                if (allPlazasIncorrectas.length > 0) {
+                    warningMsg += `\n- Líneas con Tipo de Plaza incorrecto (se guardaron como NULL): ${allPlazasIncorrectas.join(', ')}`;
+                }
+                
+                if (warningMsg) {
+                    alert(`Carga rápida completada con las siguientes advertencias:\n${warningMsg}`);
+                } else {
+                    alert('Carga rápida completada exitosamente sin advertencias.');
+                }
+                
+                statusText.innerText = '¡Carga rápida completada! Recargando listado...';
+                setTimeout(() => {
+                    location.reload();
+                }, 500);
+                
+            } catch (err) {
+                console.error(err);
+                alert(`Error al procesar el archivo: ${err.message}`);
+                resetUploadModal();
+            }
+        };
+        
+        reader.readAsArrayBuffer(file);
+    }
+    
+    function resetUploadModal() {
+        const uploadContent = document.getElementById('uploadFormContent');
+        const progressContent = document.getElementById('progressContent');
+        if (uploadContent) uploadContent.classList.remove('hidden');
+        if (progressContent) progressContent.classList.add('hidden');
+        
+        const progressFill = document.getElementById('progressBarFill');
+        const progressPercent = document.getElementById('progressPercent');
+        const progressStatusText = document.getElementById('progressStatusText');
+        
+        if (progressFill) progressFill.style.width = '0%';
+        if (progressPercent) progressPercent.innerText = '0%';
+        if (progressStatusText) progressStatusText.innerText = '';
+        
+        const statC = document.getElementById('statCreados');
+        const statA = document.getElementById('statActualizados');
+        const statO = document.getElementById('statOmitidos');
+        
+        if (statC) statC.innerText = '0';
+        if (statA) statA.innerText = '0';
+        if (statO) statO.innerText = '0';
+        
+        const fileInput = document.getElementById('excel_file');
+        if (fileInput) {
+            fileInput.value = '';
+            updateFastFileName(fileInput);
+        }
+    }
+</script>
+{% endblock scripts %}
+
+{% block styles %}
+<style>
+    @keyframes slideUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .animate-slide-up {
+        animation: slideUp 0.4s ease-out forwards;
+    }
+    
+    .custom-select {
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236b7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 0.75rem center;
+        background-size: 1.25em 1.25em;
+    }
+    
+    header.header-style {
+        display: none !important;
+    }
+    body > div.flex.justify-center.mt-4.space-x-2 {
+        display: none !important;
+    }
+</style>
+{% endblock styles %}
+
+{% block content %}
+<main class="min-h-screen bg-gray-50/50 p-6 md:p-12">
+    <div class="max-w-7xl mx-auto">
+        <!-- Cabecera -->
+        <div class="mb-12 animate-slide-up">
+            <div class="flex items-center space-x-3 mb-4">
+                <a href="{% url 'carga_datos' %}" class="px-4 py-1.5 bg-gray-100 text-gray-600 text-[10px] font-bold uppercase tracking-[0.2em] rounded-full hover:bg-gray-200 transition-colors">
+                    &larr; Volver
+                </a>
+                <span class="px-4 py-1.5 bg-emerald-50 text-inm-verde-100 text-[10px] font-bold uppercase tracking-[0.2em] rounded-full border border-emerald-100/50">Personal</span>
+            </div>
+            <div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
+                <div>
+                    <h1 class="text-5xl font-black text-gray-900 tracking-tight mb-4">Personal INM<span class="text-inm-verde-100">.</span></h1>
+                    <p class="text-lg text-gray-500 max-w-2xl font-medium">Gestión administrativa, plazas, sueldos y movimientos del personal por oficina de representación.</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-3">
+                    {% if request.user.is_superuser %}
+                    <button onclick="openCargaRapidaModal();" class="px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-bold shadow-xl shadow-emerald-950/20 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center">
+                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                        Carga Rápida
+                    </button>
+                    {% endif %}
+                    <button onclick="resetPersonalForm(); openPersonalModal();" class="px-8 py-4 bg-stone-800 text-white rounded-2xl font-bold shadow-xl shadow-stone-900/20 hover:bg-stone-900 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center">
+                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
+                        Nuevo Personal
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notificaciones de Django -->
+        {% if messages %}
+        <div class="mb-10 w-full animate-slide-up">
+            {% for message in messages %}
+            <div class="p-4 rounded-2xl mb-3 flex items-center {% if message.tags == 'success' %}bg-emerald-50 text-emerald-800 border border-emerald-100{% else %}bg-rose-50 text-rose-800 border border-rose-100{% endif %} shadow-sm">
+                <div class="flex-shrink-0">
+                    {% if message.tags == 'success' %}
+                    <svg class="h-5 w-5 text-emerald-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
+                    {% else %}
+                    <svg class="h-5 w-5 text-rose-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" /></svg>
+                    {% endif %}
+                </div>
+                <div class="ml-3"><p class="text-sm font-bold">{{ message }}</p></div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Panel de Búsqueda y Tabla -->
+        <div class="bg-white border border-gray-100 rounded-[2.5rem] shadow-sm overflow-hidden mb-12 animate-slide-up" style="animation-delay: 0.1s;">
+            <div class="p-8 border-b border-gray-50">
+                <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
+                    <div>
+                        <h2 class="text-xl font-bold text-gray-900">Personal Registrado</h2>
+                        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Gestión de personal de la representación</p>
+                    </div>
+                    <div class="flex items-center space-x-2 px-4 py-3 bg-gray-50 rounded-xl">
+                        <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                        <span class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{{ total_matched }} Empleados Coincidentes</span>
+                    </div>
+                </div>
+
+                <!-- Formulario de Filtros Servidor -->
+                <form method="GET" action="{% url 'personal_list' %}" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end bg-gray-50/50 p-6 rounded-3xl border border-gray-100">
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Nombre / Empleado / Plaza</label>
+                        <div class="relative">
+                            <input type="text" name="nombre" value="{{ nombre_query }}" placeholder="Buscar por nombre, plaza, nº..." class="w-full pl-4 pr-10 py-3 bg-white border border-gray-200 rounded-xl outline-none text-xs font-bold text-gray-700 placeholder-gray-400 focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all">
+                            <span class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-400">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Estado (OR)</label>
+                        <select name="estado_id" class="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none text-xs font-bold text-gray-700 focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all appearance-none cursor-pointer">
+                            {% if estados_list_all|length > 1 %}
+                                <option value="">Todos los Estados</option>
+                            {% endif %}
+                            {% for est in estados_list_all %}
+                                <option value="{{ est.id }}" {% if estado_id_query == est.id|slugify %}selected{% endif %}>{{ est.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Puesto Específico</label>
+                        <div class="relative">
+                            <input type="text" name="puesto" value="{{ puesto_query }}" placeholder="Ej: JEFE DE DEPARTAMENTO" class="w-full pl-4 pr-10 py-3 bg-white border border-gray-200 rounded-xl outline-none text-xs font-bold text-gray-700 placeholder-gray-400 focus:ring-2 focus:ring-inm-verde-100 focus:border-transparent transition-all">
+                            <span class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-400">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center space-x-2">
+                        <button type="submit" class="flex-1 py-3 bg-stone-800 hover:bg-stone-900 text-white text-xs font-bold rounded-xl transition-all shadow-md flex items-center justify-center space-x-2 hover:scale-[1.02] active:scale-[0.98]">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path></svg>
+                            <span>Filtrar</span>
+                        </button>
+                        {% if nombre_query or estado_id_query or puesto_query %}
+                            <a href="{% url 'personal_list' %}" class="px-4 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-bold rounded-xl transition-all flex items-center justify-center hover:scale-[1.02] active:scale-[0.98]" title="Limpiar Filtros">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+                            </a>
+                        {% endif %}
+                    </div>
+                </form>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="w-full text-left">
+                    <thead>
+                        <tr class="bg-gray-50/50">
+                            <th class="px-8 py-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Nombre Completo</th>
+                            <th class="px-8 py-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Plaza / Nivel</th>
+                            <th class="px-8 py-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Puesto Específico</th>
+                            <th class="px-8 py-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Estatus / Movimiento</th>
+                            <th class="px-8 py-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-right">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-50">
+                        {% for pers in personal_list %}
+                        <tr class="hover:bg-gray-50/80 transition-colors group">
+                            <td class="px-8 py-6">
+                                <div class="flex items-center">
+                                    <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-inm-verde-100 flex items-center justify-center font-black mr-4 text-lg">
+                                        {{ pers.nombre|default:"U"|first }}
+                                    </div>
+                                    <div>
+                                        <div class="text-sm font-bold text-gray-900 col-nombre">{{ pers.nombre|default:"" }} {{ pers.apellido|default:"" }}</div>
+                                        <div class="text-[10px] font-bold text-gray-400 col-empleado">Nº Emp: {{ pers.num_empleado|default:"SIN NÚMERO" }}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-8 py-6">
+                                <div class="text-xs font-bold text-gray-700">{{ pers.estado.nombre }}</div>
+                                <div class="text-[10px] font-bold text-gray-400 uppercase tracking-tight">CÓD: {{ pers.codigo_plaza }} ({{ pers.tipo_plaza|default:"S/D" }}) — NIVEL {{ pers.nivel }}</div>
+                            </td>
+                            <td class="px-8 py-6">
+                                <div class="text-xs font-bold text-gray-700 col-puesto">
+                                    {{ pers.puesto_especifico }}
+                                    {% if pers.jefe_oficina %}
+                                    <span class="ml-1 px-2 py-0.5 inline-block text-[8px] font-black rounded bg-purple-50 text-purple-700 border border-purple-100 uppercase">JEFE</span>
+                                    {% endif %}
+                                </div>
+                                <div class="text-[10px] font-bold text-gray-400">
+                                    {% with dependencias=pers.actividad.all %}
+                                        {% if dependencias %}Dep: {% for dep in dependencias %}{{ dep.nombre }}{% if not forloop.last %}, {% endif %}{% endfor %}{% else %}SIN DEPENDENCIA ASOCIADA{% endif %}
+                                    {% endwith %}
+                                </div>
+                                <div class="text-[9px] font-bold text-emerald-600 mt-1 uppercase tracking-tight">📍 {{ pers.lugar_asignado.nombre_inmueble|default:"SIN LUGAR ASIGNADO" }}</div>
+                            </td>
+                            <td class="px-8 py-6">
+                                <div class="flex flex-col space-y-1">
+                                    <span class="px-2 py-0.5 inline-block text-[9px] font-black rounded-full w-max {% if pers.estatus.estatus|upper == 'ACTIVO' %}bg-emerald-50 text-emerald-700 border border-emerald-100{% else %}bg-amber-50 text-amber-700 border border-amber-100{% endif %}">
+                                        {{ pers.estatus.estatus|default:"S/D"|upper }}
+                                    </span>
+                                    <span class="text-[9px] font-bold text-gray-400 uppercase">
+                                        MOVIMIENTO: {% if pers.tipo_movimiento %}SÍ{% else %}NO{% endif %}
+                                    </span>
+                                </div>
+                            </td>
+                            <td class="px-8 py-6 text-right">
+                                <div class="flex justify-end space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button onclick="editPersonal({{ pers.id }})" class="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors shadow-sm">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                                    </button>
+                                    <form method="POST" action="{% url 'eliminar_personal' pers.id %}" onsubmit="return confirm('¿Está seguro de eliminar este registro?')" class="inline">
+                                        {% csrf_token %}
+                                        <button type="submit" class="p-2.5 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-100 transition-colors shadow-sm">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr class="empty-row">
+                            <td colspan="5" class="px-8 py-16 text-center">
+                                <div class="flex flex-col items-center">
+                                    <div class="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4 text-gray-300">
+                                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                                    </div>
+                                    <p class="text-sm font-bold text-gray-400 uppercase tracking-widest">No hay registros</p>
+                                    <p class="text-xs text-gray-400 mt-1">Comienza agregando un nuevo miembro de personal.</p>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        <tr class="empty-row hidden">
+                            <td colspan="5" class="px-8 py-16 text-center">
+                                <div class="flex flex-col items-center">
+                                    <p class="text-sm font-bold text-gray-400 uppercase tracking-widest">Sin resultados</p>
+                                    <p class="text-xs text-gray-400 mt-1">Ningún personal coincide con tu búsqueda.</p>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Paginación Servidor -->
+            {% if personal_list.has_other_pages %}
+            <div class="px-8 py-5 border-t border-gray-50 bg-gray-50/20 flex flex-col sm:flex-row justify-between items-center gap-4">
+                <div class="text-xs font-bold text-gray-500">
+                    Mostrando <span class="text-gray-900">{{ personal_list.start_index }}</span> a <span class="text-gray-900">{{ personal_list.end_index }}</span> de <span class="text-gray-900">{{ total_matched }}</span> registros
+                </div>
+                
+                <div class="flex items-center space-x-1">
+                    {% if personal_list.has_previous %}
+                        <!-- Primera página -->
+                        <a href="?page=1{% if nombre_query %}&nombre={{ nombre_query }}{% endif %}{% if estado_id_query %}&estado_id={{ estado_id_query }}{% endif %}{% if puesto_query %}&puesto={{ puesto_query }}{% endif %}" 
+                           class="p-2 text-gray-500 hover:text-inm-verde-100 hover:bg-gray-100 rounded-xl transition-all"
+                           title="Primera página">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"></path></svg>
+                        </a>
+                        <!-- Página anterior -->
+                        <a href="?page={{ personal_list.previous_page_number }}{% if nombre_query %}&nombre={{ nombre_query }}{% endif %}{% if estado_id_query %}&estado_id={{ estado_id_query }}{% endif %}{% if puesto_query %}&puesto={{ puesto_query }}{% endif %}" 
+                           class="p-2 text-gray-500 hover:text-inm-verde-100 hover:bg-gray-100 rounded-xl transition-all"
+                           title="Página anterior">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                        </a>
+                    {% endif %}
+
+                    <!-- Rango de páginas inteligentes para no saturar la pantalla -->
+                    {% for num in personal_list.paginator.page_range %}
+                        {% if num == personal_list.number %}
+                            <span class="px-3.5 py-2 bg-stone-800 text-white text-xs font-black rounded-xl shadow-sm">{{ num }}</span>
+                        {% elif num > personal_list.number|add:"-3" and num < personal_list.number|add:"3" %}
+                            <a href="?page={{ num }}{% if nombre_query %}&nombre={{ nombre_query }}{% endif %}{% if estado_id_query %}&estado_id={{ estado_id_query }}{% endif %}{% if puesto_query %}&puesto={{ puesto_query }}{% endif %}" 
+                               class="px-3.5 py-2 text-gray-600 hover:text-inm-verde-100 hover:bg-gray-100 text-xs font-bold rounded-xl transition-all">
+                                {{ num }}
+                            </a>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if personal_list.has_next %}
+                        <!-- Página siguiente -->
+                        <a href="?page={{ personal_list.next_page_number }}{% if nombre_query %}&nombre={{ nombre_query }}{% endif %}{% if estado_id_query %}&estado_id={{ estado_id_query }}{% endif %}{% if puesto_query %}&puesto={{ puesto_query }}{% endif %}" 
+                           class="p-2 text-gray-500 hover:text-inm-verde-100 hover:bg-gray-100 rounded-xl transition-all"
+                           title="Página siguiente">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                        </a>
+                        <!-- Última página -->
+                        <a href="?page={{ personal_list.paginator.num_pages }}{% if nombre_query %}&nombre={{ nombre_query }}{% endif %}{% if estado_id_query %}&estado_id={{ estado_id_query }}{% endif %}{% if puesto_query %}&puesto={{ puesto_query }}{% endif %}" 
+                           class="p-2 text-gray-500 hover:text-inm-verde-100 hover:bg-gray-100 rounded-xl transition-all"
+                           title="Última página">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"></path></svg>
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+            {% elif total_matched > 0 %}
+            <!-- Si hay registros pero es una sola página -->
+            <div class="px-8 py-5 border-t border-gray-50 bg-gray-50/20 flex justify-between items-center">
+                <div class="text-xs font-bold text-gray-500">
+                    Mostrando <span class="text-gray-900">1</span> a <span class="text-gray-900">{{ total_matched }}</span> de <span class="text-gray-900">{{ total_matched }}</span> registros
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Modal Formulario Principal -->
+    <div id="personalModal" class="hidden fixed inset-0 z-40 flex items-center justify-center p-4">
+        <!-- Fondo Translúcido -->
+        <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-md transition-opacity" onclick="closePersonalModal()"></div>
+        
+        <!-- Contenido Modal -->
+        <div class="relative bg-white rounded-[2.5rem] shadow-2xl w-full max-w-4xl overflow-hidden border border-gray-100 animate-slide-up max-h-[90vh] flex flex-col">
+            <!-- Cabecera de Modal -->
+            <div class="p-8 border-b border-gray-50 flex justify-between items-start flex-shrink-0 bg-gray-50/50">
+                <div>
+                    <span class="text-[10px] font-bold uppercase tracking-widest text-inm-verde-100" id="personal-modal-subtitle">Registro</span>
+                    <h2 id="personal-modal-title" class="text-3xl font-extrabold text-gray-900 mt-1">Registrar Personal</h2>
+                </div>
+                <button onclick="closePersonalModal()" class="text-gray-400 hover:text-gray-600 transition-colors bg-white p-3 rounded-2xl shadow-sm hover:shadow-md focus:outline-none">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+
+            <!-- Cuerpo de Formulario -->
+            <form id="personalForm" action="{% url 'guardar_personal' %}" method="POST" class="p-8 space-y-8 overflow-y-auto flex-grow text-left custom-scrollbar">
+                {% csrf_token %}
+                <input type="hidden" name="personal_id" id="personal_id">
+
+                <!-- Sección 1: Datos de Identificación del Empleado -->
+                <div>
+                    <h3 class="text-lg font-bold text-gray-800 flex items-center mb-6">
+                        <span class="w-8 h-8 bg-emerald-100 text-inm-verde-100 rounded-lg flex items-center justify-center mr-3 text-sm font-bold">1</span>
+                        Identificación y Adscripción
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Nombre(s)</label>
+                            <input type="text" name="nombre" placeholder="Ej: JUAN" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold uppercase text-sm focus:ring-2 focus:ring-inm-verde-100 transition-all">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Apellido(s)</label>
+                            <input type="text" name="apellido" placeholder="Ej: PÉREZ LÓPEZ" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold uppercase text-sm focus:ring-2 focus:ring-inm-verde-100 transition-all">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Estado</label>
+                            <select name="estado_id" required onchange="filterLugarAsignadoByEstado()" class="custom-select block w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-inm-verde-100 transition-all outline-none font-bold text-gray-700">
+                                {% for estado in estados_list %}
+                                <option value="{{ estado.id }}">{{ estado.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Nº Empleado</label>
+                            <input type="text" name="num_empleado" maxlength="8" placeholder="Ej: 12345678" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold uppercase text-sm focus:ring-2 focus:ring-inm-verde-100 transition-all">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Lugar Asignado (Inmueble)</label>
+                            <select name="lugar_asignado_id" required class="custom-select block w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-inm-verde-100 transition-all outline-none font-bold text-gray-700">
+                                <option value="">--- Seleccione Lugar ---</option>
+                                {% for inm in inmuebles_list %}
+                                <option value="{{ inm.id }}" data-estado="{{ inm.estado_id }}">[{{ inm.estado.nombre }}] {{ inm.nombre_inmueble }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Estatus</label>
+                            <select name="estatus_id" required class="custom-select block w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-inm-verde-100 transition-all outline-none font-bold text-gray-700">
+                                <option value="">--- Seleccione Estatus ---</option>
+                                {% for est in estatus_list %}
+                                <option value="{{ est.id }}">{{ est.estatus }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">CURP</label>
+                            <input type="text" name="curp" maxlength="18" placeholder="Ej: AAAA999999AAAAAA99" pattern="[A-Z]{4}[0-9]{6}[A-Z]{6}[0-9A-Z]{2}" title="CURP inválida (Formato: AAAA999999AAAAAA99)" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold uppercase text-sm focus:ring-2 focus:ring-inm-verde-100 transition-all">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Fecha Nacimiento</label>
+                            <input type="date" name="fecha_nacimiento" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold text-sm focus:ring-2 focus:ring-inm-verde-100">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Sexo</label>
+                            <select name="sexo" class="custom-select block w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-inm-verde-100 transition-all outline-none font-bold text-gray-700">
+                                <option value="">--- Seleccione Sexo ---</option>
+                                <option value="M">Masculino</option>
+                                <option value="F">Femenino</option>
+                                <option value="X">Otro</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-6 mt-4 pl-1">
+                        <label class="flex items-center cursor-pointer space-x-3">
+                            <input type="checkbox" name="tipo_movimiento" checked class="w-5 h-5 text-inm-verde-100 border-gray-300 rounded focus:ring-inm-verde-100">
+                            <span class="text-xs font-bold text-gray-700 uppercase">Definitivo</span>
+                        </label>
+                        <label class="flex items-center cursor-pointer space-x-3">
+                            <input type="checkbox" name="jefe_oficina" class="w-5 h-5 text-inm-verde-100 border-gray-300 rounded focus:ring-inm-verde-100">
+                            <span class="text-xs font-bold text-purple-700 font-extrabold uppercase">Jefe Oficina</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Sección 2: Plaza y Compensaciones -->
+                <div>
+                    <h3 class="text-lg font-bold text-gray-800 flex items-center mb-6">
+                        <span class="w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center mr-3 text-sm font-bold">2</span>
+                        Plaza, Cargo y Sueldos
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Tipo de Plaza</label>
+                            <select name="tipo_plaza_id" required class="custom-select block w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-inm-verde-100 transition-all outline-none font-bold text-gray-700">
+                                <option value="">--- Seleccione Plaza ---</option>
+                                {% for tp in tipo_plaza_list %}
+                                <option value="{{ tp.id }}">{{ tp.plazaT }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Código de Plaza</label>
+                            <input type="text" name="codigo_plaza" required placeholder="Ej: CF01020" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold uppercase text-sm focus:ring-2 focus:ring-inm-verde-100 transition-all">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Nivel</label>
+                            <input type="text" name="nivel" required maxlength="4" placeholder="Ej: 27A" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold uppercase text-sm focus:ring-2 focus:ring-inm-verde-100 transition-all">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Dependencia(s)</label>
+                            <button type="button" id="personal-actividad-btn" onclick="togglePersonalActividadSelector()" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl flex justify-between items-center outline-none transition-all focus:ring-2 focus:ring-inm-verde-100">
+                                <span id="personal-actividades-label" class="text-sm font-medium text-gray-400 overflow-hidden text-ellipsis whitespace-nowrap">Seleccionar Dependencias...</span>
+                                <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                            </button>
+                            <div id="personal-actividad-dropdown" class="hidden relative left-0 right-0 mt-2 p-4 bg-white border border-gray-200 rounded-2xl shadow-2xl z-50 max-h-52 overflow-y-auto">
+                                {% for act in actividades_list %}
+                                <label class="flex items-center gap-3 py-1.5 cursor-pointer hover:bg-gray-50 rounded-lg px-2">
+                                    <input type="checkbox" name="actividad_ids[]" value="{{ act.id }}" data-nombre="{{ act.nombre }}" onchange="updatePersonalActividadesDisplay()" class="w-5 h-5 text-inm-verde-100 border-gray-300 rounded focus:ring-inm-verde-100">
+                                    <span class="text-sm font-medium text-gray-700">{{ act.nombre }}</span>
+                                </label>
+                                {% empty %}
+                                <p class="text-sm text-gray-400 text-center py-2">No hay dependencias registradas.</p>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Puesto Específico</label>
+                            <input type="text" name="puesto_especifico" required placeholder="Ej: SUBDIRECTOR DE ENLACE OPERATIVO" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold uppercase text-sm focus:ring-2 focus:ring-inm-verde-100 transition-all">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Sueldo Bruto ($)</label>
+                            <input type="number" step="any" name="sueldo_bruto" placeholder="0.00" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold text-sm focus:ring-2 focus:ring-inm-verde-100 transition-all">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Sueldo Neto ($)</label>
+                            <input type="number" step="any" name="sueldo_neto" placeholder="0.00" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold text-sm focus:ring-2 focus:ring-inm-verde-100 transition-all">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sección 3: Fechas y Vigencias -->
+                <div>
+                    <h3 class="text-lg font-bold text-gray-800 flex items-center mb-6">
+                        <span class="w-8 h-8 bg-purple-100 text-purple-600 rounded-lg flex items-center justify-center mr-3 text-sm font-bold">3</span>
+                        Fechas y Vigencias
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Fecha Ingreso INM</label>
+                            <input type="date" name="fecha_ingreso_inm" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold text-sm focus:ring-2 focus:ring-inm-verde-100">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Fecha Ingreso Plaza</label>
+                            <input type="date" name="fecha_ingreso_plaza" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold text-sm focus:ring-2 focus:ring-inm-verde-100">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Vigencia Inicio Movimiento</label>
+                            <input type="date" name="vig_inicio_mov" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold text-sm focus:ring-2 focus:ring-inm-verde-100">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Vigencia Término Movimiento</label>
+                            <input type="date" name="vig_termino_mov" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold text-sm focus:ring-2 focus:ring-inm-verde-100">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Botones Acción -->
+                <div class="pt-8 border-t border-gray-100 flex justify-end space-x-4 flex-shrink-0">
+                    <button type="button" onclick="closePersonalModal()" class="px-8 py-4 bg-gray-100 text-gray-500 rounded-2xl font-bold hover:bg-gray-200 transition-all focus:outline-none">Cancelar</button>
+                    <button type="submit" class="px-12 py-4 bg-inm-verde-100 text-white rounded-2xl font-bold shadow-lg shadow-emerald-900/20 hover:bg-inm-verde-200 transition-all focus:outline-none">Guardar Personal</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Carga Rápida -->
+    <div id="cargaRapidaModal" class="hidden fixed inset-0 z-40 flex items-center justify-center p-4">
+        <!-- Fondo Oscuro -->
+        <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-md transition-opacity" onclick="closeCargaRapidaModal()"></div>
+        
+        <!-- Contenido Modal -->
+        <div class="bg-white rounded-[2.5rem] w-full max-w-lg p-8 shadow-2xl relative z-10 border border-gray-100 flex flex-col max-h-[90vh]">
+            <!-- Cabecera de Modal -->
+            <div class="flex justify-between items-start mb-6">
+                <div>
+                    <span class="text-[10px] font-bold uppercase tracking-widest text-emerald-600">Importación Rápida</span>
+                    <h2 class="text-3xl font-extrabold text-gray-900 mt-1">Carga Rápida Excel</h2>
+                </div>
+                <button onclick="closeCargaRapidaModal()" class="text-gray-400 hover:text-gray-600 transition-colors bg-white p-3 rounded-2xl shadow-sm hover:shadow-md focus:outline-none">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+
+            <!-- Cuerpo Modal -->
+            <form id="cargaRapidaForm" onsubmit="handleCargaRapidaSubmit(event)" class="space-y-6">
+                {% csrf_token %}
+                
+                <!-- Contenedor del Formulario de Subida -->
+                <div id="uploadFormContent" class="space-y-6">
+                    <div class="bg-gray-50/50 border border-dashed border-gray-200 rounded-3xl p-8 text-center hover:border-emerald-400 transition-colors group cursor-pointer relative">
+                        <input type="file" name="excel_file" id="excel_file" accept=".xlsx, .xls" required class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onchange="updateFastFileName(this)">
+                        <div class="flex flex-col items-center pointer-events-none">
+                            <div class="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 mb-4 group-hover:scale-110 transition-transform">
+                                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                            </div>
+                            <p class="text-sm font-bold text-gray-700 mb-1" id="upload-label">Seleccionar Plantilla Excel</p>
+                            <p class="text-xs font-bold text-gray-400 uppercase tracking-wider" id="upload-filename">Formatos permitidos: .xlsx, .xls</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-amber-50/60 border border-amber-100 rounded-2xl p-4 flex items-start space-x-3">
+                        <svg class="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        <div class="text-xs font-semibold text-amber-800 leading-relaxed">
+                            <p class="font-bold mb-1">Notas importantes:</p>
+                            <ul class="list-disc list-inside space-y-1">
+                                <li>El sistema identificará si debe actualizar o crear a partir del <strong>Código de Plaza</strong>.</li>
+                                <li>El <strong>Inmueble Asignado</strong> se dejará en blanco y el estatus de <strong>Jefe de Oficina</strong> se configurará en <code>FALSO</code> para todo el personal importado.</li>
+                                <li>Si el estatus es <code>VACANTE</code>, se limpiarán los datos demográficos y de fechas automáticamente.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Botones Acción -->
+                    <div class="pt-6 border-t border-gray-100 flex justify-end space-x-4">
+                        <button type="button" onclick="closeCargaRapidaModal()" class="px-6 py-3 bg-gray-100 text-gray-500 rounded-xl font-bold hover:bg-gray-200 transition-all focus:outline-none">Cancelar</button>
+                        <button type="submit" class="px-8 py-3 bg-emerald-600 text-white rounded-xl font-bold shadow-lg shadow-emerald-950/20 hover:bg-emerald-700 transition-all focus:outline-none">Iniciar Carga</button>
+                    </div>
+                </div>
+
+                <!-- Contenedor de la Barra de Carga (Asíncrono) -->
+                <div id="progressContent" class="hidden space-y-6 py-4 text-center">
+                    <div class="flex flex-col items-center">
+                        <!-- Spinner Circular Premium -->
+                        <div class="relative w-24 h-24 mb-4">
+                            <div class="absolute inset-0 rounded-full border-4 border-emerald-100"></div>
+                            <div class="absolute inset-0 rounded-full border-4 border-emerald-600 border-t-transparent animate-spin"></div>
+                            <div class="absolute inset-0 flex items-center justify-center">
+                                <span id="progressPercent" class="text-lg font-black text-emerald-800">0%</span>
+                            </div>
+                        </div>
+                        
+                        <h3 class="text-base font-black text-gray-800 uppercase tracking-tight">Procesando Importación...</h3>
+                        <p id="progressStatusText" class="text-xs font-bold text-gray-400 mt-1">Preparando archivo Excel...</p>
+                        
+                        <!-- Barra de Progreso Lineal -->
+                        <div class="w-full bg-gray-100 rounded-full h-3 mt-6 relative overflow-hidden border border-gray-200/50">
+                            <div id="progressBarFill" class="bg-gradient-to-r from-emerald-500 to-teal-600 h-full rounded-full w-0 transition-all duration-300"></div>
+                        </div>
+                        
+                        <!-- Estadísticas de procesamiento -->
+                        <div class="grid grid-cols-3 gap-2 w-full mt-6 bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                            <div class="text-center">
+                                <span id="statCreados" class="text-lg font-black text-emerald-600 block">0</span>
+                                <span class="text-[8px] font-bold text-gray-400 uppercase tracking-wider">Creados</span>
+                            </div>
+                            <div class="text-center border-x border-gray-200">
+                                <span id="statActualizados" class="text-lg font-black text-blue-600 block">0</span>
+                                <span class="text-[8px] font-bold text-gray-400 uppercase tracking-wider">Actualizados</span>
+                            </div>
+                            <div class="text-center">
+                                <span id="statOmitidos" class="text-lg font-black text-amber-600 block">0</span>
+                                <span class="text-[8px] font-bold text-gray-400 uppercase tracking-wider">Omitidos</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</main>
+{% endblock content %}

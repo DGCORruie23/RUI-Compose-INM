@@ -1,0 +1,1695 @@
+from django.shortcuts import render, get_object_or_404, redirect
+from django.db.models import Max, Count, Case, Value, When, IntegerField   
+from django.views.decorators.csrf import csrf_exempt
+from rest_framework.parsers import JSONParser
+from django.http import JsonResponse, HttpResponseRedirect, HttpResponse
+from django.contrib.auth.hashers import make_password, check_password
+from .serializers import UserGetSerializer, UserGetSerializerC, PaisesGetSerializer, EstadoFuerzaGetSerializer, FrasesGetSerializer, ListRescatePuntoSerializer, RescatePuntoSerializer, ValidacionServidorGetSerializer
+from .serializers import MunicipiosGetSerializer, PuntosInterGetSerializer, ConteoRapidoSerializer, MsgUpdateGetSerializer, ConteoDisuadidosSerializer
+from .models import Usuario, Paises, EstadoFuerza, Frases, Municipios, PuntosInternacion, RescatePunto, ConteoRapidoPunto, MsgUpdate, Inadmitido, ValidacionServidor, encrypt_str_pass, decrypt_str_pass
+from .forms import CargarArchivoForm, ExcelForm, ExcelFormOr, ExcelFormOrs 
+import openpyxl as opxl
+from openpyxl.writer.excel import save_virtual_workbook
+from datetime import *
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.conf import settings
+import os
+
+# Create your views here.
+@csrf_exempt
+def login_user(request):
+
+    if request.method == 'POST':
+        datos_recibidos = JSONParser().parse(request)
+        datos_serializados = UserGetSerializer(data=datos_recibidos)
+        # print(datos_serializados)
+        if datos_serializados.is_valid():
+            datos = datos_serializados.data
+            usuario_info = datos.get('nickname')
+            pass_info = datos.get('password')
+
+            # print(f" nickname: {usuario_info}, pass: {pass_info}")
+
+            if(Usuario.objects.filter(nickname = usuario_info).exists()):
+
+                datos_usuario = Usuario.objects.get(nickname = usuario_info)
+
+                if(check_password(pass_info, datos_usuario.password)):
+                    nuevo_serializer = {'nickname': datos_usuario.nickname,
+                                        'nombre': datos_usuario.nombre,
+                                        'apellido': datos_usuario.apellido,
+                                        'password': 'ok',
+                                        'estado': datos_usuario.estado,
+                                        'tipo': datos_usuario.tipo}
+                    
+                    # print(f" ${datos_usuario.nickname} ${datos_usuario.nombre} ${datos_usuario.apellido} ${datos_usuario.estado}")
+                    serializer_datos = UserGetSerializerC(nuevo_serializer)
+                    return JsonResponse(serializer_datos.data, status = 200)
+
+                else:
+                    nuevo_serializer = {'nickname': 'error',
+                                        'nombre': '',
+                                        'apellido': '',
+                                         'password': 'error',
+                                         'estado': '',
+                                         'tipo': ''}
+                    serializer_datos = UserGetSerializerC(nuevo_serializer)
+                    return JsonResponse(serializer_datos.data, status = 200)
+
+            else:
+
+                nuevo_serializer = {'nickname': 'error',
+                                        'nombre': '',
+                                        'apellido': '',
+                                         'password': 'error',
+                                         'estado': '',
+                                         'tipo': ''}
+                serializer_datos = UserGetSerializerC(nuevo_serializer)
+                return JsonResponse(serializer_datos.data, status = 200)
+        else:
+            nuevo_serializer = {'nickname': 'error',
+                                        'nombre': '',
+                                        'apellido': '',
+                                         'password': 'error',
+                                         'estado': '',
+                                         'tipo': ''}
+            serializer_datos = UserGetSerializerC(nuevo_serializer)
+            return JsonResponse(serializer_datos.data, status = 200)
+
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
+@csrf_exempt
+def cargarPais(request):
+    if(request.method == "POST"):
+        form = CargarArchivoForm(request.POST, request.FILES)
+        if(form.is_valid()):
+            # Nota: "archivo" este campo se llama como se llama en el form  
+            excel_file = request.FILES["archivo"]
+            nombreA = str(excel_file.name)
+            extensionA = (nombreA.split(".")[-1]).lower()
+            # print((nombreA.split(".")[-1]).lower())
+            if( extensionA == "xlsx" 
+               or extensionA == ".xlsm" 
+               or extensionA == ".xlsb" 
+               or extensionA == ".xltx" 
+               or extensionA == ".xltm" 
+               or extensionA == ".xls"):
+                dataWB = opxl.load_workbook(excel_file, data_only=True)
+
+                data = dataWB.worksheets[0]
+
+                # print(data.cell(4,2).value)
+
+                # Se leen los datos del excel
+                paises = []
+                i = 1
+                while not(i == 0):
+                    if(data.cell(i+3,2).value == None):
+                        i = 0
+                    else:
+                        paises.append([data.cell(i+3,2).value, data.cell(i+3,3).value])
+                        i+=1
+                #-----------------------------------
+
+                #Eliminar todos los registros de Paises
+                Paises.objects.all().delete()
+                #------------------------
+
+                # Se agrega a la DB los paises y se crea un string de ellos
+                paisesStr = "{"    
+                for num, nac in enumerate(paises):
+                    paisesStr += f'\n\t"{nac}",' 
+                    Paises.objects.create(idPais = num + 1, nombre_pais = nac[0], iso3 = nac[1])
+                    # print(nac)
+                paisesStr += "\n}" 
+                #----------------------------
+
+                # pasar string de las nacionalidades 
+                # print(paisesStr) 
+                #------------------------
+            return redirect("dashboard")
+    else:
+        form = CargarArchivoForm()
+    return render(request, "cargarExcel/cargarArchivoPaises.html", {"form" : form})
+
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
+@csrf_exempt
+def cargarPuntoI(request):
+    if(request.method == "POST"):
+        form = CargarArchivoForm(request.POST, request.FILES)
+        if(form.is_valid()):
+            # Nota: "archivo" este campo se llama como se llama en el form  
+            excel_file = request.FILES["archivo"]
+            nombreA = str(excel_file.name)
+            extensionA = (nombreA.split(".")[-1]).lower()
+            # print((nombreA.split(".")[-1]).lower())
+            if( extensionA == "xlsx" 
+               or extensionA == ".xlsm" 
+               or extensionA == ".xlsb" 
+               or extensionA == ".xltx" 
+               or extensionA == ".xltm" 
+               or extensionA == ".xls"):
+                dataWB = opxl.load_workbook(excel_file, data_only=True)
+
+                data = dataWB.worksheets[0]
+
+                # print(data.cell(4,2).value)
+
+                # Se leen los datos del excel
+                puntoI = []
+                i = 1
+                while not(i == 0):
+                    if(data.cell(i,1).value == None):
+                        i = 0
+                    else:
+                        puntoI.append([data.cell(i,1).value, data.cell(i,2).value, data.cell(i,3).value])
+                        i+=1
+                #-----------------------------------
+
+                #Eliminar todos los registros de Paises
+                PuntosInternacion.objects.all().delete()
+                #------------------------
+
+                # Se agrega a la DB los paises y se crea un string de ellos
+                puntoIStr = "{"    
+                for num, punto in enumerate(puntoI):
+                    puntoIStr += f'\n\t"{punto}",' 
+                    PuntosInternacion.objects.create(idPuntoInter = num + 1, estadoPunto = punto[0], nombrePunto = punto[1], tipoPunto = punto[2], )
+                    # print(nac)
+                puntoIStr += "\n}" 
+                #----------------------------
+
+                # pasar string de las nacionalidades 
+                # print(puntoIStr) 
+                #------------------------
+            return redirect("dashboard")
+    else:
+        form = CargarArchivoForm()
+    return render(request, "cargarExcel/cargarArchivoPuntosInter.html", {"form" : form})
+
+
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
+@csrf_exempt
+def cargarEdoFuerza(request):
+    if(request.method == "POST"):
+        form = CargarArchivoForm(request.POST, request.FILES)
+        if(form.is_valid()):
+            # Nota: "archivo" este campo se llama como se llama en el form  
+            excel_file = request.FILES["archivo"]
+            nombreA = str(excel_file.name)
+            extensionA = (nombreA.split(".")[-1]).lower()
+            # print((nombreA.split(".")[-1]).lower())
+            if( extensionA == "xlsx" 
+               or extensionA == ".xlsm" 
+               or extensionA == ".xlsb" 
+               or extensionA == ".xltx" 
+               or extensionA == ".xltm" 
+               or extensionA == ".xls"):
+                dataWB = opxl.load_workbook(excel_file, data_only=True)
+
+                data = dataWB.worksheets[0]
+
+                # print(data.cell(4,2).value)
+
+                # Se leen los datos del excel
+                edoFuerza = []
+                auxL = []
+            
+                i = 1
+                while not(i == 0):
+
+                    auxL.clear()
+
+                    if(data.cell(i+2,1).value == None):
+                        i = 0
+                        # print(edoFuerza)
+                    else:
+                        for x in range(1, 14, 1):
+                            
+                            ax = data.cell(i+2, x).value
+                            
+                            if(x == 13):
+                                if(ax == "CECO RIO BRAVO"):
+                                    auxL.append(1)
+                                elif(ax == "CECO SUCHIATE"):
+                                    auxL.append(2)
+                                else:
+                                    auxL.append(3)
+                            else:
+                                if(ax == None or ax == "N/A"):
+                                    auxL.append("0")
+                                else:
+                                    auxL.append(ax)
+
+                        edoFuerza.append(auxL[:])
+                        i+=1
+                #-----------------------------------
+
+                #Verificar si la lista esta vacia para no guardar información
+                if(bool(edoFuerza)):
+
+                    # print(edoFuerza)
+
+                    #Eliminar todos los registros de Paises
+                    EstadoFuerza.objects.all().delete()
+                    #------------------------
+
+                    # Se agrega a la DB los paises y se crea un string de ellos
+                    edoFuerzaStr = "{"    
+                    for num, fuerzaP in enumerate(edoFuerza):
+                        
+                        edoFuerzaStr += "\n\t"
+                        
+                        edoFuerzaStr += f"{fuerzaP}"
+                        
+                        textoC, lat, lon = convertirU(fuerzaP[5])
+
+                        EstadoFuerza.objects.create(
+                            idEdoFuerza = num + 1 ,
+                            oficinaR = str(fuerzaP[0]),
+                            numPunto = int(str(fuerzaP[1])),
+                            nomPuntoRevision = str(fuerzaP[2]),
+                            tipoP = str(fuerzaP[3]),
+                            ubicacion = str(fuerzaP[4]),
+                            coordenadasTexto = textoC,
+                            latitud = float(lat),
+                            longitud = float(lon),
+                            personalINM = int(str(fuerzaP[6])),
+                            personalSEDENA = int(str(fuerzaP[7])),
+                            personalMarina = int(str(fuerzaP[8])),
+                            personalGuardiaN = int(str(fuerzaP[9])),
+                            personalOTROS = int(str(fuerzaP[10])),
+                            vehiculos = int(str(fuerzaP[11])),
+                            seccion = int(str(fuerzaP[12])),
+                            )
+                        # print(nac)
+                    edoFuerzaStr += "\n}" 
+                    #----------------------------
+
+                    # pasar string de las nacionalidades 
+                    # print(edoFuerzaStr) 
+                    #------------------------
+            # return HttpResponseRedirect("/info/cargarFuerza")
+            return redirect("pagina_pruebas_edoFuerza")
+    else:
+        form = CargarArchivoForm()
+    return render(request, "cargarExcel/cargarArchivoFuerza.html", {"form" : form})
+
+
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
+@csrf_exempt
+def cargarMunicipios(request):
+    if(request.method == "POST"):
+        form = CargarArchivoForm(request.POST, request.FILES)
+        if(form.is_valid()):
+            # Nota: "archivo" este campo se llama como se llama en el form  
+            excel_file = request.FILES["archivo"]
+            nombreA = str(excel_file.name)
+            extensionA = (nombreA.split(".")[-1]).lower()
+            # print((nombreA.split(".")[-1]).lower())
+            if( extensionA == "xlsx" 
+               or extensionA == ".xlsm" 
+               or extensionA == ".xlsb" 
+               or extensionA == ".xltx" 
+               or extensionA == ".xltm" 
+               or extensionA == ".xls"):
+                dataWB = opxl.load_workbook(excel_file, data_only=True)
+
+                data = dataWB.worksheets[0]
+
+                # print(data.cell(4,2).value)
+
+                # Se leen los datos del excel
+                municipio = []
+                auxL = []
+            
+                i = 1
+                while not(i == 0):
+
+                    auxL.clear()
+
+                    if(data.cell( i+4, 4).value == None):
+                        i = 0
+                        # print(edoFuerza)
+                    else:
+                        edo = data.cell(i + 3, 4).value
+                        edoAbrev = data.cell(i + 4, 4).value
+                        nomMun = data.cell(i + 4, 6).value
+
+                        abrevMayus = ((edoAbrev.upper()).replace(".","")).replace(" ","")
+
+                        if(abrevMayus == "AGS"):
+                            edo = "AGUASCALIENTES"
+                        elif(abrevMayus == "BC"):
+                            edo = "BAJA CALIFORNIA"
+                        elif(abrevMayus == "BCS"):
+                            edo = "BAJA CALIFORNIA SUR"
+                        elif(abrevMayus == "CAMP"):
+                            edo = "CAMPECHE"
+                        elif(abrevMayus == "CDMX"):
+                            edo = "CDMX"
+                        elif(abrevMayus == "CHIH"):
+                            edo = "CHIHUAHUA"
+                        elif(abrevMayus == "CHIS"):
+                            edo = "CHIAPAS"
+                        elif(abrevMayus == "COAH"):
+                            edo = "COAHUILA"
+                        elif(abrevMayus == "COL"):
+                            edo = "COLIMA"
+                        elif(abrevMayus == "DGO"):
+                            edo = "DURANGO"
+                        elif(abrevMayus == "GRO"):
+                            edo = "GUERRERO"
+                        elif(abrevMayus == "GTO"):
+                            edo = "GUANAJUATO"
+                        elif(abrevMayus == "HGO"):
+                            edo = "HIDALGO"
+                        elif(abrevMayus == "JAL"):
+                            edo = "JALISCO"
+                        elif(abrevMayus == "MEX"):
+                            edo = "EDOMEX"
+                        elif(abrevMayus == "MICH"):
+                            edo = "MICHOACÁN"
+                        elif(abrevMayus == "MOR"):
+                            edo = "MORELOS"
+                        elif(abrevMayus == "NAY"):
+                            edo = "NAYARIT"
+                        elif(abrevMayus == "NL"):
+                            edo = "NUEVO LEÓN"
+                        elif(abrevMayus == "OAX"):
+                            edo = "OAXACA"
+                        elif(abrevMayus == "PUE"):
+                            edo = "PUEBLA"
+                        elif(abrevMayus == "QROO"):
+                            edo = "QUINTANA ROO"
+                        elif(abrevMayus == "QRO"):
+                            edo = "QUERÉTARO"
+                        elif(abrevMayus == "SIN"):
+                            edo = "SINALOA"
+                        elif(abrevMayus == "SLP"):
+                            edo = "SAN LUIS POTOSÍ"
+                        elif(abrevMayus == "SON"):
+                            edo = "SONORA"
+                        elif(abrevMayus == "TAB"):
+                            edo = "TABASCO"
+                        elif(abrevMayus == "TAMPS"):
+                            edo = "TAMAULIPAS"
+                        elif(abrevMayus == "TLAX"):
+                            edo = "TLAXCALA"
+                        elif(abrevMayus == "VER"):
+                            edo = "VERACRUZ"
+                        elif(abrevMayus == "YUC"):
+                            edo = "YUCATÁN"
+                        elif(abrevMayus == "ZAC"):
+                            edo = "ZACATECAS"
+                        else:
+                            edo = ""
+                        
+                        municipio.append([edo, abrevMayus, nomMun])
+
+                        i+=1
+                #-----------------------------------
+
+                #Verificar si la lista esta vacia para no guardar información
+                if(bool(municipio)):
+
+                    # print(edoFuerza)
+
+                    #Eliminar todos los registros de Paises
+                    Municipios.objects.all().delete()
+                    #------------------------
+
+                    # Se agrega a la DB los paises y se crea un string de ellos
+                    municipioStr = "{"    
+                    for num, fuerzaP in enumerate(municipio):
+                        
+                        municipioStr += "\n\t"
+                        
+                        municipioStr += f"{fuerzaP}"
+
+                        Municipios.objects.create(
+                            idMunicipio = num + 1 ,
+                            estado = str(fuerzaP[0]),
+                            estadoAbr = str(fuerzaP[1]),
+                            nomMunicipio = str(fuerzaP[2]),
+                            )
+                        # print(nac)
+                    municipioStr += "\n}" 
+
+                    # print("\n\nmunicipios")
+                    # datosMun = Municipios.objects.values('estadoAbr').order_by('estadoAbr').distinct() 
+                    # for x in datosMun:
+                    #     print(x)
+
+                    # print("\n\nOrs")
+                    # datosOr = EstadoFuerza.objects.values('oficinaR').order_by('oficinaR').distinct() 
+                    # for x in datosOr:
+                    #     print(x)
+                    #----------------------------
+
+                    # pasar string de las nacionalidades 
+                    # print(edoFuerzaStr) 
+                    #------------------------
+            return redirect("dashboard")
+    else:
+        form = CargarArchivoForm()
+    return render(request, "cargarExcel/cargarArchivoMunicipios.html", {"form" : form})
+
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
+@csrf_exempt
+def cargarInadmitidos(request):
+    if(request.method == "POST"):
+        form = CargarArchivoForm(request.POST, request.FILES)
+        if(form.is_valid()):
+            excel_file = request.FILES["archivo"]
+            nombreA = str(excel_file.name)
+            extensionA = (nombreA.split(".")[-1]).lower()
+            if( extensionA in ["xlsx", "xlsm", "xlsb", "xltx", "xltm", "xls"]):
+                dataWB = opxl.load_workbook(excel_file, data_only=True)
+                data = dataWB.worksheets[0]
+
+                i = 2
+                while True:
+                    cell_val = data.cell(i, 1).value
+                    if cell_val is None:
+                        break
+
+                    try:
+                        raw_fecha = data.cell(i, 1).value
+                        raw_hora = data.cell(i, 2).value
+                        puntoIn = str(data.cell(i, 3).value or "").strip().upper()
+                        nacionalidad = str(data.cell(i, 4).value or "").strip().upper()
+                        nombre = str(data.cell(i, 5).value or "").strip().upper()
+                        raw_nacimiento = data.cell(i, 6).value
+                        raw_sexo = str(data.cell(i, 7).value or "").strip().upper()
+                        raw_edad = data.cell(i, 8).value
+                        oficina = str(data.cell(i, 9).value or "").strip().upper()
+
+                        # Parse Fecha
+                        if isinstance(raw_fecha, (datetime, date)):
+                            fecha_obj = raw_fecha if isinstance(raw_fecha, date) else raw_fecha.date()
+                        else:
+                            fecha_str = str(raw_fecha).split(" ")[0]
+                            fecha_obj = datetime.strptime(fecha_str, "%Y-%m-%d").date()
+
+                        # Parse Hora
+                        if isinstance(raw_hora, time):
+                            hora_obj = raw_hora
+                        elif isinstance(raw_hora, datetime):
+                            hora_obj = raw_hora.time()
+                        else:
+                            hora_str = str(raw_hora).strip()
+                            if len(hora_str.split(":")) == 2:
+                                hora_obj = datetime.strptime(hora_str, "%H:%M").time()
+                            else:
+                                hora_obj = datetime.strptime(hora_str, "%H:%M:%S").time()
+
+                        fecha_hora = datetime.combine(fecha_obj, hora_obj)
+
+                        # Parse Nacimiento
+                        if isinstance(raw_nacimiento, (datetime, date)):
+                            nacimiento = raw_nacimiento if isinstance(raw_nacimiento, date) else raw_nacimiento.date()
+                        else:
+                            nac_str = str(raw_nacimiento).split(" ")[0]
+                            nacimiento = datetime.strptime(nac_str, "%Y-%m-%d").date()
+
+                        # Genero
+                        genero = "H" if raw_sexo in ["H", "HOMBRE"] else ("M" if raw_sexo in ["M", "MUJER"] else "X")
+
+                        # Edad
+                        edad = int(raw_edad) if raw_edad is not None else None
+
+                        Inadmitido.objects.create(
+                            fecha_hora=fecha_hora,
+                            oficina=oficina,
+                            puntoInter=puntoIn,
+                            nac=nacionalidad,
+                            nombreCompleto=nombre,
+                            nacimiento=nacimiento,
+                            genero=genero,
+                            edad=edad
+                        )
+                    except Exception as e:
+                        print(f"Error procesando fila {i} de Inadmitidos: {e}")
+
+                    i += 1
+
+    return redirect("dashboard")
+
+@login_required
+@csrf_exempt
+def generarExcelInadmitidos(request):
+    if request.method == "POST":
+        fechaI = request.POST.get("fechaInicio")
+        fechaF = request.POST.get("fechaFin")
+
+        if not fechaI or not fechaF:
+            return redirect("dashboard")
+
+        fechaIN = datetime.strptime(fechaI, "%Y-%m-%d")
+        fechaFN = datetime.strptime(fechaF, "%Y-%m-%d") + timedelta(days=1) - timedelta(seconds=1)
+
+        valores = Inadmitido.objects.filter(fecha_hora__range=(fechaIN, fechaFN)).order_by("fecha_hora")
+        if not request.user.is_superuser:
+            user_profile = getattr(request.user, "usuarioL", None)
+            user_ofi = user_profile.oficinaR if user_profile else None
+            valores = valores.filter(oficina=user_ofi)
+
+        workbook = opxl.Workbook()
+        worksheet = workbook.active
+        worksheet.title = "Inadmitidos"
+
+        # Encabezados
+        headers = ["Fecha", "Hora", "Punto de internacion", "Pais", "Nombre completo", "Fecha de nacimiento", "Sexo", "Edad", "OR"]
+        worksheet.append(headers)
+
+        for v in valores:
+            sexo_str = "Hombre" if v.genero == "H" else ("Mujer" if v.genero == "M" else "No especificado")
+            worksheet.append([
+                v.fecha_hora.strftime("%Y-%m-%d"),
+                v.fecha_hora.strftime("%H:%M:%S"),
+                v.puntoInter,
+                v.nac,
+                v.nombreCompleto,
+                v.nacimiento.strftime("%Y-%m-%d") if v.nacimiento else "",
+                sexo_str,
+                v.edad,
+                v.oficina
+            ])
+
+        response = HttpResponse(content=save_virtual_workbook(workbook), content_type='application/vnd.ms-excel')
+        response['Content-Disposition'] = f'attachment; filename="Inadmitidos_{fechaI}_a_{fechaF}.xlsx"'
+        return response
+
+    return redirect("dashboard")
+
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
+@csrf_exempt
+def cargaMasivaUser(request):
+    if(request.method == "POST"):
+        form = CargarArchivoForm(request.POST, request.FILES)
+        if(form.is_valid()):
+            # Nota: "archivo" este campo se llama como se llama en el form  
+            excel_file = request.FILES["archivo"]
+            nombreA = str(excel_file.name)
+            extensionA = (nombreA.split(".")[-1]).lower()
+            # print((nombreA.split(".")[-1]).lower())
+            if( extensionA == "xlsx" 
+               or extensionA == ".xlsm" 
+               or extensionA == ".xlsb" 
+               or extensionA == ".xltx" 
+               or extensionA == ".xltm" 
+               or extensionA == ".xls"):
+                dataWB = opxl.load_workbook(excel_file, data_only=True)
+
+                data = dataWB.worksheets[0]
+
+                # print(data.cell(4,2).value)
+
+                # Se leen los datos del excel
+                municipio = []
+                auxL = []
+            
+                i = 1
+                while not(i == 0):
+
+                    auxL.clear()
+
+                    if(data.cell( i+4, 4).value == None):
+                        i = 0
+                        # print(edoFuerza)
+                    else:
+                        nickname = data.cell(i + 4, 2).value
+                        password = data.cell(i + 4, 3).value
+                        nombres = data.cell(i + 4, 4).value
+                        apellidos = data.cell(i + 4, 5).value
+                        estado = data.cell(i + 4, 6).value
+                        tipo = data.cell(i + 4, 7).value
+                        tipoD = data.cell(i + 4, 8).value
+
+                        if tipoD == "a" or tipoD == 'A':
+                            dispo = '1'
+                        elif tipoD == "i" or tipoD == 'I':
+                            dispo = '2'
+                        else: 
+                            dispo = '3'
+
+                        raw_pass = str(password) if password is not None else ""
+                        encrypted_str_pass = encrypt_str_pass(raw_pass)
+
+                        if (Usuario.objects.filter(nickname = nickname).exists()):
+                            passUpdate = make_password(raw_pass)
+                            Usuario.objects.filter(nickname = nickname).update(
+                                nombre=nombres, apellido=apellidos, password=passUpdate, estado=estado, 
+                                str_pass=encrypted_str_pass,
+                                tipo_disp=dispo,
+                                )
+                        else:
+                            Usuario.objects.create(
+                                nickname=nickname, 
+                                nombre=nombres, 
+                                apellido=apellidos, 
+                                password=raw_pass,
+                                estado=estado,
+                                tipo=tipo,
+                                str_pass=encrypted_str_pass,
+                                tipo_disp=dispo,
+                            )
+                        i = i + 1
+
+                #-----------------------------------
+            return redirect("pagina_pruebas_usuarios")
+    else:
+        form = CargarArchivoForm()
+    return render(request, "cargarExcel/cargarUsuarios.html", {"form" : form})
+
+
+
+@csrf_exempt
+def insert_rescates(request):
+    if request.method == 'POST':
+        datos_recibidos = JSONParser().parse(request)
+        datos_serializados = RescatePuntoSerializer(data=datos_recibidos, many=True)
+        if datos_serializados.is_valid():
+            datos_serializados.save()
+
+            # print(datos)
+            dataR = {
+                'guardado' : "ok"
+            }
+            return JsonResponse(dataR, status = 200)
+            
+        else:
+            print(datos_serializados.data)
+            datos_serializados.is_valid
+            print(datos_serializados.errors)
+            dataR = {
+                'guardado' : "error"
+            }
+            return JsonResponse( dataR, status = 200)
+
+@csrf_exempt
+def insert_conteo(request):
+
+    if request.method == 'POST':
+        datos_recibidos = JSONParser().parse(request)
+        datos_serializados = ConteoRapidoSerializer(data=datos_recibidos, many=True)
+        if datos_serializados.is_valid():
+            datos_serializados.save()
+            # print(datos)
+            dataR = {
+                'guardado' : "ok"
+            }
+            return JsonResponse(dataR, status = 200)
+            
+        else:
+            # print(datos_serializados.data)
+            # datos_serializados.is_valid
+            # print(datos_serializados.errors)
+            dataR = {
+                'guardado' : "error"
+            }
+            return JsonResponse( dataR, status = 200)
+        
+@csrf_exempt
+def insert_disuadidos(request):
+    if request.method == 'POST':
+        datos_recibidos = JSONParser().parse(request)
+        datos_serializados = ConteoDisuadidosSerializer(data=datos_recibidos, many=True)
+        if datos_serializados.is_valid():
+            datos_serializados.save()
+            # print(datos)
+            dataR = {
+                'guardado' : "ok"
+            }
+            return JsonResponse(dataR, status = 200)
+            
+        else:
+            # print(datos_serializados.data)
+            # datos_serializados.is_valid
+            # print(datos_serializados.errors)
+            dataR = {
+                'guardado' : "error"
+            }
+            return JsonResponse(dataR, status = 400)
+
+@csrf_exempt
+def msgUpdateUrl(request):
+    if request.method == 'GET':
+        snippets = MsgUpdate.objects.last()
+        serializer = MsgUpdateGetSerializer(snippets, many=False)
+        return JsonResponse(serializer.data, safe=False)
+
+@csrf_exempt
+def validacionL(request):
+    if request.method == 'GET':
+        servidor_info = ValidacionServidor.objects.filter(activo=True).last()
+        if not servidor_info:
+            servidor_info = ValidacionServidor.objects.last()
+        if servidor_info:
+            serializer = ValidacionServidorGetSerializer(servidor_info, many=False)
+            return JsonResponse(serializer.data, safe=False, status=200)
+        else:
+            return JsonResponse({"error": "No hay información de servidor disponible"}, status=404)
+    return JsonResponse({"error": "Método no permitido"}, status=405)
+
+@csrf_exempt
+def infoPaises(request):
+    if request.method == 'GET':
+        snippets = Paises.objects.all()
+        serializer = PaisesGetSerializer(snippets, many=True)
+        return JsonResponse(serializer.data, safe=False)
+
+@csrf_exempt
+def infoMunicipios(request):
+    if request.method == "GET":                                                                                                                                  
+        # 1. Definimos la lista con el orden deseado de los estados                                                                                              
+        custom_order = [                                                                                                                                         
+            "AGUASCALIENTES",                                                                                                                                    
+            "BAJA CALIFORNIA",                                                                                                                                   
+            "BAJA CALIFORNIA SUR",                                                                                                                               
+            "CAMPECHE",                                                                                                                                          
+            "COAHUILA",                                                                                                                                          
+            "COLIMA",                                                                                                                                            
+            "CHIAPAS",                                                                                                                                           
+            "CHIHUAHUA",                                                                                                                                         
+            "CDMX",                                                                                                                                              
+            "DURANGO",                                                                                                                                           
+            "GUANAJUATO",                                                                                                                                        
+            "GUERRERO",                                                                                                                                          
+            "HIDALGO",                                                                                                                                           
+            "JALISCO",                                                                                                                                           
+            "EDOMEX",                                                                                                                                            
+            "MICHOACÁN",                                                                                                                                         
+            "MORELOS",                                                                                                                                           
+            "NAYARIT",                                                                                                                                           
+            "NUEVO LEÓN",                                                                                                                                        
+            "OAXACA",                                                                                                                                            
+            "PUEBLA",                                                                                                                                            
+            "QUERÉTARO",                                                                                                                                         
+            "QUINTANA ROO",                                                                                                                                      
+            "SAN LUIS POTOSÍ",                                                                                                                                   
+            "SINALOA",                                                                                                                                           
+            "SONORA",                                                                                                                                            
+            "TABASCO",                                                                                                                                           
+            "TAMAULIPAS",                                                                                                                                        
+            "TLAXCALA",                                                                                                                                          
+            "VERACRUZ",                                                                                                                                          
+            "YUCATÁN",                                                                                                                                           
+            "ZACATECAS",                                                                                                                                         
+        ]                                                                                                                                                        
+
+        # 2. Generamos las condiciones de ordenamiento para Django
+        preserved_order = [
+            When(estado=estado_name, then=Value(i))
+            for i, estado_name in enumerate(custom_order)
+        ]
+
+        # 3. Hacemos la consulta anotando el índice dinámico y ordenando por él
+        snippets = Municipios.objects.annotate(
+            order_index=Case(
+                *preserved_order,
+                default=Value(len(custom_order)),
+                output_field=IntegerField(),
+            )
+        ).order_by("order_index")
+
+        serializer = MunicipiosGetSerializer(snippets, many=True)
+        return JsonResponse(serializer.data, safe=False)
+    
+@csrf_exempt
+def infoPuntosInterna(request):
+    if request.method == 'GET':
+        snippets = PuntosInternacion.objects.all()
+        serializer = PuntosInterGetSerializer(snippets, many=True)
+        return JsonResponse(serializer.data, safe=False)
+    
+@csrf_exempt
+def infoEstadoFuerza(request):
+    if request.method == 'GET':
+        snippets = EstadoFuerza.objects.all()
+        serializer = EstadoFuerzaGetSerializer(snippets, many=True)
+        return JsonResponse(serializer.data, safe=False)
+    
+@csrf_exempt
+def infoFrases(request):
+    if request.method == 'GET':
+        snippets = Frases.objects.all()
+        serializer = FrasesGetSerializer(snippets, many=True)
+        return JsonResponse(serializer.data, safe=False)
+
+@login_required
+@csrf_exempt
+def get_rescates_json(request):
+    if request.method == 'GET':
+        fecha = request.GET.get('fecha')
+        oficinaR = request.GET.get('oficinaR')
+        
+        if not fecha or not oficinaR:
+            return JsonResponse({'error': 'Faltan parámetros'}, status=400)
+        
+        try:
+            # Convertir fecha de YYYY-MM-DD a dd-mm-yy que es como se guarda en la DB
+            fecha_dt = datetime.strptime(fecha, "%Y-%m-%d")
+            fecha_str = fecha_dt.strftime("%d-%m-%y")
+        except ValueError:
+            return JsonResponse({'error': 'Formato de fecha inválido'}, status=400)
+
+        if not request.user.is_superuser:
+            user_profile = getattr(request.user, 'usuarioL', None)
+            oficinaR = user_profile.oficinaR if user_profile else None
+
+        if request.user.is_superuser and oficinaR == "TODAS":
+            snippets = RescatePunto.objects.filter(fecha=fecha_str)
+        else: 
+            snippets = RescatePunto.objects.filter(fecha=fecha_str, oficinaRepre=oficinaR)
+
+
+        serializer = RescatePuntoSerializer(snippets, many=True)
+        return JsonResponse(serializer.data, safe=False)
+
+@csrf_exempt 
+def convertirU(coordenadas):
+    strCoor = str(coordenadas)
+    lat = float("0.0")
+    lon = float("0.0")
+    return strCoor, lat, lon
+
+
+@login_required
+@csrf_exempt
+def generarExcelNombres(request):
+    if(request.method == "POST"):
+        form = ExcelForm(request.POST)
+        if(form.is_valid()):
+            # print(request.POST)
+            # Nota: "archivo" este campo se llama como se llama en el form  
+            dia = request.POST["fechaDescarga_day"]
+            mes = request.POST["fechaDescarga_month"]
+            year = request.POST["fechaDescarga_year"]
+
+            fechaR = datetime.strptime(f"{dia}/{mes}/{year}", "%d/%m/%Y").strftime('%d-%m-%y')
+
+            valores = RescatePunto.objects.filter(fecha= fechaR)
+            if not request.user.is_superuser:
+                user_profile = getattr(request.user, 'usuarioL', None)
+                user_ofi = user_profile.oficinaR if user_profile else None
+                valores = valores.filter(oficinaRepre=user_ofi)
+            
+            workbook = opxl.load_workbook('tmp/dup.xlsm', read_only=False, keep_vba=True)
+            worksheet = workbook.active
+            
+            for valor in valores:
+                worksheet.append([valor.oficinaRepre, 
+                                 valor.fecha,
+                                 valor.hora,
+                                 valor.nombreAgente.upper(),
+                                 "1" if valor.aeropuerto else "",
+                                 "1" if valor.carretero else "",
+                                 valor.tipoVehic.upper(),
+                                 valor.lineaAutobus.upper(),
+                                 valor.numeroEcono.upper(),
+                                 valor.placas.upper(),
+                                 "1" if valor.vehiculoAseg else "",
+                                 "1" if valor.casaSeguridad else "",
+                                 "1" if valor.centralAutobus else "",
+                                 "1" if valor.ferrocarril else "",
+                                 valor.empresa,
+                                 "1" if valor.hotel else "",
+                                 valor.nombreHotel,
+                                 "1" if valor.puestosADispo else "",
+                                 "1" if valor.juezCalif else "",
+                                 "1" if valor.reclusorio else "",
+                                 "1" if valor.policiaFede else "",
+                                 "1" if valor.dif else "",
+                                 "1" if valor.policiaEsta else "",
+                                 "1" if valor.policiaMuni else "",
+                                 "1" if valor.guardiaNaci else "",
+                                 "1" if valor.fiscalia else "",
+                                 "1" if valor.otrasAuto else "",
+                                 "1" if valor.voluntarios else "",
+                                 "1" if valor.otro else "",
+                                 "1" if valor.presuntosDelincuentes else "",
+                                 valor.numPresuntosDelincuentes if valor.numPresuntosDelincuentes != 0 else "",
+                                 valor.municipio.upper(),
+                                 valor.puntoEstra.upper(),
+                                 valor.nacionalidad.upper(),
+                                 valor.iso3,
+                                 valor.nombre.upper(),
+                                 valor.apellidos.upper(),
+                                 valor.noIdentidad,
+                                 valor.parentesco.upper(),
+                                 valor.fechaNacimiento,
+                                 "Hombre" if valor.sexo else "Mujer",
+                                 "1" if valor.embarazo else "",
+                                 valor.numFamilia if valor.numFamilia != 0 else "",
+                                 valor.edad,
+                                 ])
+            
+            worksheet.append(['Rescates Totales: ', valores.count()])
+
+            response = HttpResponse(content = save_virtual_workbook(workbook), content_type='application/vnd.ms-excel.sheet.macroEnabled.12')
+            response['Content-Disposition'] = 'attachment; filename={fecha}.xlsm'.format(fecha = fechaR)
+
+            return response
+    else:
+        form = ExcelForm()
+    return render(request, "generarExcel/generarArchivoExcelNombres.html", {"form" : form})
+
+
+@login_required
+@csrf_exempt
+def generarExcelConteo(request):
+    if(request.method == "POST"):
+        form = ExcelForm(request.POST)
+        print("entro")
+        if(form.is_valid()):
+            # print(request.POST)
+            # Nota: "archivo" este campo se llama como se llama en el form  
+            dia = request.POST["fechaDescarga_day"]
+            mes = request.POST["fechaDescarga_month"]
+            year = request.POST["fechaDescarga_year"]
+
+            fechaR = datetime.strptime(f"{dia}/{mes}/{year}", "%d/%m/%Y").strftime('%d-%m-%y')
+
+            valores = ConteoRapidoPunto.objects.filter(fecha= fechaR)
+            if not request.user.is_superuser:
+                user_profile = getattr(request.user, 'usuarioL', None)
+                user_ofi = user_profile.oficinaR if user_profile else None
+                valores = valores.filter(oficinaRepre=user_ofi)
+            
+            workbook = opxl.load_workbook('tmp/dup.xlsm', read_only=False, keep_vba=True)
+            worksheet = workbook.active
+
+            for valor in valores:
+                masivoD = (valor.AS_hombres + valor.AS_mujeresNoEmb +valor.AS_mujeresEmb +
+                           valor.AA_hombres + valor.AA_mujeresNoEmb + valor.AA_mujeresEmb +
+                           valor.NNA_A_hombres + valor.NNA_A_mujeresNoEmb + valor.NNA_A_mujeresEmb +
+                           valor.NNA_S_hombres + valor.NNA_S_mujeresNoEmb + valor.NNA_S_mujeresEmb
+                           )
+                worksheet.append([valor.oficinaRepre, 
+                                 valor.fecha,
+                                 valor.hora,
+                                 valor.nombreAgente.upper(),
+                                 "1" if valor.aeropuerto else "",
+                                 "1" if valor.carretero else "",
+                                 valor.tipoVehic.upper(),
+                                 valor.lineaAutobus.upper(),
+                                 valor.numeroEcono.upper(),
+                                 valor.placas.upper(),
+                                 "1" if valor.vehiculoAseg else "",
+                                 "1" if valor.casaSeguridad else "",
+                                 "1" if valor.centralAutobus else "",
+                                 "1" if valor.ferrocarril else "",
+                                 valor.empresa,
+                                 "1" if valor.hotel else "",
+                                 valor.nombreHotel,
+                                 "1" if valor.puestosADispo else "",
+                                 "1" if valor.juezCalif else "",
+                                 "1" if valor.reclusorio else "",
+                                 "1" if valor.policiaFede else "",
+                                 "1" if valor.dif else "",
+                                 "1" if valor.policiaEsta else "",
+                                 "1" if valor.policiaMuni else "",
+                                 "1" if valor.guardiaNaci else "",
+                                 "1" if valor.fiscalia else "",
+                                 "1" if valor.otrasAuto else "",
+                                 "1" if valor.voluntarios else "",
+                                 "1" if valor.otro else "",
+                                 "1" if valor.presuntosDelincuentes else "",
+                                 valor.numPresuntosDelincuentes if valor.numPresuntosDelincuentes != 0 else "",
+                                 valor.municipio.upper(),
+                                 valor.puntoEstra.upper(),
+                                 valor.nacionalidad.upper(),
+                                 valor.iso3,
+
+                                 valor.AS_hombres,
+                                 valor.AS_mujeresNoEmb,
+                                 valor.AS_mujeresEmb,
+
+                                 valor.nucleosFamiliares,
+                                 valor.AA_hombres,
+                                 valor.AA_mujeresNoEmb,
+                                 valor.AA_mujeresEmb,
+                                 valor.NNA_A_hombres,
+                                 valor.NNA_A_mujeresNoEmb,
+                                 valor.NNA_A_mujeresEmb,
+
+                                 valor.NNA_S_hombres,
+                                 valor.NNA_S_mujeresNoEmb,
+                                 valor.NNA_S_mujeresEmb,
+
+                                 "1" if masivoD >= 40 else "",
+                                 ])
+            
+            response = HttpResponse(content = save_virtual_workbook(workbook), content_type='application/vnd.ms-excel.sheet.macroEnabled.12')
+            response['Content-Disposition'] = 'attachment; filename=rapido {fecha}.xlsm'.format(fecha = fechaR)
+            return response
+    else:
+        form = ExcelForm()
+    return render(request, "generarExcel/generarArchivoExcelConteo.html", {"form" : form})
+
+
+@login_required
+def servirApps(request):
+    return render(request, "descargas/descargar_Apps.html", {
+
+    })
+
+@csrf_exempt
+def downloadAPK(request):
+    if request.method == 'GET':
+        apk_path = os.path.join(settings.MEDIA_ROOT, 'ruie.apk')
+
+        try:
+            with open(apk_path, 'rb') as appAndroid:
+                response = HttpResponse(appAndroid, content_type="application/vnd.android.package-archive")
+                response["Content-Disposition"] = "attachment; filename=ruie.apk"
+                return response
+        except FileNotFoundError:
+            return HttpResponse("File not found.", status=404)
+    
+@login_required
+@csrf_exempt
+def pagDuplicados(request):
+    if request.method == 'GET':
+        return render(request, "descargas/descargar_duplicados.html", {})
+        
+# @csrf_exempt
+# def downloadDuplicados(request):
+#     if request.method == 'GET':
+
+#         workbook = opxl.load_workbook('tmp/rec.xlsm', read_only=False, keep_vba=True)
+#         worksheet = workbook.active
+
+#         fechaR = datetime.today().strftime('%d-%m-%y')
+        
+#         # duplicados = RescatePunto.objects.all()
+
+#         register3 = RescatePunto.objects.values("iso3", "nombre", "apellidos", "fechaNacimiento").annotate(records=Count("*")).filter(records__gt=1)
+#         duplicados = []
+#         for reg in register3:
+#             for registro in RescatePunto.objects.filter(iso3=reg['iso3'], nombre=reg['nombre'], apellidos = reg['apellidos'], fechaNacimiento=reg['fechaNacimiento']):
+#                 duplicados.append(registro)
+                
+#         for valor in duplicados:
+#             puntoR = ""
+#             if valor.aeropuerto:
+#                 puntoR = 'aeropuerto'
+#             elif valor.carretero:
+#                 puntoR = 'carretero'
+#             elif valor.centralAutobus:
+#                 puntoR = 'central de autobus'
+#             elif valor.casaSeguridad:
+#                 puntoR = 'casa de seguridad'
+#             elif valor.ferrocarril:
+#                 puntoR = 'ferrocarril'
+#             elif valor.hotel:
+#                 puntoR = 'hotel'
+#             elif valor.puestosADispo:
+#                 puntoR = 'puestos a disposicion'
+#             elif valor.voluntarios:
+#                 puntoR = 'voluntarios'
+#             else: 
+#                 puntoR = ''
+#             worksheet.append([valor.oficinaRepre, 
+#                               valor.fecha,
+#                               valor.hora,
+#                               valor.nombreAgente.upper(),
+#                               puntoR.upper(),
+#                               valor.puntoEstra.upper(),
+#                               valor.nacionalidad.upper(),
+#                               valor.iso3,
+#                               valor.nombre.upper(),
+#                               valor.apellidos.upper(),
+#                               valor.parentesco.upper(),
+#                               valor.fechaNacimiento,
+#                               valor.edad,
+#                               "Hombre" if valor.sexo else "Mujer",
+#                               "1" if valor.embarazo else "",
+#                               valor.numFamilia if valor.numFamilia != 0 else "",
+#                               ])
+            
+#         worksheet['F1'] = 'Total Registros'
+#         worksheet['G1'] = str(RescatePunto.objects.count())
+
+#         response = HttpResponse(content = save_virtual_workbook(workbook), content_type='application/vnd.ms-excel.sheet.macroEnabled.12')
+#         response['Content-Disposition'] = 'attachment; filename=Reincidentes_a_{fecha}.xlsm'.format(fecha = fechaR)
+
+#         return response
+
+
+@login_required
+@csrf_exempt
+def generarExcelTab(request):
+    if(request.method == "POST"):
+        form = ExcelFormOr(request.POST)
+        if(form.is_valid()):
+            dia = request.POST["fechaDescarga_day"]
+            mes = request.POST["fechaDescarga_month"]
+            year = request.POST["fechaDescarga_year"]
+
+            fechaR = datetime.strptime(f"{dia}/{mes}/{year}", "%d/%m/%Y").strftime('%d-%m-%y')
+
+            if not request.user.is_superuser:
+                user_profile = getattr(request.user, 'usuarioL', None)
+                user_ofi = user_profile.oficinaR if user_profile else None
+                if user_ofi != "TABASCO":
+                    return render(request, "base/error404.html")
+
+            valores = RescatePunto.objects.filter(fecha= fechaR).filter( oficinaRepre="TABASCO")
+            
+            workbook = opxl.load_workbook('tmp/dup.xlsm', read_only=False, keep_vba=True)
+            worksheet = workbook.active
+            
+            for valor in valores:
+                worksheet.append([valor.oficinaRepre, 
+                                 valor.fecha,
+                                 valor.hora,
+                                 valor.nombreAgente.upper(),
+                                 "1" if valor.aeropuerto else "",
+                                 "1" if valor.carretero else "",
+                                 valor.tipoVehic.upper(),
+                                 valor.lineaAutobus.upper(),
+                                 valor.numeroEcono.upper(),
+                                 valor.placas.upper(),
+                                 "1" if valor.vehiculoAseg else "",
+                                 "1" if valor.casaSeguridad else "",
+                                 "1" if valor.centralAutobus else "",
+                                 "1" if valor.ferrocarril else "",
+                                 valor.empresa,
+                                 "1" if valor.hotel else "",
+                                 valor.nombreHotel,
+                                 "1" if valor.puestosADispo else "",
+                                 "1" if valor.juezCalif else "",
+                                 "1" if valor.reclusorio else "",
+                                 "1" if valor.policiaFede else "",
+                                 "1" if valor.dif else "",
+                                 "1" if valor.policiaEsta else "",
+                                 "1" if valor.policiaMuni else "",
+                                 "1" if valor.guardiaNaci else "",
+                                 "1" if valor.fiscalia else "",
+                                 "1" if valor.otrasAuto else "",
+                                 "1" if valor.voluntarios else "",
+                                 "1" if valor.otro else "",
+                                 "1" if valor.presuntosDelincuentes else "",
+                                 valor.numPresuntosDelincuentes if valor.numPresuntosDelincuentes != 0 else "",
+                                 valor.municipio.upper(),
+                                 valor.puntoEstra.upper(),
+                                 valor.nacionalidad.upper(),
+                                 valor.iso3,
+                                 valor.nombre.upper(),
+                                 valor.apellidos.upper(),
+                                 valor.noIdentidad,
+                                 valor.parentesco.upper(),
+                                 valor.fechaNacimiento,
+                                 "Hombre" if valor.sexo else "Mujer",
+                                 "1" if valor.embarazo else "",
+                                 valor.numFamilia if valor.numFamilia != 0 else "",
+                                 valor.edad,
+                                 ])
+            
+            worksheet.append(['Rescates Totales: ', valores.count()])
+
+            response = HttpResponse(content = save_virtual_workbook(workbook), content_type='application/vnd.ms-excel.sheet.macroEnabled.12')
+            response['Content-Disposition'] = 'attachment; filename={fecha}.xlsm'.format(fecha = fechaR)
+
+            return response
+    else:
+        form = ExcelFormOr()
+    return render(request, "generarExcel/generarArchivoExcelOrs.html", {"form" : form})
+
+@login_required
+@csrf_exempt
+def generarExcelORs(request):
+    if(request.method == "POST"):
+        form = ExcelFormOrs(request.POST)
+        fechaR = request.POST["fechaDescarga"]
+
+        if request.user.is_superuser:
+            valores = RescatePunto.objects.filter(fecha= fechaR)
+            oficinaR="Registros_ORs"
+        else:
+            user_profile = getattr(request.user, 'usuarioL', None)
+            oficinaR = user_profile.oficinaR if user_profile else None
+            # fechaR = datetime.datetime.strptime(f"{dia}/{mes}/{year}", "%d/%m/%Y").strftime('%d-%m-%y')
+            # fechaR = datetime.datetime.strptime(f"{fechaFun}", "%d/%m/%Y").strftime('%d-%m-%y')
+
+            valores = RescatePunto.objects.filter(fecha= fechaR).filter( oficinaRepre=oficinaR)
+        
+        
+        workbook = opxl.load_workbook('tmp/dup.xlsm', read_only=False, keep_vba=True)
+        worksheet = workbook.active
+            
+        for valor in valores:
+            worksheet.append([valor.oficinaRepre, 
+                                valor.fecha,
+                                valor.hora,
+                                valor.nombreAgente.upper(),
+                                "1" if valor.aeropuerto else "",
+                                "1" if valor.carretero else "",
+                                valor.tipoVehic.upper(),
+                                valor.lineaAutobus.upper(),
+                                valor.numeroEcono.upper(),
+                                valor.placas.upper(),
+                                "1" if valor.vehiculoAseg else "",
+                                "1" if valor.casaSeguridad else "",
+                                "1" if valor.centralAutobus else "",
+                                "1" if valor.ferrocarril else "",
+                                valor.empresa,
+                                "1" if valor.hotel else "",
+                                valor.nombreHotel,
+                                "1" if valor.puestosADispo else "",
+                                "1" if valor.juezCalif else "",
+                                "1" if valor.reclusorio else "",
+                                "1" if valor.policiaFede else "",
+                                "1" if valor.dif else "",
+                                "1" if valor.policiaEsta else "",
+                                "1" if valor.policiaMuni else "",
+                                "1" if valor.guardiaNaci else "",
+                                "1" if valor.fiscalia else "",
+                                "1" if valor.otrasAuto else "",
+                                "1" if valor.voluntarios else "",
+                                "1" if valor.otro else "",
+                                "1" if valor.presuntosDelincuentes else "",
+                                valor.numPresuntosDelincuentes if valor.numPresuntosDelincuentes != 0 else "",
+                                valor.municipio.upper(),
+                                valor.puntoEstra.upper(),
+                                valor.nacionalidad.upper(),
+                                valor.iso3,
+                                valor.nombre.upper(),
+                                valor.apellidos.upper(),
+                                valor.noIdentidad,
+                                valor.parentesco.upper(),
+                                valor.fechaNacimiento,
+                                "Hombre" if valor.sexo else "Mujer",
+                                "1" if valor.embarazo else "",
+                                valor.numFamilia if valor.numFamilia != 0 else "",
+                                valor.edad,
+                                ])
+        
+        worksheet.append(['Rescates Totales: ', valores.count()])
+        worksheet.append(['Oficina: ', oficinaR])
+
+        response = HttpResponse(content = save_virtual_workbook(workbook), content_type='application/vnd.ms-excel.sheet.macroEnabled.12')
+        response['Content-Disposition'] = 'attachment; filename={oficina}_{fecha}.xlsm'.format(fecha = fechaR, oficina=oficinaR)
+
+        return response
+    
+    else:
+        return render(request, "base/error404.html")
+
+
+@login_required
+@csrf_exempt
+def generarExcelEdoFuerza(request):
+    if(request.method == "POST"):
+
+        if request.user.is_superuser:
+                    valores = EstadoFuerza.objects.all().order_by('oficinaR')
+                    
+                    
+                    workbook = opxl.load_workbook('tmp/eF.xlsm', read_only=False, keep_vba=True)
+                    worksheet = workbook.active
+                        
+                    for valor in valores:
+                        worksheet.append([valor.oficinaR, 
+                                            valor.numPunto,
+                                            valor.nomPuntoRevision,
+                                            valor.tipoP,
+                                            valor.ubicacion,
+                                            valor.coordenadasTexto,
+                                            valor.latitud,
+                                            valor.longitud,
+                                            valor.personalINM,
+                                            valor.personalSEDENA,
+                                            valor.personalMarina,
+                                            valor.personalGuardiaN,
+                                            valor.personalOTROS,
+                                            valor.vehiculos,
+                                            valor.seccion
+                                            ])
+                
+                    response = HttpResponse(content = save_virtual_workbook(workbook), content_type='application/vnd.ms-excel.sheet.macroEnabled.12')
+                    response['Content-Disposition'] = 'attachment; filename=EdoFuerza.xlsm'
+
+                    return response
+        else:
+            return render(request, "base/error404.html")
+            
+    else:
+        return render(request, "base/error404.html")
+
+
+@login_required
+@csrf_exempt
+def generarExcelUsuarios(request):
+    if(request.method == "POST"):
+        if request.user.is_superuser:
+            valores = Usuario.objects.all().order_by("estado")
+            workbook = opxl.load_workbook('tmp/us.xlsm', read_only=False, keep_vba=True)
+            worksheet = workbook.active
+            # print(valores)
+            for valor in valores:
+                estado = ""
+                if valor.estado == '1':
+                    estado = "AGUASCALIENTES"
+                elif valor.estado == '2':
+                    estado = "BAJA CALIFORNIA"
+                elif valor.estado == '3':
+                    estado = "BAJA CALIFORNIA SUR"
+                elif valor.estado == '4':
+                    estado = "CAMPECHE"
+                elif valor.estado == '5':
+                    estado = "COAHUILA"
+                elif valor.estado == '6':
+                    estado = "COLIMA"
+                elif valor.estado == '7':
+                    estado = "CHIAPAS"
+                elif valor.estado == '8':
+                    estado = "CHIHUAHUA"
+                elif valor.estado == '9':
+                    estado = "CDMX"
+                elif valor.estado == '10':
+                    estado = "DURANGO"
+                elif valor.estado == '11':
+                    estado = "GUANAJUATO"
+                elif valor.estado == '12':
+                    estado = "GUERRERO"
+                elif valor.estado == '13':
+                    estado = "HIDALGO"
+                elif valor.estado == '14':
+                    estado = "JALISCO"
+                elif valor.estado == '15':
+                    estado = "EDOMEX"
+                elif valor.estado == '16':
+                    estado = "MICHOACÁN"
+                elif valor.estado == '17':
+                    estado = "MORELOS"
+                elif valor.estado == '18':
+                    estado = "NAYARIT"
+                elif valor.estado == '19':
+                    estado = "NUEVO LEÓN"
+                elif valor.estado == '20':
+                    estado = "OAXACA"
+                elif valor.estado == '21':
+                    estado = "PUEBLA"
+                elif valor.estado == '22':
+                    estado = "QUERÉTARO"
+                elif valor.estado == '23':
+                    estado = "QUINTANA ROO"
+                elif valor.estado == '24':
+                    estado = "SAN LUIS POTOSÍ"
+                elif valor.estado == '25':
+                    estado = "SINALOA"
+                elif valor.estado == '26':
+                    estado = "SONORA"
+                elif valor.estado == '27':
+                    estado = "TABASCO"
+                elif valor.estado == '28':
+                    estado = "TAMAULIPAS"
+                elif valor.estado == '29':
+                    estado = "TLAXCALA"
+                elif valor.estado == '30':
+                    estado = "VERACRUZ"
+                elif valor.estado == '31':
+                    estado = "YUCATÁN"
+                elif valor.estado == '32':
+                    estado = "ZACATECAS"
+
+                disposi = ""
+
+                if valor.tipo_disp == '1':
+                    disposi = "ANDROID"
+                elif valor.tipo_disp == '2':
+                    disposi = "IPHONE"
+                else:
+                    disposi = "OTRO"
+
+                worksheet.append([
+                    estado,
+                    valor.nickname,
+                    valor.nombre,
+                    valor.apellido,
+                    disposi,
+                ])
+
+
+            response = HttpResponse(content = save_virtual_workbook(workbook), content_type='application/vnd.ms-excel.sheet.macroEnabled.12')
+            response['Content-Disposition'] = 'attachment; filename=Usuarios.xlsm'
+            return response
+        else:
+            return render(request, "base/error404.html")
+    
+    else:
+        return render(request, "base/error404.html")
+
+
+@login_required
+@csrf_exempt
+def generarExcelPuntosI(request):
+    if(request.method == "POST"):
+        if request.user.is_superuser:
+            valores = PuntosInternacion.objects.all().order_by("estadoPunto")
+            workbook = opxl.load_workbook('tmp/pI.xlsm', read_only=False, keep_vba=True)
+            worksheet = workbook.active
+            # print(valores)
+            for valor in valores:
+                worksheet.append([
+                    valor.estadoPunto,
+                    valor.nombrePunto,
+                    valor.tipoPunto,
+                ])
+
+
+            response = HttpResponse(content = save_virtual_workbook(workbook), content_type='application/vnd.ms-excel.sheet.macroEnabled.12')
+            response['Content-Disposition'] = 'attachment; filename=PuntosInternacion.xlsm'
+            return response
+        else:
+            return render(request, "base/error404.html")
+    
+    else:
+        return render(request, "base/error404.html")
+
+
+
+
+
+
+
+
+
+@login_required
+@csrf_exempt    
+def generarExcelFechas(request):
+    if(request.method == "POST"):
+        # print(request.POST)
+        fechaI = request.POST["fechaInicio"]
+        
+        fechaF = request.POST["fechaFin"]
+
+        fechaIN = datetime.strptime(f"{fechaI}", "%Y-%m-%d")
+        fechaFN = datetime.strptime(f"{fechaF}", "%Y-%m-%d")
+
+        # fecha_inicio = datetime(2024, 1, 1)
+        # print(fecha_inicio)
+        print(fechaIN)
+
+        # fecha_inicio = datetime(yearI, mesI, diaI)
+        # fecha_fin = datetime(diaF, mesF, yearF)
+
+        array_fechas = [(fechaIN + timedelta(days=d)).strftime("%d-%m-%y") for d in range((fechaFN - fechaIN).days + 1)]
+
+        # array_fechas = [(fechaIN + timedelta(days=d)).strftime("%d-%m-%y") for d in range((fechaIN - fechaFN).days + 1)]
+
+        print(array_fechas)
+
+        valores = RescatePunto.objects.filter(fecha__in= array_fechas)
+        if not request.user.is_superuser:
+            user_profile = getattr(request.user, 'usuarioL', None)
+            user_ofi = user_profile.oficinaR if user_profile else None
+            valores = valores.filter(oficinaRepre=user_ofi)
+
+        # if request.user.is_superuser:
+        #     valores = valores = RescatePunto.objects.filter(fecha= fechaR)
+        # else:
+        #     oficinaR = request.POST["oficina"]
+        #     # fechaR = datetime.datetime.strptime(f"{dia}/{mes}/{year}", "%d/%m/%Y").strftime('%d-%m-%y')
+        #     # fechaR = datetime.datetime.strptime(f"{fechaFun}", "%d/%m/%Y").strftime('%d-%m-%y')
+        
+        workbook = opxl.load_workbook('tmp/dup.xlsm', read_only=False, keep_vba=True)
+        worksheet = workbook.active
+            
+        for valor in valores:
+            worksheet.append([valor.oficinaRepre, 
+                                valor.fecha,
+                                valor.hora,
+                                valor.nombreAgente.upper(),
+                                "1" if valor.aeropuerto else "",
+                                "1" if valor.carretero else "",
+                                valor.tipoVehic.upper(),
+                                valor.lineaAutobus.upper(),
+                                valor.numeroEcono.upper(),
+                                valor.placas.upper(),
+                                "1" if valor.vehiculoAseg else "",
+                                "1" if valor.casaSeguridad else "",
+                                "1" if valor.centralAutobus else "",
+                                "1" if valor.ferrocarril else "",
+                                valor.empresa,
+                                "1" if valor.hotel else "",
+                                valor.nombreHotel,
+                                "1" if valor.puestosADispo else "",
+                                "1" if valor.juezCalif else "",
+                                "1" if valor.reclusorio else "",
+                                "1" if valor.policiaFede else "",
+                                "1" if valor.dif else "",
+                                "1" if valor.policiaEsta else "",
+                                "1" if valor.policiaMuni else "",
+                                "1" if valor.guardiaNaci else "",
+                                "1" if valor.fiscalia else "",
+                                "1" if valor.otrasAuto else "",
+                                "1" if valor.voluntarios else "",
+                                "1" if valor.otro else "",
+                                "1" if valor.presuntosDelincuentes else "",
+                                valor.numPresuntosDelincuentes if valor.numPresuntosDelincuentes != 0 else "",
+                                valor.municipio.upper(),
+                                valor.puntoEstra.upper(),
+                                valor.nacionalidad.upper(),
+                                valor.iso3,
+                                valor.nombre.upper(),
+                                valor.apellidos.upper(),
+                                valor.noIdentidad,
+                                valor.parentesco.upper(),
+                                valor.fechaNacimiento,
+                                "Hombre" if valor.sexo else "Mujer",
+                                "1" if valor.embarazo else "",
+                                valor.numFamilia if valor.numFamilia != 0 else "",
+                                valor.edad,
+                                ])
+        
+        worksheet.append(['Rescates Totales: ', valores.count()])
+
+        response = HttpResponse(content = save_virtual_workbook(workbook), content_type='application/vnd.ms-excel.sheet.macroEnabled.12')
+        response['Content-Disposition'] = 'attachment; filename= "Rescates_{fecha1}-{fecha2}.xlsm"'.format(fecha1 = fechaI, fecha2=fechaF)
+
+        return response
+        # return render(request, "base/error404.html")
+    
+    else:
+        return render(request, "base/error404.html")
+    
+
+
+
+@csrf_exempt
+def politica_privacidad(request):
+    
+    return render(request, "politica/politica_privacidad.html")
+
+
+
+
+@login_required
+@csrf_exempt    
+def generarExcelFechasOR(request):
+    if(request.method == "POST"):
+        # print(request.POST)
+        fechaI = request.POST["fechaInicio"]
+        
+        fechaF = request.POST["fechaFin"]
+
+        fechaIN = datetime.strptime(f"{fechaI}", "%Y-%m-%d")
+        fechaFN = datetime.strptime(f"{fechaF}", "%Y-%m-%d")
+        
+        # fecha_inicio = datetime(2024, 1, 1)
+        # print(fecha_inicio)
+        print(fechaIN)
+
+        # fecha_inicio = datetime(yearI, mesI, diaI)
+        # fecha_fin = datetime(diaF, mesF, yearF)
+
+        array_fechas = [(fechaIN + timedelta(days=d)).strftime("%d-%m-%y") for d in range((fechaFN - fechaIN).days + 1)]
+
+        # array_fechas = [(fechaIN + timedelta(days=d)).strftime("%d-%m-%y") for d in range((fechaIN - fechaFN).days + 1)]
+
+        # print(array_fechas)
+        if request.user.is_superuser:
+            oficinaR = request.POST["oficinaR"]
+        else:
+            user_profile = getattr(request.user, 'usuarioL', None)
+            oficinaR = user_profile.oficinaR if user_profile else None
+        #print(oficinaR)
+        valores = RescatePunto.objects.filter(fecha__in= array_fechas, oficinaRepre= oficinaR )
+
+        # if request.user.is_superuser:
+        #     valores = valores = RescatePunto.objects.filter(fecha= fechaR)
+        # else:
+        #     oficinaR = request.POST["oficina"]
+        #     # fechaR = datetime.datetime.strptime(f"{dia}/{mes}/{year}", "%d/%m/%Y").strftime('%d-%m-%y')
+        #     # fechaR = datetime.datetime.strptime(f"{fechaFun}", "%d/%m/%Y").strftime('%d-%m-%y')
+        
+        workbook = opxl.load_workbook('tmp/dup.xlsm', read_only=False, keep_vba=True)
+        worksheet = workbook.active
+            
+        for valor in valores:
+            worksheet.append([valor.oficinaRepre, 
+                                valor.fecha,
+                                valor.hora,
+                                valor.nombreAgente.upper(),
+                                "1" if valor.aeropuerto else "",
+                                "1" if valor.carretero else "",
+                                valor.tipoVehic.upper(),
+                                valor.lineaAutobus.upper(),
+                                valor.numeroEcono.upper(),
+                                valor.placas.upper(),
+                                "1" if valor.vehiculoAseg else "",
+                                "1" if valor.casaSeguridad else "",
+                                "1" if valor.centralAutobus else "",
+                                "1" if valor.ferrocarril else "",
+                                valor.empresa,
+                                "1" if valor.hotel else "",
+                                valor.nombreHotel,
+                                "1" if valor.puestosADispo else "",
+                                "1" if valor.juezCalif else "",
+                                "1" if valor.reclusorio else "",
+                                "1" if valor.policiaFede else "",
+                                "1" if valor.dif else "",
+                                "1" if valor.policiaEsta else "",
+                                "1" if valor.policiaMuni else "",
+                                "1" if valor.guardiaNaci else "",
+                                "1" if valor.fiscalia else "",
+                                "1" if valor.otrasAuto else "",
+                                "1" if valor.voluntarios else "",
+                                "1" if valor.otro else "",
+                                "1" if valor.presuntosDelincuentes else "",
+                                valor.numPresuntosDelincuentes if valor.numPresuntosDelincuentes != 0 else "",
+                                valor.municipio.upper(),
+                                valor.puntoEstra.upper(),
+                                valor.nacionalidad.upper(),
+                                valor.iso3,
+                                valor.nombre.upper(),
+                                valor.apellidos.upper(),
+                                valor.noIdentidad,
+                                valor.parentesco.upper(),
+                                valor.fechaNacimiento,
+                                "Hombre" if valor.sexo else "Mujer",
+                                "1" if valor.embarazo else "",
+                                valor.numFamilia if valor.numFamilia != 0 else "",
+                                valor.edad,
+                                ])
+        
+        worksheet.append(['Rescates Totales: ', valores.count()])
+
+        response = HttpResponse(content = save_virtual_workbook(workbook), content_type='application/vnd.ms-excel.sheet.macroEnabled.12')
+        response['Content-Disposition'] = 'attachment; filename= "Rescates_{fecha1}-{fecha2}.xlsm"'.format(fecha1 = fechaI, fecha2=fechaF)
+
+        return response
+        # return render(request, "base/error404.html")
+    
+    else:
+        return render(request, "base/error404.html")

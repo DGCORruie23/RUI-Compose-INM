@@ -1,0 +1,108 @@
+{% extends "base/base.html" %}
+
+{% load static %}
+
+{% block title %}Actividades{% endblock title %}
+
+{% block styles %}
+<link rel="stylesheet" href="{% static 'actividades/css/fuentes.css' %}">
+<link rel="stylesheet" href="{% static 'actividades/css/estilos.css' %}">
+<style>
+  .app {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--f-txt);
+    font-size: 14px;
+    line-height: 1.35;
+  }
+  .app svg {
+    display: inline-block;
+  }
+  header.header-style { display: none !important; }
+  #vista-pulso > #kpis {
+    padding-top: 12px;
+  }
+</style>
+{% endblock styles %}
+
+{% block estadistica %}
+    {% if request.user.is_superuser %}
+        <a href="{% url 'estadistica' %}" class="bg-inm-verde-100 text-white px-6 py-3 rounded-xl hover:bg-inm-marron-200">Estadistica</a>
+    {% endif %}
+{% endblock estadistica %}
+
+{% block content %}
+<div class="app">
+
+  <!-- ============ [1] BARRA SUPERIOR ============ -->
+  <header class="top esc">
+    <div class="marca"><b>IO-COR</b><span>Dirección General de Coordinación de Oficinas de Representación</span></div>
+    <nav class="nav" id="nav" aria-label="Secciones"></nav>
+    <div class="menu" id="menu-dir" role="menu" hidden></div>
+    <div class="menu" id="menu-inf" role="menu" hidden></div>
+  </header>
+
+  <div id="vista-pulso">
+    <p class="aviso-pasado" id="aviso-pasado" hidden>Consultas un periodo pasado: «Extranjeros con documento vigente» y «Lo que cambió» solo aparecen con datos al día. <button data-per="shein">Volver a hoy</button></p>
+    <!-- ============ [3] INDICADORES ============ -->
+    <section class="kpis esc" id="kpis" data-modo="tarjetas" aria-label="Indicadores"></section>
+
+    <main class="main">
+      <!-- ============ [4] MAPA Y BARRA DE TIEMPO ============ -->
+      <section class="mapa" id="mapa" data-m="claro" aria-label="Mapa">
+        <div class="lz" id="lz">
+          <div id="lienzo"></div>
+          <canvas id="flujo" aria-hidden="true"></canvas>
+          <div class="acop m-tit" id="m-tit"></div>
+          <div class="acop m-her" id="m-her">
+            <button data-a="sala" class="sala-b" aria-label="Infografía" title="Infografía: lo principal en pantalla completa"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/></svg></button><hr>
+            <button data-a="mas" aria-label="Acercar" title="Acercar"><svg width="14" height="14" viewBox="0 0 16 16"><path d="M3 8h10M8 3v10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg></button>
+            <button data-a="menos" aria-label="Alejar" title="Alejar"><svg width="14" height="14" viewBox="0 0 16 16"><path d="M3 8h10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg></button>
+            <button data-a="mundo" aria-label="Ver el mundo" title="Ver el mundo completo"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.3"></circle><ellipse cx="8" cy="8" rx="2.7" ry="6.3"></ellipse><path d="M1.7 8h12.6"></path></svg></button>
+            <button data-a="mx" aria-label="Centrar en México" title="Centrar en México"><svg width="14" height="14" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.4" fill="currentColor"></circle><path d="M8 1.5v2.5M8 12v2.5M1.5 8H4M12 8h2.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg></button>
+            <hr>
+            <button data-a="flujos" class="on" aria-pressed="true" aria-label="Flujos de origen a destino" title="Flujos de origen a destino"><svg width="14" height="14" viewBox="0 0 16 16"><path d="M2 12C5 4 10 4 13.5 6.5M13.5 6.5l-3.2-.4M13.5 6.5l-.6 3.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
+            <button data-a="circulos" class="on" aria-pressed="true" aria-label="Círculos por país" title="Círculos de cada país de origen"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="6" cy="9" r="4.2"></circle><circle cx="11.5" cy="5.5" r="2.6" fill="currentColor"></circle></svg></button>
+            <button data-a="puntos" aria-pressed="false" aria-label="Puntos de ingreso" title="Puntos de ingreso, repatriación y estaciones"><svg width="14" height="14" viewBox="0 0 16 16"><path d="M8 14.5s4.5-4.2 4.5-7.8a4.5 4.5 0 0 0-9 0c0 3.6 4.5 7.8 4.5 7.8z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"></path><circle cx="8" cy="6.6" r="1.5" fill="currentColor"></circle></svg></button>
+            <button data-a="car" id="b-car" aria-pressed="false" aria-label="Caravanas" title="Caravanas: salida, recorrido y disolución"><svg width="14" height="14" viewBox="0 0 16 16"><g fill="currentColor"><circle cx="3.6" cy="4.6" r="1.6"></circle><circle cx="8" cy="4.6" r="1.6"></circle><circle cx="12.4" cy="4.6" r="1.6"></circle></g><g stroke="currentColor" stroke-width="1.7" stroke-linecap="round" fill="none"><path d="M3.6 7.4v4.4M8 7.4v4.4M12.4 7.4v4.4M1.5 14h13"></path></g></svg></button>
+            <hr>
+            <button data-a="tema" aria-label="Cambiar mapa claro u oscuro" title="Mapa claro u oscuro"><svg width="14" height="14" viewBox="0 0 16 16"><path d="M8 1.5a6.5 6.5 0 1 0 0 13z" fill="currentColor"></path><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.6"></circle></svg></button>
+          </div>
+        </div>
+        <div class="tiempo esc">
+          <button class="play" id="play" aria-label="Reproducir el periodo"></button>
+          <button class="todo" id="vertodo" title="Regresa al periodo completo" hidden>Ver todo</button>
+          <div class="t-cuerpo"><div class="t-tip" id="t-tip" hidden></div>
+            <div class="t-cab"><span id="t-tit"></span><span id="t-ley"></span></div>
+            <svg id="tgraf" role="slider" tabindex="0" aria-label="Día del periodo" aria-valuemin="1"></svg>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ [5] COLUMNA DE ANÁLISIS ============ -->
+      <aside class="rail-w" aria-label="Análisis">
+        <div class="rail esc">
+          <div class="caja" id="docs"></div>
+          <div class="caja" id="analisis"></div>
+        </div>
+      </aside>
+    </main>
+
+    <!-- ============ [6] FRANJA DE CAJAS ============ -->
+    <div class="bajo-w esc"><div class="bajo" id="bajo"></div></div>
+  </div>
+
+  <!-- ============ [7] OTRAS SECCIONES ============ -->
+  <div id="vista-otra" class="otra esc" hidden></div>
+  <div class="kpi-tip" id="kpi-tip" role="tooltip" hidden></div>
+  <div class="cargando" id="cargando" role="status" aria-live="polite" hidden></div>
+
+</div>
+{% endblock content %}
+
+{% block scripts %}
+<script src="{% static 'actividades/lib/echarts.min.js' %}"></script>
+<script src="{% static 'actividades/js/datos_vacios.js' %}"></script>
+<script src="{% static 'actividades/js/geo.js' %}"></script>
+<script src="{% static 'actividades/js/app.js' %}"></script>
+{% endblock scripts %}

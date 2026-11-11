@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Resumen ejecutivo — Rescates / Operación</title>
+    <style>
+        @page { size: A4 portrait; margin: 10mm; }
+        body { font-family: sans-serif; padding: 0; margin: 0; color: #211c18; }
+        .titulo-inm { text-align: center; font-size: 9pt; margin: 0 0 8px; }
+        .colorFondo { background-color: #9A0A38; color: #fff; text-align: center; padding: 6px 0; border-radius: 4px; font-weight: bold; font-size: 12pt; margin-bottom: 10px; }
+
+        table.resumen { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+        table.resumen td { border: 1px solid #e5d9c8; padding: 6px 8px; text-align: center; font-size: 8.5pt; }
+        table.resumen .etiqueta { background-color: #4472C4; color: #fff; font-weight: bold; }
+        table.resumen .valor { font-weight: bold; font-size: 12pt; color: #1F3864; }
+
+        table.tabla { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
+        table.tabla th, table.tabla td { border: 1px solid #e5d9c8; padding: 3px 6px; font-size: 8pt; }
+        table.tabla thead th { background-color: #4472C4; color: #fff; font-weight: bold; text-align: left; }
+        table.tabla td.num { text-align: right; }
+        table.tabla tbody tr:nth-child(even) { background-color: #f3f0e8; }
+
+        h2.seccion { font-size: 10.5pt; margin: 14px 0 6px; color: #9A0A38; }
+    </style>
+</head>
+<body>
+
+    <p class="titulo-inm">INSTITUTO NACIONAL DE MIGRACIÓN<br>DIRECCIÓN GENERAL DE COORDINACIÓN DE OFICINAS DE REPRESENTACION</p>
+    <div class="colorFondo">Resumen ejecutivo — Rescates / Operación — {{ fecha_inicio }} a {{ fecha_fin }} — {{ oficina }}</div>
+
+    <table class="resumen">
+        <tr>
+            <td class="etiqueta">Total rescatados</td>
+            <td class="etiqueta">Núcleos familiares</td>
+        </tr>
+        <tr>
+            <td class="valor">{{ total_rango }}</td>
+            <td class="valor">{{ total_familias }}</td>
+        </tr>
+    </table>
+
+    <h2 class="seccion">Quiénes</h2>
+    <table class="tabla">
+        <thead><tr><th>Hombres</th><th>Mujeres</th><th>Niños</th><th>Niñas</th></tr></thead>
+        <tbody><tr><td class="num">{{ hombres }}</td><td class="num">{{ mujeres }}</td><td class="num">{{ ninos }}</td><td class="num">{{ ninas }}</td></tr></tbody>
+    </table>
+
+    <h2 class="seccion">Reincidencia</h2>
+    <table class="tabla">
+        <thead><tr><th></th><th>Reincidentes</th><th>Primera vez</th></tr></thead>
+        <tbody>
+            <tr><td>Rango filtrado</td><td class="num">{{ total_reincidentes }}</td><td class="num">{{ total_primera_vez }}</td></tr>
+            <tr><td>Histórico (toda la base)</td><td class="num">{{ total_reincidentes_historico }}</td><td class="num">{{ total_primera_vez_historico }}</td></tr>
+        </tbody>
+    </table>
+
+    <h2 class="seccion">Las 3 regiones</h2>
+    <table class="tabla">
+        <thead><tr><th>Región</th><th>Rescates primera vez</th><th>Reincidentes</th><th>Total</th></tr></thead>
+        <tbody>
+            <tr><td>Suchiate</td><td class="num">{{ subtotal_suchiate.nuevos }}</td><td class="num">{{ subtotal_suchiate.reincidentes }}</td><td class="num">{{ subtotal_suchiate.total }}</td></tr>
+            <tr><td>Río Bravo</td><td class="num">{{ subtotal_rio_bravo.nuevos }}</td><td class="num">{{ subtotal_rio_bravo.reincidentes }}</td><td class="num">{{ subtotal_rio_bravo.total }}</td></tr>
+            <tr><td>Centro</td><td class="num">{{ subtotal_centro.nuevos }}</td><td class="num">{{ subtotal_centro.reincidentes }}</td><td class="num">{{ subtotal_centro.total }}</td></tr>
+            <tr><td><strong>TOTAL</strong></td><td class="num"><strong>{{ total_regiones.nuevos }}</strong></td><td class="num"><strong>{{ total_regiones.reincidentes }}</strong></td><td class="num"><strong>{{ total_regiones.total }}</strong></td></tr>
+        </tbody>
+    </table>
+
+    <h2 class="seccion">Nacionalidades atípicas — {{ total_atipicas }}</h2>
+    {% for grupo in detalle_atipicas_agrupado %}
+    <p style="font-size:9pt;font-weight:bold;color:#9A0A38;margin:8px 0 3px;">{{ grupo.etiqueta }} — {{ grupo.total }}</p>
+    <table class="tabla">
+        <tbody>
+            {% for fila in grupo.filas %}
+            <tr><td style="background:{{ fila.color }};">{{ fila.nombre }}</td><td class="num" style="width:60px;">{{ fila.total }}</td></tr>
+            {% empty %}
+            <tr><td>Sin registros en esta región.</td><td class="num"></td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endfor %}
+
+    <h2 class="seccion">Tipo de rescate</h2>
+    <table class="tabla">
+        <thead><tr><th>Carretero</th><th>Aéreo</th><th>Ferroviario</th><th>Central de Autobús</th><th>Casa de Seguridad</th><th>Hotel</th><th>Reclusorio</th></tr></thead>
+        <tbody>
+            <tr>
+                <td class="num">{{ carretero }}</td><td class="num">{{ aereo }}</td><td class="num">{{ ferroviario }}</td>
+                <td class="num">{{ central_autobus }}</td><td class="num">{{ casa_seguridad }}</td><td class="num">{{ hotel }}</td><td class="num">{{ reclusorio }}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2 class="seccion">Retornados</h2>
+    <table class="tabla">
+        <thead><tr><th></th><th>Deportados</th><th>Retornados</th><th>Total</th></tr></thead>
+        <tbody>
+            <tr><td>Rango filtrado</td><td class="num">{{ retornados_deportado }}</td><td class="num">{{ retornados_retornado }}</td><td class="num">{{ total_retornados }}</td></tr>
+            <tr><td>Histórico (toda la base)</td><td class="num" colspan="2"></td><td class="num">{{ total_retornados_historico }}</td></tr>
+        </tbody>
+    </table>
+
+    <h2 class="seccion">Apoyo Operativo — {{ apoyo_operativo_detalle.total_general }}</h2>
+    <table class="tabla">
+        <thead><tr><th>{{ apoyo_operativo_detalle.columna }}</th><th>Puestos a Disp.</th><th>DIF</th><th>Voluntarios</th><th>Inadmitidos</th><th>Total</th></tr></thead>
+        <tbody>
+            {% for f in apoyo_operativo_detalle.filas %}
+            <tr><td>{{ f.nombre }}</td><td class="num">{{ f.puestos }}</td><td class="num">{{ f.dif }}</td><td class="num">{{ f.voluntarios }}</td><td class="num">{{ f.inadmitidos }}</td><td class="num">{{ f.total }}</td></tr>
+            {% empty %}
+            <tr><td colspan="6">Sin apoyo operativo en este rango.</td></tr>
+            {% endfor %}
+            <tr><td><strong>TOTAL</strong></td><td class="num"><strong>{{ apoyo_operativo_detalle.total_puestos }}</strong></td><td class="num"><strong>{{ apoyo_operativo_detalle.total_dif }}</strong></td><td class="num"><strong>{{ apoyo_operativo_detalle.total_voluntarios }}</strong></td><td class="num"><strong>{{ apoyo_operativo_detalle.total_inadmitidos }}</strong></td><td class="num"><strong>{{ apoyo_operativo_detalle.total_general }}</strong></td></tr>
+        </tbody>
+    </table>
+
+</body>
+</html>

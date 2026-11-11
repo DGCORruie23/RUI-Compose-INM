@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cargar Nacionalidades</title>
+</head>
+<body>
+    {% if user.is_authenticated %}
+    <center>
+        <h3>
+            Carga el archivo de las Nacionalidades disponibles
+        </h3>
+    </center>
+    <form action="" method="post" enctype="multipart/form-data">{% csrf_token %}
+        <p>
+            {{ form.archivo }}
+        </p>
+        <p>
+            <input type="submit" value="Cargar" />
+        </p>
+    </form>
+    {% endif %}
+</body>
+</html>

@@ -1,0 +1,198 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}Disuadidos{% endblock title %}
+
+{% block styles %}
+<style>
+    .rescates-tarjeta {
+        background: #ffffff; border-radius: 1rem; border: 1px solid #e5e7eb;
+        padding: 1rem 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    /* @FADAR -- mismo estilo visual que CECO 2 */
+    .ceco2-caja { background: #fff; border-radius: 1rem; border: 1px solid #e5e7eb; box-shadow: 0 1px 3px rgba(0,0,0,0.06); overflow: hidden; }
+    .ceco2-resumen { display: grid; grid-template-columns: 1fr 1fr; }
+    .ceco2-resumen > div { padding: 1rem; text-align: center; border-right: 1px solid #e5e7eb; }
+    .ceco2-resumen > div:last-child { border-right: none; }
+    .ceco2-resumen .etiqueta { background: #4472C4; color: #fff; font-weight: 700; padding: 0.4rem; border-radius: 0.4rem; margin-bottom: 0.5rem; font-size: 0.85rem; }
+    .ceco2-resumen .valor { font-size: 1.6rem; font-weight: 800; color: #1F3864; }
+    table.ceco2-tabla { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    table.ceco2-tabla thead th { background: #4472C4; color: #fff; font-weight: 700; padding: 0.5rem 0.75rem; text-align: left; }
+    table.ceco2-tabla thead th.text-right { text-align: right; }
+    table.ceco2-tabla td { padding: 0.4rem 0.75rem; border-bottom: 1px solid #DCE6F1; }
+    table.ceco2-tabla td.text-right { text-align: right; }
+    table.ceco2-tabla td.text-center { text-align: center; }
+    table.ceco2-tabla tbody tr:nth-child(even) { background: #DCE6F1; }
+    table.ceco2-tabla tr.fila-total-ceco2 td { background: #1F3864; color: #fff; font-weight: 700; }
+
+    /* @FADAR -- nota metodologica: dejar visible que "Disuadidos" reutiliza
+       un campo no dedicado (casaSeguridad), practica no estandarizada. */
+    .caja-nota-disuadidos {
+        background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 1rem;
+        padding: 1.25rem; margin-top: 1.5rem;
+    }
+    .caja-nota-disuadidos h3 { color: #92400E; font-weight: 700; font-size: 0.95rem; margin-bottom: 0.5rem; }
+    .caja-nota-disuadidos p { color: #78350F; font-size: 0.85rem; line-height: 1.5; margin-bottom: 1rem; }
+    table.tabla-evidencia { width: 100%; max-width: 560px; border-collapse: collapse; font-size: 0.85rem; }
+    table.tabla-evidencia th, table.tabla-evidencia td { padding: 0.4rem 0.75rem; text-align: right; border-bottom: 1px solid #FDE68A; }
+    table.tabla-evidencia th:first-child, table.tabla-evidencia td:first-child { text-align: left; }
+    table.tabla-evidencia thead th { color: #92400E; text-transform: uppercase; font-size: 0.7rem; }
+</style>
+{% endblock styles %}
+
+{% block content %}
+<main class="max-w-6xl mx-auto px-4 py-6">
+
+    <div class="flex items-center justify-between mb-4">
+        <h1 class="text-2xl font-bold text-[#9A0A38]">Disuadidos</h1>
+        <a href="{% url 'Reportes_Analisis:rescates_dashboard' %}" class="text-sm font-semibold text-gray-500 hover:text-[#9A0A38] transition">← Volver al dashboard</a>
+    </div>
+
+    <form method="get" class="rescates-tarjeta mb-8 flex flex-wrap items-end gap-4">
+        <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-1">Fecha</label>
+            <input type="date" name="fecha" value="{{ fecha_iso }}"
+                   class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm">
+        </div>
+        <button type="submit" class="bg-[#9A0A38] hover:bg-[#7d0830] text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
+            Generar
+        </button>
+        <a href="{{ request.path }}" class="inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition">Limpiar filtros</a>
+        <div class="flex-1"></div>
+        <a href="{% url 'Reportes_Analisis:rescates_reporte_disuadidos_pdf' %}?fecha={{ fecha_iso }}"
+           class="inline-flex items-center gap-2 bg-gray-700 hover:bg-gray-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+            ⬇ Descargar PDF
+        </a>
+        <a href="{% url 'Reportes_Analisis:rescates_reporte_disuadidos_excel' %}?fecha={{ fecha_iso }}"
+           class="inline-flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+            ⬇ Descargar Excel
+        </a>
+    </form>
+
+    {% comment %}
+    "Disuadidos" se calcula a partir del campo casaSeguridad de los rescates -- no es un campo dedicado
+    (ver la nota metodologica comentada mas abajo en este mismo archivo).
+    {% endcomment %}
+
+    <div class="ceco2-caja mb-6">
+        <div class="ceco2-resumen">
+            <div>
+                <div class="etiqueta">Fecha</div>
+                <div class="valor" style="font-size:1.2rem;">{{ fecha_actual }}</div>
+            </div>
+            <div>
+                <div class="etiqueta">Total</div>
+                <div class="valor">{{ total|default:0 }}</div>
+            </div>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="ceco2-tabla">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>OR</th>
+                        <th class="text-right">Total disuadidos</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for f in filas %}
+                    <tr>
+                        <td class="text-center">{{ fecha_actual }}</td>
+                        <td>{{ f.oficina }}</td>
+                        <td class="text-right">{{ f.total }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="3" class="text-center">Sin registros en esta fecha.</td></tr>
+                    {% endfor %}
+                    <tr class="fila-total-ceco2">
+                        <td colspan="2">TOTAL</td>
+                        <td class="text-right">{{ total|default:0 }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {# @FADAR -- desglose adicional: categoria, nacionalidad y zona migratoria #}
+    <div class="flex flex-wrap gap-6 items-start mb-6">
+        <div class="ceco2-caja" style="flex:1 1 420px;">
+            <div class="overflow-x-auto">
+                <table class="ceco2-tabla">
+                    <thead>
+                        <tr><th colspan="2">Categoría</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for etiqueta, valor in categorias_valores %}
+                        <tr><td>{{ etiqueta }}</td><td class="text-right">{{ valor }}</td></tr>
+                        {% endfor %}
+                        <tr class="fila-total-ceco2"><td>TOTAL</td><td class="text-right">{{ por_categoria.total|default:0 }}</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="ceco2-caja" style="flex:1 1 420px;">
+            <div class="overflow-x-auto" style="max-height: 320px; overflow-y: auto;">
+                <table class="ceco2-tabla">
+                    <thead>
+                        <tr><th>Nacionalidad</th><th class="text-right">Total</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for n in nacionalidades %}
+                        <tr><td>{{ n.nacionalidad }}</td><td class="text-right">{{ n.total }}</td></tr>
+                        {% empty %}
+                        <tr><td colspan="2" class="text-center">Sin registros en esta fecha.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="ceco2-caja" style="flex:1 1 260px;">
+            <div class="overflow-x-auto">
+                <table class="ceco2-tabla">
+                    <thead>
+                        <tr><th colspan="2">Zona migratoria</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Río Bravo</td><td class="text-right">{{ zonas.rio_bravo }}</td></tr>
+                        <tr><td>Centro</td><td class="text-right">{{ zonas.centro }}</td></tr>
+                        <tr><td>Suchiate</td><td class="text-right">{{ zonas.suchiate }}</td></tr>
+                        {% if zonas.sin_zona %}<tr><td>Sin zona</td><td class="text-right">{{ zonas.sin_zona }}</td></tr>{% endif %}
+                        <tr class="fila-total-ceco2"><td>TOTAL</td><td class="text-right">{{ total|default:0 }}</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {% comment %}
+    @FADAR -- nota metodologica oculta a peticion del usuario (no se borra,
+    solo se deja de mostrar). "Disuadidos" no tiene un campo dedicado en la
+    base de datos: el formulario web reutiliza el campo casaSeguridad de los
+    rescates (pensado originalmente para "rescate ocurrido en una casa de
+    seguridad") para registrar tambien los clics de "disuadidos" -- ambos
+    eventos quedan mezclados bajo el mismo dato, sin forma de separarlos con
+    certeza. Existe una tabla dedicada (DisuadidosPunto) pero esta vacia en
+    produccion.
+    Evidencia de la mezcla: a nivel de toda la base, el 91.8% de los
+    rescates trae el campo puntoEstra lleno (tipico de captura por app
+    movil). Entre los registros con casaSeguridad=True ese porcentaje cae a
+    solo 4.6% -- consistente con que la mayoria de estos registros llego
+    por el formulario web (si son "disuadidos"), con un remanente de
+    posibles casos reales de "casa de seguridad" mezclados.
+    <div class="caja-nota-disuadidos">
+        <h3>⚠ Nota metodológica — práctica de captura no estandarizada</h3>
+        <table class="tabla-evidencia">
+            <thead>
+                <tr><th></th><th>Con "puntoEstra" (posible casaSeguridad real)</th><th>Sin "puntoEstra" (posible disuadido real)</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Total del día</td><td>{{ total_con_puntoestra|default:0 }}</td><td>{{ total_sin_puntoestra|default:0 }}</td></tr>
+            </tbody>
+        </table>
+    </div>
+    {% endcomment %}
+
+</main>
+{% endblock content %}

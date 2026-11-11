@@ -1,0 +1,7 @@
+{% for tipo in tipos_vehiculo %}
+<li class="flex items-center justify-between py-0.5 px-2 -mx-2 rounded-lg cursor-pointer hover:bg-guinda-50 transition"
+    data-hold-url="{% url 'vehiculos:popover_vehiculos' %}" data-hold-params="tipo={{ tipo.nombre|urlencode }}">
+  <span class="text-slate-600">{{ tipo.nombre }}</span>
+  <span class="font-semibold text-slate-700">{{ tipo.cantidad }}</span>
+</li>
+{% endfor %}

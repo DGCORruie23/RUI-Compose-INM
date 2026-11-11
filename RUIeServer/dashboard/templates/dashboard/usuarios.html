@@ -1,0 +1,771 @@
+{% extends "base/base.html" %}
+
+{% load static %}
+
+{% block styles %}
+    <style>
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 8px;
+        }
+
+        tr:nth-child(even) {
+            background-color: #e1e1e1
+        }
+
+        th {
+            background-color rgb(197, 122, 69)AA6D;
+            color: rgb(255, 255, 255);
+        }
+
+        .bdtable {
+            width: 96%;
+            margin: 0 auto 34px;
+            border: 1px solid #b4b4b4;
+            border-radius: 12px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+            overflow-x: auto;
+            box-sizing: border-box;
+        }
+
+        .punto {
+            margin-right: 100px;
+        }
+        
+        #myInput {
+            background-position: 10px 10px;
+            background-repeat: no-repeat;
+            width: 220px;
+            font-size: 16px;
+            padding: 8px 1px 8px 8px;
+            border: 1px solid #ddd;
+            margin-left: 12%;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        #myInput2 {
+            background-position: 10px 10px;
+            background-repeat: no-repeat;
+            width: 180px;
+            font-size: 16px;
+            padding: 8px 1px 8px 8px;
+            border: 1px solid #ddd;
+            margin-left: 12%;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            margin-right: 20px;
+        }
+
+        #myInput,
+        #myInput2 {
+            box-sizing: border-box;
+            width: 100%;
+            margin: 0;
+            padding: 12px 16px;
+            font-size: 16px;
+            color: #374151;
+            background-color: #ffffff;
+            border: 1px solid #b8c2c0;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.06);
+            outline: none;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        #myInput:focus,
+        #myInput2:focus {
+            border-color: #941b4c;
+            box-shadow: 0 0 0 3px rgba(148, 27, 76, 0.12);
+        }
+
+        #myInput::placeholder,
+        #myInput2::placeholder {
+            color: #8b929f;
+        }
+
+        #myTable .celda-accion {
+            text-align: center;
+            white-space: nowrap;
+            padding: 8px 2px;
+        }
+
+        #myTable th[colspan="2"] {
+            text-align: center;
+        }
+
+        #myTable {
+            width: 100%;
+            table-layout: fixed;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+
+        #myTable .celda-accion a,
+        #myTable .celda-accion button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
+            width: 96px;
+            height: 40px;
+            padding: 0 8px;
+            margin: 0;
+            font-size: 14px;
+            line-height: 1;
+            white-space: nowrap;
+        }
+
+        #myTable th,
+        #myTable td {
+            text-align: left;
+            padding: 10px 8px;
+            box-sizing: border-box;
+        }
+
+        #myTable th {
+            color: #ffffff;
+            font-weight: 600;
+        }
+
+        #myTable tr.header {
+            background-color: #235B4E;
+        }
+
+        #myTable tr:nth-child(even) {
+            background-color: #e1e1e1;
+        }
+
+        #myTable tr:nth-child(odd):not(.header) {
+            background-color: #d6c5a3;
+        }
+          
+        .flex-container {
+            display: flex;
+            align-items: stretch;
+        }
+
+        .flex-container > div {
+            margin: 10px;
+            text-align: center;
+            line-height: 20px;
+            font-size: 15px;
+        }
+
+        .overlay { 
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            width: 100%;
+            box-sizing: border-box;
+            background: rgba(0, 0, 0, 0.7);
+            transition: opacity 500ms;
+            visibility: hidden;
+            opacity: 0;
+            z-index: 9999;
+        }
+
+        .overlay:target {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        #popupBody {
+            width: 46%;
+            max-width: 600px;
+            box-sizing: border-box;
+            padding: 24px;
+            border-radius: 15px;
+            box-shadow: 0 0 5px #CCC;
+            background: #FFF;
+            position: relative;
+            margin: 20vh auto;
+            transition: all 500ms ease-in-out;
+            z-index: 10000;
+        }
+
+        .popupContent {
+            min-width: 0;
+            overflow-wrap: break-word;
+        }
+
+        #popupBody h3 {
+            margin: 0;
+            padding-right: 25px;
+            text-align: center;
+        }
+
+        #popupBody input[type="file"] {
+            display: block;
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
+        }
+
+        #cerrar {
+            position: absolute;
+            top: 12px;
+            right: 16px;
+            font-size: 30px;
+            font-weight: bold;
+            text-decoration: none;
+            color: #F00;
+            transition: color 100ms ease-in-out;
+        }
+
+        tr.header {
+            background-color: #235B4E;
+        }
+
+        @media screen and (max-width: 800px) {
+            .contIcons {
+                justify-content: stretch;
+                gap: 10px;
+            }
+
+            .contIcons > div {
+                width: 100%;
+                min-width: 0;
+                flex: 1 1 100%;
+            }
+
+           .contIcons > a,
+            .contIcons > form {
+                flex: 1 1 0;
+                width: 0;
+                min-width: 0;
+                margin: 0;
+                box-sizing: border-box;
+            }
+
+            .contIcons > form {
+                display: flex;
+            }
+
+            .contIcons > a,
+            .contIcons > form > button {
+                width: 100%;
+                min-width: 0;
+                min-height: 46px;
+                padding: 8px 4px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                box-sizing: border-box;
+                font-size: 12px;
+                white-space: nowrap;
+            }
+
+            .bdtable {
+                width: 96%;
+                margin: 0 auto 24px;
+                overflow-x: auto;
+                overflow-y: hidden;
+                -webkit-overflow-scrolling: touch;
+                box-sizing: border-box;
+                position: relative;
+            }
+            
+            #myTable {
+                width: 950px;
+                min-width: 950px;
+                table-layout: fixed;
+                border-collapse: separate;
+                border-spacing: 0;
+            }
+
+            #myTable colgroup col:nth-child(1) {
+                width: 7% !important;
+            }
+
+            #myTable colgroup col:nth-child(2) {
+                width: 9% !important;
+            }
+
+            #myTable colgroup col:nth-child(3) {
+                width: 19% !important;
+            }
+
+            #myTable colgroup col:nth-child(4) {
+                width: 29% !important;
+            }
+
+            #myTable colgroup col:nth-child(5) {
+                width: 16% !important;
+            }
+
+            #myTable colgroup col:nth-child(6),
+            #myTable colgroup col:nth-child(7) {
+                width: 10% !important;
+            }
+
+            #myTable th,
+            #myTable td {
+                padding: 9px 8px;
+                overflow-wrap: break-word;
+                border: none !important;
+                background-clip: padding-box;
+            }
+
+            #myTable .celda-accion {
+                padding: 8px 3px;
+                text-align: center;
+                white-space: nowrap;
+            }
+
+            #myTable .celda-accion a,
+            #myTable .celda-accion button {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                box-sizing: border-box;
+                width: 78px;
+                padding: 7px 6px;
+                margin: 0;
+                font-size: 14px;
+                min-height: 36px;
+                white-space: nowrap;
+            }
+
+            #popupBody {
+                width: 90%;
+                max-width: 500px;
+                box-sizing: border-box;
+                margin: 25vh auto;
+                padding: 24px;
+            }
+
+            #cerrar {
+                top: 10px;
+                right: 15px;
+            }
+        }
+
+        @media screen and (min-width: 801px) and (max-width: 1100px) {
+            .bdtable {
+                width: 96%;
+                margin: 0 auto 24px;
+                overflow-x: auto;
+                overflow-y: hidden;
+                -webkit-overflow-scrolling: touch;
+                box-sizing: border-box;
+                position: relative;
+            }
+
+            #myTable {
+                width: 100%;
+                min-width: 1100px;
+                table-layout: fixed;
+                border-collapse: separate;
+                border-spacing: 0;
+            }
+
+            #myTable colgroup col:nth-child(1) {
+                width: 6% !important;
+            }
+
+            #myTable colgroup col:nth-child(2) {
+                width: 8% !important;
+            }
+
+            #myTable colgroup col:nth-child(3) {
+                width: 22% !important;
+            }
+
+            #myTable colgroup col:nth-child(4) {
+                width: 28% !important;
+            }
+
+            #myTable colgroup col:nth-child(5) {
+                width: 14% !important;
+            }
+
+            #myTable colgroup col:nth-child(6),
+            #myTable colgroup col:nth-child(7) {
+                width: 10% !important;
+            }
+
+            #myTable th:nth-child(2),
+            #myTable td:nth-child(2) {
+                text-align: center;
+            }
+
+            #myTable th:nth-child(3),
+            #myTable td:nth-child(3) {
+                padding-left: 18px;
+            }
+
+            #myTable .celda-accion a,
+            #myTable .celda-accion button {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                box-sizing: border-box;
+                width: 78px;
+                min-height: 36px;
+                padding: 7px 6px;
+                margin: 0;
+                font-size: 14px;
+                line-height: 1;
+                white-space: nowrap;
+            }
+        }
+
+        @media screen and (min-width: 601px) {
+            #popupBody {
+                width: 46%;
+                max-width: none;
+                padding: 2%;
+                margin: 20% auto;
+                box-sizing: content-box;
+            }
+        }
+
+        @media screen and (max-width: 600px) {
+            #popupBody {
+                width: calc(100% - 32px);
+                max-width: 420px;
+                margin: 20vh auto;
+                padding: 24px 18px;
+            }
+
+            #popupBody form p {
+                margin: 12px 0;
+            }
+
+            #popupBody input[type="file"] {
+                font-size: 14px;
+            }
+
+            #popupBody input[type="submit"] {
+                min-height: 44px;
+                margin-left: 0;
+            }
+
+            #cerrar {
+                top: 8px;
+                right: 12px;
+            }
+        }
+
+    </style>
+    {% endblock styles %}
+
+    {% block content %}
+
+    <!-- <div class="flex-container">
+        <div class="px-1" style="flex-grow: 0; width: 600px;"><input type="text" id="myInput" onkeyup="myFunction()" placeholder="Buscar por nombre completo..."></div>
+        <div style="flex-grow: 1; margin-top: 25px; margin-right: 30%;"><a href="#popup" class="py-3 px-5 mx-1 bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-xl text-white ">Carga masiva</a></div> 
+        <div style="flex-grow: 1; margin-top: 25px; margin-right: 8%;"><a href="{% url 'agregar_usuario' %}" class="py-4 px-6 bg-inm-rojo-300 rounded-xl text-white hover:bg-inm-marron-100 btn-sm ml-auto">
+            Agregar Usuario
+        </a></div>
+    </div> -->
+
+    <div class="w-[96%] mx-auto mt-2">
+        <div class="contIcons flex flex-wrap items-center justify-between gap-3 py-1">
+            <div class="min-w-0 flex-1">
+                    <input type="text" id="myInput" onkeyup="myFunction()" placeholder="Buscar por nombre completo"
+                            class="w-full rounded-xl border border-gray-300 bg-white px-3 py-3 text-gray-700 shadow-sm outline-none transition 
+                            placeholder:text-gray-400 focus:border-[#941b4c] focus:ring-2 focus:ring-[#941b4c]/20">
+            </div>
+            <div class="min-w-0 flex-1">
+                    <input type="text" id="myInput2" onkeyup="myFunction2()" placeholder="Buscar por OR..."
+                            class="w-full rounded-xl border border-gray-300 bg-white px-3 py-3 text-gray-700 shadow-sm outline-none transition 
+                            placeholder:text-gray-400 focus:border-[#941b4c] focus:ring-2 focus:ring-[#941b4c]/20">
+            </div>
+                <!-- Carga masiva -->
+                <a href="#popup" class="inline-flex min-h-[52px] items-center justify-center rounded-xl bg-inm-rojo-300 px-5 py-3 text-center 
+                                    font-medium text-white shadow-sm transition hover:bg-inm-marron-100">
+                        Carga masiva
+                </a>
+                <!-- Agregar usuario --> 
+                <a href="{% url 'agregar_usuario' %}" class="inline-flex min-h-[52px] items-center justify-center rounded-xl bg-inm-rojo-300 px-5 py-3 text-center 
+                                                         font-medium text-white shadow-sm transition hover:bg-inm-marron-100">
+                        Agregar Usuario
+                </a>
+                <!-- Descargar -->
+                <form action="{% url 'descarga_excelUsuarios' %}" method="post" class="w-full sm:w-auto">
+                    {% csrf_token %}
+                    <button type="submit" class="inline-flex min-h-[52px] w-full items-center justify-center rounded-xl bg-inm-rojo-300 px-5 py-3 
+                                             font-medium text-white shadow-sm transition hover:bg-inm-marron-100 sm:w-auto">
+                        Descargar
+                    </button>
+                </form>
+        </div>
+    </div>
+
+    <div id="popup" class="overlay">
+        <div id="popupBody">
+            <a href="#" id="cerrar">&times;</a>
+            <div class="popupContent">
+                {% if user.is_authenticated %}
+                <center>
+                    <h3>
+                        Carga el archivo de Usuarios
+                    </h3>
+                    <br>
+                </center>
+                <form action="{% url 'cargar_usuarios' %}" method="post" enctype="multipart/form-data">{% csrf_token %}
+                    <p>
+                        {{ form.archivo }}
+                    </p>
+                    <br>
+                    <p>
+                        <input class="py-2 px-5 mx-1 bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-xl text-white" type="submit" value="Cargar" />
+                    </p>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="bdtable bg-inm-marron-100 mt-2">
+        <table id="myTable">
+            <colgroup>
+                <col style="width: 7%;">
+                <col style="width: 8%;">
+                <col style="width: 20%;">
+                <col style="width: 30%;">
+                <col style="width: 17%;">
+                <col style="width: 8%;">
+                <col style="width: 8%;">
+            </colgroup>
+            <tr class="header">
+                <th>ID</th>
+                <th>Estado</th>
+                <th>Nickname</th>
+                <th>Nombre completo</th>
+                <th>Tipo de Usuario</th>
+                <th colspan="2">Acciones</th>
+            </tr>
+            {% for item in usuario %}
+                <tr>
+                    <td>{{ item.idUser }}</td>
+                    <td>
+                        {% if item.estado == '1' %}AGS{% endif %}
+                        {% if item.estado == '2' %}BC{% endif %}
+                        {% if item.estado == '3' %}BCS{% endif %}
+                        {% if item.estado == '4' %}CAMP{% endif %}
+                        {% if item.estado == '9' %}CDMX{% endif %}
+                        {% if item.estado == '7' %}CHIS{% endif %}
+                        {% if item.estado == '8' %}CHIH{% endif %}
+                        {% if item.estado == '5' %}COAH{% endif %}
+                        {% if item.estado == '6' %}COL{% endif %}
+                        {% if item.estado == '10' %}DGO{% endif %}
+                        {% if item.estado == '15' %}EDOMEX{% endif %}
+                        {% if item.estado == '12' %}GRO{% endif %}
+                        {% if item.estado == '11' %}GTO{% endif %}
+                        {% if item.estado == '13' %}HGO{% endif %}
+                        {% if item.estado == '14' %}JAL{% endif %}
+                        {% if item.estado == '16' %}MICH{% endif %}
+                        {% if item.estado == '17' %}MOR{% endif %}
+                        {% if item.estado == '18' %}NAY{% endif %}
+                        {% if item.estado == '19' %}NL{% endif %}
+                        {% if item.estado == '20' %}OAX{% endif %}
+                        {% if item.estado == '21' %}PUE{% endif %}
+                        {% if item.estado == '22' %}QRO{% endif %}
+                        {% if item.estado == '23' %}QROO{% endif %}
+                        {% if item.estado == '24' %}SLP{% endif %}
+                        {% if item.estado == '25' %}SIN{% endif %}
+                        {% if item.estado == '26' %}SON{% endif %}
+                        {% if item.estado == '27' %}TAB{% endif %}
+                        {% if item.estado == '28' %}TAMPS{% endif %}
+                        {% if item.estado == '29' %}TLAX{% endif %}
+                        {% if item.estado == '30' %}VER{% endif %}
+                        {% if item.estado == '31' %}YUC{% endif %}
+                        {% if item.estado == '32' %}ZAC{% endif %}
+                    </td>
+                    <td>{{ item.nickname }}</td>
+                    <td>{{ item.nombre }} {{ item.apellido }}</td>
+                    <td>
+                        {% if item.tipo == '1' %}Administrador{% endif %}
+                        {% if item.tipo == '2' %}Validador{% endif %}
+                        {% if item.tipo == '3' %}Capturador{% endif %}
+                    </td>
+                    <td class="celda-accion">
+                        <a href="{% url 'editar_usuario' id_usuario=item.idUser %}" 
+                            class="inline-flex items-center justify-center w-[78px] h-[36px] bg-inm-verde-200 hover:bg-inm-marron-100 rounded-xl text-white">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                </svg>
+                            <span class="sr-only">Editar</span>
+                        </a>
+                    </td>
+                    <td class="celda-accion">
+                        <button
+                            type="button"
+                            onclick="confirmarEliminarUsuario('{{ item.idUser }}', '{{ item.estado|escapejs }}', '{{ item.nickname|escapejs }}', '{{ item.nombre|escapejs }}', '{{ item.apellido|escapejs }}')"
+                            class="py-2 px-4 bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-xl text-white">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                            </svg>
+                            <span class="sr-only">Eliminar</span>
+                        </button>
+                    </td>
+                </tr>
+            {% endfor %}
+        </table>
+    </div>
+
+    <div id="modalEliminarUsuario" class="hidden fixed inset-0 z-[200] items-center justify-center bg-black/60 p-4">
+        <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <h2 class="mb-3 text-xl font-bold text-gray-800">
+                Confirmar eliminación
+            </h2>
+            <p class="mb-3 text-gray-700">
+                ¿Estás seguro de que deseas eliminar este usuario?
+            </p>
+            <p class="mb-2 text-sm text-gray-600">
+                Estado: <strong id="estadoEliminarUsuario"></strong>
+            </p>
+            <p class="mb-2 text-sm text-gray-600">
+                Nickname: <strong id="nicknameEliminarUsuario"></strong>
+            </p>
+            <p class="mb-2 text-sm text-gray-600">
+                Nombre completo: <strong id="nombreEliminarUsuario"></strong>
+            </p>
+            <form id="formEliminarUsuario" method="POST">
+                {% csrf_token %}
+                <div class="flex justify-end gap-3">
+                    <button type="button"
+                            onclick="cerrarConfirmacionUsuario()"
+                            class="rounded-xl bg-gray-200 px-4 py-2 text-gray-800 hover:bg-gray-300">
+                            Cancelar
+                    </button>
+
+                    <button
+                        type="submit"
+                        class="rounded-xl bg-inm-rojo-300 px-4 py-2 text-white hover:bg-inm-marron-100">
+                        Sí, eliminar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <br>
+
+    <script>
+        function myFunction() {
+            var input, filter, table, tr, td, i, txtValue;
+            input = document.getElementById("myInput");
+            filter = input.value.toUpperCase();
+            table = document.getElementById("myTable");
+            tr = table.getElementsByTagName("tr");
+            for (i = 0; i < tr.length; i++) {
+              td = tr[i].getElementsByTagName("td")[3];
+              if (td) {
+                txtValue = td.textContent || td.innerText;
+                if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                  tr[i].style.display = "";
+                } else {
+                  tr[i].style.display = "none";
+                }
+              }       
+            }
+          }
+
+          function myFunction2() {
+            var input, filter, table, tr, td, i, txtValue;
+            input = document.getElementById("myInput2");
+            filter = input.value.toUpperCase();
+            table = document.getElementById("myTable");
+            tr = table.getElementsByTagName("tr");
+            for (i = 0; i < tr.length; i++) {
+              td = tr[i].getElementsByTagName("td")[1];
+              if (td) {
+                txtValue = td.textContent || td.innerText;
+                if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                  tr[i].style.display = "";
+                } else {
+                  tr[i].style.display = "none";
+                }
+              }       
+            }
+          }
+    </script>
+
+    <script>
+        function confirmarEliminarUsuario(id, estado, nickname, nombre, apellido) {
+            const modal = document.getElementById('modalEliminarUsuario');
+            const formulario = document.getElementById('formEliminarUsuario'); if (!modal || !formulario) return;
+            formulario.action = "{% url 'eliminar_usuario' id_usuario=0 %}".replace('/0', '/' + encodeURIComponent(id));
+            const abreviaturas = {
+                    '1': 'AGS',
+                    '2': 'BC',
+                    '3': 'BCS',
+                    '4': 'CAMP',
+                    '9': 'CDMX',
+                    '7': 'CHIS',
+                    '8': 'CHIH',
+                    '5': 'COAH',
+                    '6': 'COL',
+                    '10': 'DGO',
+                    '15': 'EDOMEX',
+                    '12': 'GRO',
+                    '11': 'GTO',
+                    '13': 'HGO',
+                    '14': 'JAL',
+                    '16': 'MICH',
+                    '17': 'MOR',
+                    '18': 'NAY',
+                    '19': 'NL',
+                    '20': 'OAX',
+                    '21': 'PUE',
+                    '22': 'QRO',
+                    '23': 'QROO',
+                    '24': 'SLP',
+                    '25': 'SIN',
+                    '26': 'SON',
+                    '27': 'TAB',
+                    '28': 'TAMPS',
+                    '29': 'TLAX',
+                    '30': 'VER',
+                    '31': 'YUC',
+                    '32': 'ZAC'
+                };
+
+            document.getElementById('estadoEliminarUsuario').textContent = abreviaturas[String(estado).trim()] || estado;
+            document.getElementById('nicknameEliminarUsuario').textContent = nickname;
+            document.getElementById('nombreEliminarUsuario').textContent =
+                (nombre + ' ' + apellido).trim();
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function cerrarConfirmacionUsuario() {
+            const modal = document.getElementById('modalEliminarUsuario'); if (!modal) return;
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const modal = document.getElementById('modalEliminarUsuario');
+            if (modal) {
+                modal.addEventListener('click', function (event) {
+                    if (event.target === modal) {
+                        cerrarConfirmacionUsuario();
+                    }
+                });
+            }
+            document.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape') {
+                    cerrarConfirmacionUsuario();
+                }
+             });
+        });
+    </script>
+    {% endblock content %}
+
+</body>
+
+</html>

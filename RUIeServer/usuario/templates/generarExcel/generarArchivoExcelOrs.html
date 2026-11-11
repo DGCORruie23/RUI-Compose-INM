@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="es">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Descargar Archivo Rescate por días</title>
+    </head>
+    <body>
+        <center>
+            <h3>
+                Ingresa la fecha para descargar la información
+            </h3>
+            <form action="" method="post" enctype="multipart/form-data">{% csrf_token %}
+                <p>
+                    {{form.fechaDescarga}} 
+                </p>
+                <p>
+                    <input type="submit" value="Descargar" />
+                </p>
+            </form>
+        </center>
+    </body>
+</html>

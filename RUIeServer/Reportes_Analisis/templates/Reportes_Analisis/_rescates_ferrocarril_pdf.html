@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Rescates vía ferrocarril</title>
+    <style>
+        @page { size: A4 portrait; margin: 10mm; }
+        body { font-family: sans-serif; padding: 0; margin: 0; color: #211c18; }
+        .titulo-inm { text-align: center; font-size: 9pt; margin: 0 0 8px; }
+        .colorFondo { background-color: #9A0A38; color: #fff; text-align: center; padding: 6px 0; border-radius: 4px; font-weight: bold; font-size: 12pt; margin-bottom: 10px; }
+
+        table.resumen { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+        table.resumen td { border: 1px solid #e5d9c8; padding: 6px 8px; text-align: center; font-size: 8.5pt; }
+        table.resumen .etiqueta { background-color: #4472C4; color: #fff; font-weight: bold; }
+        table.resumen .valor { font-weight: bold; font-size: 12pt; color: #1F3864; }
+
+        table.tabla { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
+        table.tabla th, table.tabla td { border: 1px solid #e5d9c8; padding: 3px 6px; font-size: 8pt; }
+        table.tabla thead th { background-color: #4472C4; color: #fff; font-weight: bold; text-align: left; }
+        table.tabla td.num { text-align: right; }
+        table.tabla tbody tr:nth-child(even) { background-color: #f3f0e8; }
+
+        h2.seccion { font-size: 10.5pt; margin: 14px 0 6px; color: #9A0A38; }
+    </style>
+</head>
+<body>
+
+    <p class="titulo-inm">INSTITUTO NACIONAL DE MIGRACIÓN<br>DIRECCIÓN GENERAL DE COORDINACIÓN DE OFICINAS DE REPRESENTACION</p>
+    <div class="colorFondo">Rescates vía ferrocarril — {{ fecha_inicio }} a {{ fecha_fin }}</div>
+
+    <table class="resumen">
+        <tr>
+            <td class="etiqueta">Vía ferrocarril</td>
+            <td class="etiqueta">% del rango</td>
+            <td class="etiqueta">Menores</td>
+            <td class="etiqueta">Mayores</td>
+        </tr>
+        <tr>
+            <td class="valor">{{ total_ferro }}</td>
+            <td class="valor">{{ porcentaje }}%</td>
+            <td class="valor">{{ total_menores }}</td>
+            <td class="valor">{{ total_mayores }}</td>
+        </tr>
+    </table>
+
+    <h2 class="seccion">Quiénes</h2>
+    <table class="tabla">
+        <thead><tr><th>Hombres</th><th>Mujeres</th><th>Niños</th><th>Niñas</th></tr></thead>
+        <tbody><tr><td class="num">{{ hombres }}</td><td class="num">{{ mujeres }}</td><td class="num">{{ ninos }}</td><td class="num">{{ ninas }}</td></tr></tbody>
+    </table>
+
+    <h2 class="seccion">Las 3 regiones</h2>
+    <table class="tabla">
+        <thead><tr><th>Región</th><th>Total</th></tr></thead>
+        <tbody>
+            {% for r in regiones %}
+            <tr><td>{{ r.nombre }}</td><td class="num">{{ r.total }}</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h2 class="seccion">Top nacionalidades</h2>
+    <table class="tabla">
+        <thead><tr><th>Nacionalidad</th><th>Total</th></tr></thead>
+        <tbody>
+            {% for nac in top_nacionalidades %}
+            <tr><td style="background:{{ nac.color }};">{{ nac.nombre }}</td><td class="num">{{ nac.total }}</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h2 class="seccion">Puntos más frecuentes, por región</h2>
+    {% for r in regiones %}
+    <p style="font-size:9pt;font-weight:bold;color:{{ r.color }};margin:8px 0 3px;">{{ r.nombre }}</p>
+    <table class="tabla">
+        <tbody>
+            {% for punto, total in r.puntos %}
+            <tr><td>{{ punto }}</td><td class="num" style="width:60px;">{{ total }}</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endfor %}
+
+    <h2 class="seccion">Reincidencia</h2>
+    <table class="tabla">
+        <thead><tr><th></th><th>Reincidentes</th><th>Primera vez</th></tr></thead>
+        <tbody>
+            <tr><td>Vía ferrocarril</td><td class="num">{{ ferro_reinc }}</td><td class="num">{{ ferro_primera }}</td></tr>
+            <tr><td>Resto de las vías</td><td class="num">{{ resto_reinc }}</td><td class="num">{{ resto_primera }}</td></tr>
+        </tbody>
+    </table>
+
+</body>
+</html>

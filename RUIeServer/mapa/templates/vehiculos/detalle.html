@@ -1,0 +1,12 @@
+{% extends "vehiculos/base.html" %}
+{% load static %}
+
+{% block title %}Vehículo {{ vehiculo.placa }}{% endblock %}
+{% block header %}Vehículo {{ vehiculo.placa }}{% endblock %}
+{% block header_actions %}
+<a href="{% url 'vehiculos:listado' %}" class="text-sm text-guinda hover:underline font-medium">← Volver al listado</a>
+{% endblock %}
+
+{% block content %}
+{% include "vehiculos/_detalle_contenido.html" %}
+{% endblock %}

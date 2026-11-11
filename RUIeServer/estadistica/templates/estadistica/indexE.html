@@ -1,0 +1,137 @@
+{% extends "base/base.html" %}
+
+{% load static %}
+
+{% block title %}Estadistica{% endblock title %}
+
+{% block estadistica %}
+    {% if request.user.is_superuser %}
+        <a href="{% url 'estadistica' %}" class="bg-inm-verde-100 text-white px-6 py-3 rounded-xl hover:bg-inm-marron-200">Estadistica</a>
+    {% endif %}
+{% endblock estadistica %}
+
+{% block content %}
+<div class="flex-grow flex flex-col justify-center items-center p-4">
+
+    <!-- Contenedor de dos columnas -->
+    <div class="grid grid-cols-2 gap-8 w-full max-w-2xl">
+        
+        <!-- Columna Izquierda -->
+        <div class="flex flex-col justify-center items-center p-4">
+            <a type="button" href="{% url 'busqueda' %}" class="ml-8 basis-1/8 py-5 px-5 mx-1 bg-inm-rojo-300 hover:bg-inm-marron-100 hover:text-2xl rounded-xl text-xl text-white text-center">
+                Reincidencia Diaria
+            </a>
+            {% comment %} <div class=" ml-8 basis-1/8 py-5 px-5 mx-1 bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-xl text-white text-center">
+                <a href="{% url 'busqueda' %}" class="">Reincidencia Diaria</a>
+            </div>  {% endcomment %}
+        </div>
+        
+        <!-- Columna Derecha -->
+        <div class="flex justify-center items-center p-4">
+            <a type="button" href="{% url 'reincidente' %}" class="ml-6 basis-1/8 py-5 px-5 mx-1 bg-inm-rojo-300 hover:bg-inm-marron-100 hover:text-2xl rounded-xl text-xl text-white text-center">
+                Busqueda de Reincidente por nombre
+            </a>
+        </div>
+
+        <div class="bg-white p-4 rounded-lg shadow mb-8">
+            <h1 class="text-xl text-center font-semibold text-inm-marron-200 ">Reporte de Registros</h1>
+            {% comment %} <h2 class="text-xxl font-semibold">Seleccione Intervalo de tiempo de busqueda:</h2> {% endcomment %}
+            <br>
+            <center>
+                <form method="POST" id="form-fecha1" action="{% url 'generar_pdfT' %}" enctype="multipart/form-data">{% csrf_token %}
+                    <label class="font-semibold text-inm-verde-100">Fecha de Reporte</label>
+                    <input type="date" name="fechaI" id="id_fechaI" value="{{ hoy }}">
+                    <label class="font-semibold text-inm-verde-100">Retornos </label>
+                    <input type="number" name="retornos" id="id_retornos" value="0">
+                    <br>
+                    <br>
+                    <button class="py-4 px-4 mx-1 bg-inm-rojo-300 hover:bg-inm-marron-100 hover:text-2xl rounded-xl text-xl text-white text-center" type="submit">Descargar Reporte</button>
+                </form>
+            </center>
+            
+        </div>
+
+        <div class="bg-white p-4 rounded-lg shadow mb-8">
+            <h1 class="text-xl text-center font-semibold text-inm-marron-200 ">Reporte del Centro Coodinador de Operaciones</h1>
+            {% comment %} <h2 class="text-xxl font-semibold">Seleccione Intervalo de tiempo de busqueda:</h2> {% endcomment %}
+            <br>
+            <center>
+                <form method="POST" id="form-fechaCECO" action="{% url 'generar_pdf_ceco' %}" enctype="multipart/form-data">{% csrf_token %}
+                    <label class="font-semibold text-inm-verde-100">Fecha</label>
+                    <input type="date" name="fechaI" id="id_fechaI" value="{{ hoy }}">
+                    <br>
+                    <br>
+                    <button class="py-4 px-4 mx-1 bg-inm-rojo-300 hover:bg-inm-marron-100 hover:text-2xl rounded-xl text-xl text-white text-center" type="submit">Descargar Reporte</button>
+                </form>
+            </center>
+            
+        </div>
+
+        <div class="bg-white p-4 rounded-lg shadow mb-8">
+            <h1 class="text-xl text-center font-semibold text-inm-marron-200 ">Cuadro de Datos</h1>
+            {% comment %} <h2 class="text-xxl font-semibold">Seleccione Intervalo de tiempo de busqueda:</h2> {% endcomment %}
+            <br>
+            <center>
+                <form method="POST" id="form-Cuadro" action="{% url 'generar_cuadro_diario' %}" enctype="multipart/form-data">{% csrf_token %}
+                    <label class="font-semibold text-inm-verde-100">Fecha</label>
+                    <input type="date" name="fechaI" id="id_fechaI" value="{{ hoy }}">
+                    <br>
+                    <br>
+                    <button class="py-4 px-4 mx-1 bg-inm-rojo-300 hover:bg-inm-marron-100 hover:text-2xl rounded-xl text-xl text-white text-center" type="submit">Descargar Reporte</button>
+                </form>
+            </center>
+            
+        </div>
+
+        <div class="bg-white p-4 rounded-lg shadow mb-8"> 
+            <button class="py-4 px-4 mx-1 bg-inm-rojo-300 hover:bg-inm-marron-100 hover:text-2xl rounded-xl text-xl text-white text-center" type="button" onclick="enviarFormularios()">Enviar Todo</button>
+        </div>
+
+
+
+        <!-- <div class="flex justify-center items-center p-4"> 
+            <a href="{% url 'generar_pdf' %}" class="ml-6 basis-1/8 py-5 px-5 mx-1 bg-inm-rojo-300 hover:bg-inm-marron-100 hover:text-2xl rounded-xl text-xl text-white text-center" target="_blank">
+                Descargar Reporte de Estado de Fuerza en PDF
+            </a>
+        </div> -->
+
+    </div>
+
+</div>
+
+<script>
+    function enviarFormularioEnNuevaPestana(formId) {
+        const formOriginal = document.getElementById(formId);
+        const formData = new FormData(formOriginal);
+        const action = formOriginal.action;
+
+        // Crear un formulario oculto en la página actual
+        const formOculto = document.createElement("form");
+        formOculto.method = "POST";
+        formOculto.action = action;
+        formOculto.target = "_blank"; // Se abrirá en una nueva pestaña
+
+        // Agregar los datos del formulario original al formulario oculto
+        for (const [name, value] of formData.entries()) {
+            const input = document.createElement("input");
+            input.type = "hidden";
+            input.name = name;
+            input.value = value;
+            formOculto.appendChild(input);
+        }
+
+        // Agregar el formulario al body y enviarlo
+        document.body.appendChild(formOculto);
+        formOculto.submit();
+
+        // Eliminar el formulario después de enviarlo
+        document.body.removeChild(formOculto);
+    }
+
+    function enviarFormularios() {
+        enviarFormularioEnNuevaPestana("form-fecha1");
+        enviarFormularioEnNuevaPestana("form-fechaCECO");
+        enviarFormularioEnNuevaPestana("form-Cuadro");
+    }
+</script>
+{% endblock content %}

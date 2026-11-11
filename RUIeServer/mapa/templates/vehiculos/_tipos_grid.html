@@ -1,0 +1,14 @@
+{% for tipo in tipos_vehiculo %}
+<div class="border border-slate-100 rounded-xl p-4 flex items-center gap-3 hover:border-guinda-100 hover:shadow-sm transition cursor-pointer"
+     data-hold-url="{% url 'vehiculos:popover_vehiculos' %}" data-hold-params="tipo={{ tipo.nombre|urlencode }}">
+  <span class="w-9 h-9 rounded-lg bg-guinda-50 text-guinda flex items-center justify-center text-sm font-semibold shrink-0">
+    {{ tipo.cantidad }}
+  </span>
+  <div class="min-w-0">
+    <p class="text-sm font-medium text-slate-700 truncate">{{ tipo.nombre }}</p>
+    <p class="text-xs text-slate-400">{{ tipo.cantidad }} unidad{{ tipo.cantidad|pluralize:"es" }}</p>
+  </div>
+</div>
+{% empty %}
+<p class="text-sm text-slate-400 col-span-full text-center py-6">No hay tipos de vehículo con ese filtro.</p>
+{% endfor %}

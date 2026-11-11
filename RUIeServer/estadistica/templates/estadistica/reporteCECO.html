@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Reporte CECO</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        @page {
+            /* size: A4 landscape; Establecer formato horizontal */
+            size: A4 portrait; /* Establecer formato vertical */
+            margin: 10mm;
+        }
+
+        body {
+            font-family: 'Montserrat', sans-serif;
+            padding: 0;
+        }
+        h5 {
+            text-align: center;
+            align-items: center;
+            margin-top: -10px;
+            margin-bottom: -10px;
+        }
+        h6 {
+            text-align: center;
+            align-items: center;
+            margin-bottom: -4px;
+        }
+        
+        .fecha {
+            text-align: right;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        
+        .letra {
+            font-size: 3pt;
+            
+        }
+        .colorFondo {
+            background-color: #4E1224;
+            text-align: center;
+            color: #f2f2f2;
+        }
+
+        .letraT6 { 
+            color:rgb(234, 234, 234);
+            background-color:rgb(112, 48, 160); /* Color de fondo */
+            writing-mode: vertical-lr; /* Texto en vertical (de abajo hacia arriba) */
+            font-size: 6pt;
+            border: 1px solid rgb(255, 255, 255); 
+            text-align: center;
+        }
+
+        .letraT0 { 
+            color:rgb(233, 232, 232);
+            background-color:rgb(179, 142, 93); /* Color de fondo */
+            writing-mode: vertical-lr; /* Texto en vertical (de abajo hacia arriba) */
+            font-size: 3pt;
+            border: 1px solid rgb(255, 255, 255); 
+            text-align: center;
+        }
+        
+        .letraT1 { 
+            color: #ffffff;
+            background-color: #761B36;; /* Color de fondo */
+            font-size: 3pt;
+            border: 1px solid rgb(255, 255, 255); 
+            text-align: center;
+        }
+
+        .letraT2 { 
+            color:rgb(0, 0, 0);
+            background-color: #d9d9d9; /* Color de fondo */
+            font-size: 3pt;
+            border: 1px solid rgb(255, 255, 255); 
+            text-align: center;
+        }
+
+        .letraT5 { 
+            color:rgb(0, 0, 0);
+            background-color: #d9d9d9; /* Color de fondo */
+            font-size: 5pt;
+            border: 1px solid rgb(255, 255, 255); 
+            text-align: center;
+        }
+
+        .letraT3 { 
+            color:rgb(244, 244, 244);
+            background-color:rgb(40, 92, 77);  /* Color de fondo */
+            writing-mode: vertical-lr; /* Texto en vertical (de abajo hacia arriba) */
+            font-size: 3pt;
+            border: 1px solid rgb(255, 255, 255); 
+            text-align: center;
+        }
+
+        .letraT7 { 
+            color:rgb(0, 0, 0);
+            background-color:rgb(68, 185, 252); /* Color de fondo */
+            writing-mode: vertical-lr; /* Texto en vertical (de abajo hacia arriba) */
+            font-size: 3pt;
+            border: 1px solid rgb(255, 255, 255); 
+            text-align: center;
+        }
+
+        .letraT4 { 
+            color:rgb(237, 237, 237);
+            background-color:rgb(19, 50, 43); /* Color de fondo */
+            writing-mode: vertical-lr; /* Texto en vertical (de abajo hacia arriba) */
+            font-size: 3pt;
+            border: 1px solid rgb(255, 255, 255); 
+            text-align: center;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr; /* 🔹 Ahora son 3 columnas */
+            gap: 15px;
+            page-break-inside: avoid;
+        }
+
+        .page-break {
+            page-break-before: always;
+        }
+
+
+        .containerP1 {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between; /* 🔹 Espaciado uniforme */
+            page-break-inside: avoid;
+        }
+
+        .tabla-oficina {
+            width: 32%; /* 🔹 3 columnas sin perder espacio */
+            border-collapse: collapse;
+            margin-bottom: 10px;
+        }
+
+        .tabla-oficina th, .tabla-oficina td {
+            border: 1px solid black;
+            padding: 5px;
+            text-align: center;
+            font-size: 5pt;
+        }
+
+        .tabla-oficina th {
+            background-color:rgb(40, 92, 77); 
+            color: rgb(250, 250, 250); 
+        }
+
+        .tabla-oficina td {
+            background-color:rgb(233, 233, 233); 
+        }
+    </style>
+</head>
+<body>
+
+    <p class="letra">INSTITUTO NACIONAL DE MIGRACIÓN<br>DIRECCIÓN GENERAL DE OFICINAS DE REPRESENTACION</p>
+    <div class="colorFondo">
+        <h6 class="letra">Informe Diario<br>{{ fecha_actual}}</h6>
+    </div>
+    
+    <br>
+    <h5>Rescates por Oficina y Punto</h5>
+    <br>
+
+    <div>
+        {% for oficina, datos in rescOR_punto.items %}
+        <table class='tabla-oficina'>
+            <thead>
+                <tr>
+                    <th class="letraT3" colspan="2">{{ oficina }}</th>
+                </tr>
+                <tr>
+                    <th class="letraT3">Punto</th>
+                    <th class="letraT3">Rescates</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for key, value in datos.items %}
+                <tr>
+                    <td>{{ key }}</td>
+                    <td>{{ value }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="2"> <strong>Sin rescates.</strong></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        {% if forloop.counter|divisibleby:6 %}  {# Cada 6 tablas, forzar un salto de página #}
+            <div class="page-break"></div>
+        {% endif %}
+
+    {% endfor %}
+
+    </div>
+
+
+    <div class="page-break"></div>
+
+    <br>
+    <h5>Rescates por Oficina y Nacionalidad</h5>
+
+    {% for oficina, nacionalidades in rescOR_nac.items %}
+
+    {% if forloop.counter0|divisibleby:4 and not forloop.first %}
+            <div class="page-break"></div> <!-- 🔹 Salto de página cada 9 oficinas -->
+    {% endif %}
+
+            <div class="contenedor1">
+                <h6>{{ oficina }}</h6>
+                
+                <table border="1" class="contenedor1">
+                    <thead>
+                        <tr>
+                            <th class="letraT1">Nacionalidad</th>
+        
+                            <th class="letraT2">Adultos Hombres Solos</th>
+                            <th class="letraT3">Adultos Mujeres Solas</th>
+        
+                            <th class="letraT2">Adultos Hombres Acompañan NNA</th>
+                            <th class="letraT3">Adultos Mujeres Acompañan NNA</th>
+                            <th class="letraT2">NNA Acompañados Hombres</th>
+                            <th class="letraT3">NNA Acompañados Mujeres</th>
+        
+                            <th class="letraT2">NNA No Acompañados Hombres</th>
+                            <th class="letraT3">NNA No Acompañados Mujeres</th>
+        
+                            <th class="letraT0">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for nacio, datos in nacionalidades.items %}
+                    <tr>
+                        <td class="letraT1">{{ nacio }}</td>
+                        <td class="letraT2">{{ datos.H_AS }}</td>
+                        <td class="letraT3">{{ datos.M_AS }}</td>
+        
+                        <td class="letraT2">{{ datos.H_AA }}</td>
+                        <td class="letraT3">{{ datos.M_AA }}</td>
+                        <td class="letraT2">{{ datos.H_mA }}</td>
+                        <td class="letraT3">{{ datos.M_mA }}</td>
+        
+                        <td class="letraT2">{{ datos.H_mS }}</td>
+                        <td class="letraT3">{{ datos.M_mS }}</td>
+                        
+                        <td class="letraT0">{{ datos.total }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="9">Sin rescates.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                </table>
+            </div>
+    
+
+    {% endfor %}
+    
+    <!-- <p class="fecha">Fecha: {{ fecha_actual }}</p> -->
+    
+
+</body>
+</html>

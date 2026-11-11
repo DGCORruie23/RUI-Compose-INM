@@ -1,0 +1,70 @@
+services:
+  web:
+    container_name: RUIEapp
+    restart: always
+    build: ./RUIeServer
+    command: gunicorn serverRUI.wsgi:application --bind 0.0.0.0:8000 --reload --workers 5 --threads 2 --timeout 120
+    #command: python manage.py runserver 0.0.0.0:8000
+    expose:
+      - 8000
+    env_file:
+      - .env.dev
+    links:
+      - db
+    volumes: 
+      - ./static_volume:/src/backendRUIe/static
+      - ./media_volume:/src/backendRUIe/media
+      - ./test_files:/src/backendRUIe/test_files
+      - ./RUIeServer/estadistica:/src/backendRUIe/estadistica
+      - ./RUIeServer/dashboard:/src/backendRUIe/dashboard
+      - ./RUIeServer/usuario:/src/backendRUIe/usuario
+      - ./RUIeServer/mapa:/src/backendRUIe/mapa
+      - ./RUIeServer/usuarioL:/src/backendRUIe/usuarioL
+      - ./RUIeServer/serverRUI:/src/backendRUIe/serverRUI
+      - ./RUIeServer/Reportes_Analisis:/src/backendRUIe/Reportes_Analisis
+      - ./RUIeServer/vehiculos:/src/backendRUIe/vehiculos
+      - ./RUIeServer/actividades:/src/backendRUIe/actividades
+
+  # -- refresca el view mapa_mv_reincidencia_rescates cada 10 min, aparte de
+  # cualquier request. Reusa la imagen de postgres solo por el cliente psql,
+  # no guarda datos propios.
+  cron-reincidencia:
+    container_name: RUIEcronReincidencia
+    restart: always
+    image: postgres:16.4-alpine
+    command: ["/bin/sh", "-c", "while true; do PGPASSWORD=\"$$POSTGRES_PASSWORD\" psql -h db -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\" -c \"REFRESH MATERIALIZED VIEW CONCURRENTLY mapa_mv_reincidencia_rescates;\"; sleep 600; done"]
+    env_file:
+      - .env.db
+    links:
+      - db
+
+  db:
+    container_name: dbPGruie
+    restart: always
+    image: postgres:16.4-alpine
+    shm_size: 128mb
+    volumes:
+      - ./postgres_data:/var/lib/postgresql/data
+    env_file:
+      - .env.db
+
+  nginx:
+    container_name: RuieNginx
+    build: ./nginx
+    # restart: always
+    expose:
+      - 443
+    ports:
+      - 443:443
+      - 80:80
+    links:
+      - web
+    volumes:
+      - ./static_volume:/src/backendRUIe/static
+      - ./media_volume:/src/backendRUIe/media
+      - ./certificados:/etc/nginx/certs
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/nginx.conf
+    environment:
+      - VIRTUAL_HOST=ruie.inami.gob.mx
+      - LETSENCRYPT_HOST=ruie.inami.gob.mx
+      - LETSENCRYPT_EMAIL=dgcor.rui23@gmail.com

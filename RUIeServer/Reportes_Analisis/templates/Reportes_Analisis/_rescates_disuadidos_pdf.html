@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Disuadidos {{ fecha_actual }}</title>
+    <style>
+        @page { size: A4; margin: 10mm; }
+        body { font-family: sans-serif; padding: 0; margin: 0; }
+        .titulo-inm { text-align: center; font-size: 9pt; margin: 0 0 4px; }
+        h2.dis-header {
+            text-align: center; font-size: 13pt; font-weight: 900; color: #fff;
+            background-color: #4472C4; padding: 6px 0; margin: 0 0 8px; border-radius: 4px;
+        }
+        table.ceco2-tabla { border-collapse: collapse; width: 100%; margin-bottom: 16px; }
+        table.ceco2-tabla th, table.ceco2-tabla td { border: 1px solid #DCE6F1; padding: 4px 6px; text-align: center; font-size: 9pt; }
+        table.ceco2-tabla thead th { background-color: #4472C4; color: #fff; font-weight: bold; }
+        table.ceco2-tabla td.text-right { text-align: right; }
+        table.ceco2-tabla td:nth-child(2) { text-align: left; }
+        table.ceco2-tabla tr.fila-total-ceco2 td { background-color: #1F3864; color: #fff; font-weight: bold; }
+
+        .caja-nota { background-color: #FFFBEB; border: 1px solid #FDE68A; border-radius: 8px; padding: 10px 14px; margin-top: 10px; }
+        .caja-nota h3 { color: #92400E; font-size: 10pt; margin: 0 0 6px; }
+        .caja-nota p { color: #78350F; font-size: 8.5pt; line-height: 1.4; margin: 0 0 8px; }
+        table.tabla-evidencia { width: 60%; border-collapse: collapse; font-size: 8.5pt; }
+        table.tabla-evidencia th, table.tabla-evidencia td { padding: 4px 8px; text-align: right; border-bottom: 1px solid #FDE68A; }
+        table.tabla-evidencia th:first-child, table.tabla-evidencia td:first-child { text-align: left; }
+        table.tabla-evidencia thead th { color: #92400E; }
+
+        .fila-desglose { display: flex; gap: 12px; }
+        .fila-desglose > div { flex: 1; }
+        table.tabla-nac-dis { max-height: none; }
+    </style>
+</head>
+<body>
+
+    <p class="titulo-inm">INSTITUTO NACIONAL DE MIGRACIÓN<br>DIRECCIÓN GENERAL DE COORDINACIÓN DE OFICINAS DE REPRESENTACION</p>
+    <h2 class="dis-header">Disuadidos — {{ fecha_actual }}</h2>
+
+    <table class="ceco2-tabla">
+        <thead>
+            <tr><th>Fecha</th><th>OR</th><th>Total disuadidos</th></tr>
+        </thead>
+        <tbody>
+            {% for f in filas %}
+            <tr>
+                <td>{{ fecha_actual }}</td>
+                <td>{{ f.oficina }}</td>
+                <td class="text-right">{{ f.total }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="3">Sin registros en esta fecha.</td></tr>
+            {% endfor %}
+            <tr class="fila-total-ceco2">
+                <td colspan="2">TOTAL</td>
+                <td class="text-right">{{ total|default:0 }}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="fila-desglose">
+        <div>
+            <table class="ceco2-tabla">
+                <thead><tr><th colspan="2">Categoría</th></tr></thead>
+                <tbody>
+                    {% for etiqueta, valor in categorias_valores %}
+                    <tr><td style="text-align:left;">{{ etiqueta }}</td><td class="text-right">{{ valor }}</td></tr>
+                    {% endfor %}
+                    <tr class="fila-total-ceco2"><td>TOTAL</td><td class="text-right">{{ por_categoria.total|default:0 }}</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div>
+            <table class="ceco2-tabla">
+                <thead><tr><th colspan="2">Zona migratoria</th></tr></thead>
+                <tbody>
+                    <tr><td style="text-align:left;">Río Bravo</td><td class="text-right">{{ zonas.rio_bravo }}</td></tr>
+                    <tr><td style="text-align:left;">Centro</td><td class="text-right">{{ zonas.centro }}</td></tr>
+                    <tr><td style="text-align:left;">Suchiate</td><td class="text-right">{{ zonas.suchiate }}</td></tr>
+                    {% if zonas.sin_zona %}<tr><td style="text-align:left;">Sin zona</td><td class="text-right">{{ zonas.sin_zona }}</td></tr>{% endif %}
+                    <tr class="fila-total-ceco2"><td>TOTAL</td><td class="text-right">{{ total|default:0 }}</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <table class="ceco2-tabla tabla-nac-dis" style="margin-top:16px;">
+        <thead><tr><th>Nacionalidad</th><th>Total</th></tr></thead>
+        <tbody>
+            {% for n in nacionalidades %}
+            <tr><td style="text-align:left;">{{ n.nacionalidad }}</td><td class="text-right">{{ n.total }}</td></tr>
+            {% empty %}
+            <tr><td colspan="2">Sin registros en esta fecha.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% comment %}
+    @FADAR -- nota metodologica oculta a peticion del usuario (no se borra,
+    solo se deja de mostrar). Ver el mismo comentario en
+    rescates_reporte_disuadidos.html para el texto completo.
+    <div class="caja-nota">
+        <h3>⚠ Nota metodológica — práctica de captura no estandarizada</h3>
+        <table class="tabla-evidencia">
+            <thead>
+                <tr><th></th><th>Con puntoEstra</th><th>Sin puntoEstra</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Total del día</td><td>{{ total_con_puntoestra|default:0 }}</td><td>{{ total_sin_puntoestra|default:0 }}</td></tr>
+            </tbody>
+        </table>
+    </div>
+    {% endcomment %}
+
+</body>
+</html>

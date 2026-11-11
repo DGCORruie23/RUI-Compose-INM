@@ -1,0 +1,28 @@
+{% for v in vehiculos %}
+<tr class="fila-vehiculo border-t border-slate-100 hover:bg-slate-50 transition">
+  <td class="px-4 py-3 font-medium text-slate-700">{{ v.placa }}</td>
+  <td class="px-4 py-3 text-slate-600">{{ v.marca }} {{ v.modelo }}</td>
+  <td class="px-4 py-3 text-slate-600">{{ v.tipo_vehiculo }}</td>
+  <td class="px-4 py-3">
+    <span class="text-xs font-semibold rounded px-2 py-0.5
+      {% if v.situacion_color == 'activo' %}bg-emerald-100 text-emerald-700
+      {% elif v.situacion_color == 'mantenimiento' %}bg-amber-100 text-amber-700
+      {% else %}bg-rose-100 text-rose-700{% endif %}">
+      {{ v.situacion }}
+    </span>
+  </td>
+  <td class="px-4 py-3 text-slate-600">{{ v.tipo_asignacion }}</td>
+  <td class="px-4 py-3 text-slate-600">{{ v.estado }}</td>
+  <td class="px-4 py-3 text-right">
+    {% comment %}v.detalle_url ya resuelve por id o por placa segun corresponda (ver _urls_detalle_vehiculo en views.py).{% endcomment %}
+    <a href="{{ v.detalle_url }}" data-modal-url="{{ v.detalle_fragmento_url }}"
+       class="text-emerald-600 hover:text-emerald-700 hover:underline font-medium whitespace-nowrap">
+      Ver detalle →
+    </a>
+  </td>
+</tr>
+{% empty %}
+<tr>
+  <td colspan="7" class="text-center text-slate-400 py-10">No hay vehículos que coincidan con estos filtros.</td>
+</tr>
+{% endfor %}

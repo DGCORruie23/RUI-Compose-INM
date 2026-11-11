@@ -1,0 +1,116 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}Reporte especial de nacionalidades{% endblock title %}
+
+{% block styles %}
+<style>
+    .rescates-tarjeta {
+        background: #ffffff; border-radius: 1rem; border: 1px solid #e5e7eb;
+        padding: 1rem 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    /* @FADAR -- colores del tema del Excel de referencia (accent1/2, dk2,
+       lt2, accent6) resueltos a RGB real -- misma paleta que CECO V1/V2. */
+    table.nacesp-tabla { width: 100%; border-collapse: collapse; font-family: sans-serif; font-size: 0.85rem; }
+    table.nacesp-tabla th, table.nacesp-tabla td { border: 1px solid #DCE6F1; padding: 0.5rem 0.6rem; text-align: center; }
+    table.nacesp-tabla td:first-child { text-align: left; font-weight: 700; }
+    .col-azul { background: #4472C4; color: #fff; }
+    .col-naranja { background: #ED7D31; color: #fff; }
+    .col-azulgris { background: #44546A; color: #fff; }
+    .col-verdeosc { background: #13322B; color: #fff; }
+    .col-verde { background: #70AD47; color: #fff; }
+    table.nacesp-tabla tr.fila-total td { background: #E7E6E6; font-weight: 700; }
+</style>
+{% endblock styles %}
+
+{% block content %}
+<main class="max-w-6xl mx-auto px-4 py-6">
+
+    <div class="flex items-center justify-between mb-4">
+        <h1 class="text-2xl font-bold text-[#9A0A38]">Reporte especial de nacionalidades</h1>
+        <a href="{% url 'Reportes_Analisis:rescates_dashboard' %}" class="text-sm font-semibold text-gray-500 hover:text-[#9A0A38] transition">← Volver al dashboard</a>
+    </div>
+
+    <form method="get" class="rescates-tarjeta mb-8 flex flex-wrap items-end gap-4">
+        <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-1">Fecha inicio</label>
+            <input type="date" name="fecha_inicio" value="{{ fecha_inicio }}"
+                   class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm">
+        </div>
+        <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-1">Fecha fin</label>
+            <input type="date" name="fecha_fin" value="{{ fecha_fin }}"
+                   class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm">
+        </div>
+        <button type="submit" class="bg-[#9A0A38] hover:bg-[#7d0830] text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
+            Generar
+        </button>
+        <a href="{{ request.path }}" class="inline-flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition">Limpiar filtros</a>
+        <div class="flex-1"></div>
+        <a href="{% url 'Reportes_Analisis:rescates_reporte_nacionalidades_especiales_pdf' %}?fecha_inicio={{ fecha_inicio }}&fecha_fin={{ fecha_fin }}"
+           class="inline-flex items-center gap-2 bg-gray-700 hover:bg-gray-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+            ⬇ Descargar PDF
+        </a>
+        <a href="{% url 'Reportes_Analisis:rescates_reporte_nacionalidades_especiales_excel' %}?fecha_inicio={{ fecha_inicio }}&fecha_fin={{ fecha_fin }}"
+           class="inline-flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+            ⬇ Descargar Excel
+        </a>
+    </form>
+
+    <p class="text-xs text-gray-400 mb-4">
+        Lista fija de 4 nacionalidades con situación especial.
+    </p>
+
+    <div class="rescates-tarjeta overflow-x-auto">
+        <table class="nacesp-tabla">
+            <thead>
+                <tr>
+                    <th class="col-azul">TOTAL<br>RESCATADOS</th>
+                    <th colspan="2" rowspan="2" class="col-naranja">MAYORES DE EDAD SOLOS</th>
+                    <th colspan="2" rowspan="2" class="col-azulgris">MAYORES DE EDAD QUE ACOMPAÑAN A NNA'S</th>
+                    <th colspan="4" class="col-verdeosc">MENORES DE EDAD</th>
+                    <th class="col-verdeosc"></th>
+                    <th rowspan="3" class="col-verde">TOTAL</th>
+                </tr>
+                <tr>
+                    <th class="col-azul">{{ fecha_actual }}</th>
+                    <th colspan="2" class="col-verdeosc">ACOMPAÑADOS</th>
+                    <th colspan="2" class="col-naranja">NO ACOMPAÑADOS</th>
+                    <th class="col-naranja">OFICINAS</th>
+                </tr>
+                <tr>
+                    <th class="col-azul">NACIONALIDAD</th>
+                    <th class="col-naranja">H</th><th class="col-naranja">M</th>
+                    <th class="col-azulgris">H</th><th class="col-azulgris">M</th>
+                    <th class="col-verdeosc">H</th><th class="col-verdeosc">M</th>
+                    <th class="col-naranja">H</th><th class="col-naranja">M</th>
+                    <th class="col-naranja"></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for f in filas %}
+                <tr>
+                    <td>{{ f.nacionalidad }}</td>
+                    <td>{{ f.H_AS }}</td><td>{{ f.M_AS }}</td>
+                    <td>{{ f.H_AA }}</td><td>{{ f.M_AA }}</td>
+                    <td>{{ f.H_mA }}</td><td>{{ f.M_mA }}</td>
+                    <td>{{ f.H_mS }}</td><td>{{ f.M_mS }}</td>
+                    <td style="text-align:left; font-weight:400;">{{ f.oficinas }}</td>
+                    <td>{{ f.total }}</td>
+                </tr>
+                {% endfor %}
+                <tr class="fila-total">
+                    <td>TOTAL</td>
+                    <td>{{ fila_total.H_AS }}</td><td>{{ fila_total.M_AS }}</td>
+                    <td>{{ fila_total.H_AA }}</td><td>{{ fila_total.M_AA }}</td>
+                    <td>{{ fila_total.H_mA }}</td><td>{{ fila_total.M_mA }}</td>
+                    <td>{{ fila_total.H_mS }}</td><td>{{ fila_total.M_mS }}</td>
+                    <td></td>
+                    <td>{{ fila_total.total }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+</main>
+{% endblock content %}

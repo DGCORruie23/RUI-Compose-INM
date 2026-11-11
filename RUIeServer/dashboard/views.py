@@ -1,0 +1,1312 @@
+from django.shortcuts import render, redirect
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.http import JsonResponse
+from django.db.models import Count
+from usuarioL.models import usuarioL
+from .forms import ExcelForm, RegistroForm, RegistroNewForm, puntosIForm, RegistroCreateForm
+from usuario.models import RescatePunto, EstadoFuerza, PuntosInternacion, Municipios, Paises, Usuario, Inadmitido, encrypt_str_pass, decrypt_str_pass
+from django.contrib import messages
+from datetime import *
+
+from .forms import EstadoFuerzaForm, UsuarioForm
+from usuario.forms import CargarArchivoForm
+from django.shortcuts import render, get_object_or_404, redirect
+from django.core.paginator import Paginator, EmptyPage
+from django.contrib.auth.hashers import make_password
+from django.views.decorators.http import require_POST
+
+import json
+from django.db import connection
+
+def marcar_reincidentes(valores):
+    """
+    Identifica qué registros corresponden a personas con reincidencia
+    registrada en la vista materializada mapa_mv_reincidencia_rescates
+    comparando nombre, apellidos y nacionalidad.
+    Asigna val.es_reincidente = True/False a cada objeto y retorna el conjunto de idRescate reincidentes.
+    """
+    if not valores:
+        return set()
+
+    registros = list(valores)
+    ids = [r.idRescate for r in registros if getattr(r, 'idRescate', None)]
+    if not ids:
+        return set()
+
+    reincidentes_ids = set()
+    try:
+        with connection.cursor() as cur:
+            cur.execute("""
+                SELECT DISTINCT r."idRescate"
+                FROM usuario_rescatepunto r
+                JOIN mapa_mv_reincidencia_rescates v
+                  ON r.nombre = v.nombre AND r.apellidos = v.apellidos AND r.nacionalidad = v.nacionalidad
+                WHERE r."idRescate" = ANY(%s) AND (v.clasificacion = 'Reincidente' OR v.veces >= 2)
+            """, [ids])
+            reincidentes_ids = {row[0] for row in cur.fetchall()}
+    except Exception as e:
+        try:
+            with connection.cursor() as cur:
+                cur.execute("""
+                    SELECT DISTINCT r."idRescate"
+                    FROM usuario_rescatepunto r
+                    JOIN mapa_mv_reincidencia_rescates v
+                      ON r.nombre = v.nombre AND r.apellidos = v.apellidos AND r.nacionalidad = v.nacionalidad
+                    WHERE r."idRescate" = ANY(%s)
+                """, [ids])
+                reincidentes_ids = {row[0] for row in cur.fetchall()}
+        except Exception as e2:
+            print("Error al verificar reincidencia en mapa_mv_reincidencia_rescates:", e2)
+
+    for r in registros:
+        r.es_reincidente = (r.idRescate in reincidentes_ids)
+
+    return reincidentes_ids
+
+# Create your views here.
+
+@login_required
+def dashboard(request):
+    user_profile = getattr(request.user, 'usuarioL', None)
+    userDataI = [user_profile] if user_profile else []
+
+    if request.method == 'GET':
+        form = ExcelForm()
+        formCargar1 = CargarArchivoForm()
+        data = {
+            'usuario' : userDataI,
+            'form': form,
+            'formCargar1': formCargar1
+        }
+        return render(request, "dashboard/dashboard.html", context=data)
+    
+    elif request.method == 'POST':
+        form = ExcelForm(request.POST)
+        valores = []
+        if(form.is_valid()):
+            dia = request.POST["fechaDescarga_day"]
+            mes = request.POST["fechaDescarga_month"]
+            year = request.POST["fechaDescarga_year"]
+
+            fechaR = datetime.strptime(f"{dia}/{mes}/{year}", "%d/%m/%Y").strftime('%d-%m-%y')
+
+            oficina = user_profile.oficinaR if user_profile else None
+            valores = RescatePunto.objects.filter(fecha=fechaR, oficinaRepre=oficina)
+
+        data = {
+            'usuario' : userDataI,
+            'form': form,
+            'values' : valores,
+        }
+            
+        return render(request, "dashboard/dashboard.html", context=data)
+
+    else: 
+        form = ExcelForm()
+        data = {
+            'usuario' : userDataI,
+            'form': form,
+        }
+        return render(request, "dashboard/dashboard.html", context=data) 
+
+@login_required
+def datos_inadmitidos(request):
+    if request.method == 'POST':
+        fecha_str = request.POST.get('fechaDescarga') or request.POST.get('fechaInadmitidos')
+        if fecha_str:
+            try:
+                fecha_obj = datetime.strptime(fecha_str, "%Y-%m-%d").date()
+            except ValueError:
+                fecha_obj = date.today()
+        else:
+            fecha_obj = date.today()
+
+        user_profile = getattr(request.user, 'usuarioL', None)
+        userDataI = [user_profile] if user_profile else []
+
+        valores = Inadmitido.objects.filter(fecha_hora__date=fecha_obj)
+        if not request.user.is_superuser and user_profile:
+            valores = valores.filter(oficina=user_profile.oficinaR)
+
+        context = {
+            'usuario': userDataI,
+            'values': valores,
+            'fecha_seleccionada': fecha_obj.strftime("%Y-%m-%d"),
+            'fecha_formateada': fecha_obj.strftime("%d/%m/%Y"),
+        }
+        return render(request, "dashboard/datos_inadmitidos.html", context=context)
+
+    return redirect('/dashboard')
+
+@login_required
+def datos_fecha(request):
+    if request.method == 'POST':
+        form = ExcelForm(request.POST)
+        if form.is_valid():
+            # Obtiene la fecha seleccionada del formulario
+            fecha_seleccionada = form.cleaned_data['fechaDescarga']
+
+            print(fecha_seleccionada)
+            # Redirige a la vista de la tabla de productos con la fecha seleccionada
+            return redirect('tabla_registros_fecha', year=fecha_seleccionada.year, month=fecha_seleccionada.month, day=fecha_seleccionada.day)
+    else:
+        return redirect('/dashboard')
+    
+@login_required
+def datos_fechas(request):
+    if request.method == 'POST':
+        form = ExcelForm(request.POST)
+        if form.is_valid():
+            user_profile = getattr(request.user, 'usuarioL', None)
+            userDataI = [user_profile] if user_profile else []
+            
+            fechaI = request.POST["fechaInicio"]
+            fechaF = request.POST["fechaFin"]
+
+            fechaIN = datetime.strptime(f"{fechaI}", "%Y-%m-%d")
+            fechaFN = datetime.strptime(f"{fechaF}", "%Y-%m-%d")
+            
+            array_fechas = [(fechaIN + timedelta(days=d)).strftime("%d-%m-%y") for d in range((fechaFN - fechaIN).days + 1)]
+            form = ExcelForm()
+            
+            valores = RescatePunto.objects.filter(fecha__in=array_fechas)
+                
+            if request.user.is_superuser:
+                template = "dashboard/datos_diaSU.html"
+            else:
+                oficina = user_profile.oficinaR if user_profile else None
+                valores = valores.filter(oficinaRepre=oficina)
+                template = "dashboard/datos_dia.html"
+
+            registros = list(valores)
+            reincidentes_ids = marcar_reincidentes(registros)
+
+            data = {
+                'usuario' : userDataI,
+                'form': form,
+                'values' : registros,
+                'reincidentes_ids': reincidentes_ids,
+                'fecha_P' : array_fechas,
+                'fecha_inicio_api': fechaI,
+                'fecha_fin_api': fechaF,
+            }
+
+            return render(request, template, context=data)
+    
+    return redirect('/dashboard')
+    
+@login_required
+def eliminar_registros(request):
+    if request.method == 'POST':
+        # Obtén los IDs de los productos seleccionados
+        registros_seleccionados = request.POST.getlist('registros_seleccionados')
+
+        # Elimina los productos seleccionados
+        registros_eliminar = RescatePunto.objects.filter(idRescate__in=registros_seleccionados)
+        if not request.user.is_superuser:
+            user_profile = getattr(request.user, 'usuarioL', None)
+            user_ofi = user_profile.oficinaR if user_profile else None
+            registros_eliminar = registros_eliminar.filter(oficinaRepre=user_ofi)
+
+        if registros_eliminar.exists():
+            fechaR = registros_eliminar[0].fecha
+            registros_eliminar.delete()
+
+            # Redirige a la página de la tabla de productos o a donde desees
+            fecha_seleccionada = datetime.strptime(f"{fechaR}", "%d-%m-%y")
+            return redirect('tabla_registros_fecha', year=fecha_seleccionada.year, month=fecha_seleccionada.month, day=fecha_seleccionada.day)
+
+    # Obtén todos los productos para mostrar en la tabla
+    return redirect("/dashboard")
+
+
+@login_required
+def corregir_registros_masivo(request):
+    if request.method == 'POST':
+        registros_seleccionados = request.POST.getlist('registros_seleccionados')
+        nueva_oficina = request.POST.get('nueva_oficina')
+        nuevo_tipo_punto = request.POST.get('nuevo_tipo_punto')
+        nuevo_punto = request.POST.get('nuevo_punto')
+        fecha_redirect = request.POST.get('fecha_redirect')
+
+        user_profile = getattr(request.user, 'usuarioL', None)
+        user_ofi = user_profile.oficinaR if user_profile else "CDMX"
+
+        # Limit to user's assigned office if not superuser
+        if not request.user.is_superuser:
+            nueva_oficina = user_ofi
+
+        if registros_seleccionados and nueva_oficina:
+            db_aerop = False
+            db_carre = False
+            db_centralA = False
+            db_casaS = False
+            db_ferro = False
+            db_hotel = False
+            db_puestos = False
+            db_volunt = False
+
+            if nuevo_tipo_punto == 'aeropuerto':
+                db_aerop = True
+            elif nuevo_tipo_punto == 'carretero':
+                db_carre = True
+            elif nuevo_tipo_punto == 'central de autobus':
+                db_centralA = True
+            elif nuevo_tipo_punto == 'disuadidos':
+                db_casaS = True
+            elif nuevo_tipo_punto == 'ferrocarril':
+                db_ferro = True
+            elif nuevo_tipo_punto == 'visitas de verificación':
+                db_hotel = True
+            elif nuevo_tipo_punto == 'puestos a disposición':
+                db_puestos = True
+                nuevo_punto = ""
+            else:
+                db_volunt = True
+                nuevo_punto = ""
+
+            queryset_actualizar = RescatePunto.objects.filter(idRescate__in=registros_seleccionados)
+            if not request.user.is_superuser:
+                queryset_actualizar = queryset_actualizar.filter(oficinaRepre=user_ofi)
+
+            queryset_actualizar.update(
+                oficinaRepre=nueva_oficina,
+                aeropuerto=db_aerop,
+                carretero=db_carre,
+                casaSeguridad=db_casaS,
+                centralAutobus=db_centralA,
+                ferrocarril=db_ferro,
+                hotel=db_hotel,
+                puestosADispo=db_puestos,
+                voluntarios=db_volunt,
+                puntoEstra=nuevo_punto.upper() if nuevo_punto else ""
+            )
+            messages.success(request, "Registros corregidos exitosamente.")
+            
+            if fecha_redirect:
+                try:
+                    fecha_sel = datetime.strptime(fecha_redirect, "%d-%m-%y")
+                    return redirect('tabla_registros_fecha', year=fecha_sel.year, month=fecha_sel.month, day=fecha_sel.day)
+                except ValueError:
+                    pass
+        else:
+            messages.error(request, "Error en la corrección: Debe seleccionar registros y oficina.")
+
+    return redirect('/dashboard')
+
+
+@login_required
+def tabla_registros(request, year=None, month=None, day=None):
+    user_profile = getattr(request.user, 'usuarioL', None)
+    userDataI = [user_profile] if user_profile else []
+
+    fechaR = datetime.strptime(f"{day}/{month}/{year}", "%d/%m/%Y").strftime('%d-%m-%y')
+    form = ExcelForm()
+    
+    valores = RescatePunto.objects.filter(fecha=fechaR)
+
+    datos_puntos_estrategicos = {}
+    datos_puntos_internacion = {}
+    datos_municipios = {}
+    
+    punto_attr_map = {
+        'aeropuerto': 'aeropuerto',
+        'carretero': 'carretero',
+        'central de autobus': 'centralAutobus',
+        'disuadidos': 'casaSeguridad',
+        'ferrocarril': 'ferrocarril',
+        'visitas de verificación': 'hotel',
+        'puestos a disposición': 'puestosADispo',
+        'voluntarios': 'voluntarios',
+    }
+    tiposPNombre = list(punto_attr_map.keys())
+
+    oficina_limite = None
+    if not request.user.is_superuser:
+        oficina_limite = user_profile.oficinaR if user_profile else None
+
+    for ef in EstadoFuerza.objects.all():
+        oficina = ef.oficinaR
+        if oficina_limite and oficina != oficina_limite:
+            continue
+        tipo = ef.tipoP
+        nombre = ef.nomPuntoRevision.strip()
+        if oficina not in datos_puntos_estrategicos:
+            datos_puntos_estrategicos[oficina] = {}
+        if tipo not in datos_puntos_estrategicos[oficina]:
+            datos_puntos_estrategicos[oficina][tipo] = []
+            datos_puntos_estrategicos[oficina][tipo].append(nombre)
+
+    for pi in PuntosInternacion.objects.all():
+        est = pi.estadoPunto
+        if oficina_limite and est != oficina_limite:
+            continue
+        tipo = pi.tipoPunto
+        nom = pi.nombrePunto.strip()
+        if est not in datos_puntos_internacion:
+            datos_puntos_internacion[est] = {}
+        if tipo not in datos_puntos_internacion[est]:
+            datos_puntos_internacion[est][tipo] = []
+        datos_puntos_internacion[est][tipo].append(nom)
+
+    for mun in Municipios.objects.all():
+        est = mun.estado
+        if oficina_limite and est != oficina_limite:
+            continue
+        nom = mun.nomMunicipio.strip()
+        if est not in datos_municipios:
+            datos_municipios[est] = []
+        datos_municipios[est].append(nom)
+
+    if request.user.is_superuser:
+        template = "dashboard/datos_diaSU.html"
+    else:
+        valores = valores.filter(oficinaRepre=oficina_limite)
+        template = "dashboard/datos_dia.html"
+
+    registros = list(valores)
+    reincidentes_ids = marcar_reincidentes(registros)
+
+    data = {
+        'usuario' : userDataI,
+        'form': form,
+        'values' : registros,
+        'reincidentes_ids': reincidentes_ids,
+        'fecha_P' : fechaR,
+        'fecha_inicio_api': f"{year}-{month:02d}-{day:02d}",
+        'fecha_fin_api': f"{year}-{month:02d}-{day:02d}",
+        'year_context': year,
+        'month_context': month,
+        'day_context': day,
+        'puntosEstrategicos': datos_puntos_estrategicos,
+        'puntosInternacion': datos_puntos_internacion,
+        'municipios': datos_municipios,
+        'tiposPNombre': tiposPNombre,
+    }
+
+    return render(request, template, context=data)
+    
+@login_required
+def editarData(request, pk):
+    rescate = get_object_or_404(RescatePunto, idRescate=pk)
+    user_profile = getattr(request.user, 'usuarioL', None)
+    user_ofi = user_profile.oficinaR if user_profile else None
+
+    if not request.user.is_superuser and rescate.oficinaRepre != user_ofi:
+        messages.error(request, "No tienes permiso para editar registros de otra oficina.")
+        return redirect("/dashboard")
+    
+    if request.method == 'GET':
+        ofiRep = str(rescate.oficinaRepre)
+        
+        # Mapeo de tipos de punto para simplificar la lógica
+        punto_attr_map = {
+            'aeropuerto': 'aeropuerto',
+            'carretero': 'carretero',
+            'central de autobus': 'centralAutobus',
+            'disuadidos': 'casaSeguridad',
+            'ferrocarril': 'ferrocarril',
+            'visitas de verificación': 'hotel',
+            'puestos a disposición': 'puestosADispo',
+            'voluntarios': 'voluntarios',
+        }
+        
+        tiposPNombre = list(punto_attr_map.keys())
+        puntoR = next((name for name, attr in punto_attr_map.items() if getattr(rescate, attr)), '')
+
+        # Preparar datos iniciales para el formulario
+        try:
+            fecha_naci_dt = datetime.strptime(rescate.fechaNacimiento, "%d/%m/%Y")
+            fecha_naci_str = fecha_naci_dt.strftime('%Y-%m-%d')
+        except (ValueError, TypeError):
+            fecha_naci_str = ""
+
+        datosR = {
+            'idRescate': pk,
+            'fecha': rescate.fecha,
+            'hora': datetime.strptime(rescate.hora, "%H:%M").strftime("%H:%M") if rescate.hora else "",
+            'tipo_punto': puntoR,
+            'puntoEstra': rescate.puntoEstra,
+            'nacionalidad': rescate.nacionalidad,
+            'nombre': rescate.nombre,
+            'apellidos': rescate.apellidos,
+            'parentesco': rescate.parentesco,
+            'fechaNacimiento': fecha_naci_str,
+            'sexo': 'True' if (rescate.sexo is True or str(rescate.sexo).lower() == 'true') else 'False',
+            'embarazo': 'True' if (rescate.embarazo is True or str(rescate.embarazo).lower() == 'true') else 'False',
+            'numFamilia': rescate.numFamilia,
+            'oficinaR': rescate.oficinaRepre
+        }
+
+        form = RegistroNewForm(initial=datosR)
+
+        # Optimización: Consultas únicas y procesamiento en memoria
+        # Estado Fuerza
+        types_puntosAll = []
+        types_PRescateC = []
+        types_PRescateCA = []
+        types_PRescateF = []
+        datos_puntos_estrategicos = {}
+
+        for ef in EstadoFuerza.objects.all():
+            oficina = ef.oficinaR
+            tipo = ef.tipoP
+            nombre = ef.nomPuntoRevision.strip()
+            nombre_upper = nombre
+
+            types_puntosAll.append(oficina)
+            
+            # Agrupación para el diccionario de puntos estratégicos
+            if oficina not in datos_puntos_estrategicos:
+                datos_puntos_estrategicos[oficina] = {}
+            if tipo not in datos_puntos_estrategicos[oficina]:
+                datos_puntos_estrategicos[oficina][tipo] = []
+            datos_puntos_estrategicos[oficina][tipo].append(nombre)
+
+            # Filtros específicos para la oficina actual del rescate
+            if oficina == ofiRep:
+                if tipo == "Carretero":
+                    types_PRescateC.append(nombre_upper)
+                elif tipo == "Central de autobús":
+                    types_PRescateCA.append(nombre_upper)
+                elif tipo == "Ferroviario":
+                    types_PRescateF.append(nombre_upper)
+
+        # Puntos de Internación
+        types_PRescateA = []
+        datos_puntos_internacion = {}
+        for pi in PuntosInternacion.objects.all():
+            est = pi.estadoPunto
+            tipo = pi.tipoPunto
+            nom = pi.nombrePunto.strip()
+            
+            if est not in datos_puntos_internacion:
+                datos_puntos_internacion[est] = {}
+            if tipo not in datos_puntos_internacion[est]:
+                datos_puntos_internacion[est][tipo] = []
+            datos_puntos_internacion[est][tipo].append(nom)
+
+            if est == ofiRep and tipo == "AEREOS":
+                types_PRescateA.append(nom)
+
+        # Municipios
+        types_PRescateM = []
+        datos_municipios = {}
+        for mun in Municipios.objects.all():
+            est = mun.estado
+            nom = mun.nomMunicipio.strip()
+            
+            if est not in datos_municipios:
+                datos_municipios[est] = []
+            datos_municipios[est].append(nom)
+
+            if est == ofiRep:
+                types_PRescateM.append(nom)
+
+        # Nacionalidades
+        types_Naciona = [p.nombre_pais.strip() for p in Paises.objects.all()]
+
+        context = {
+            "form": form,
+            "value": rescate,
+            "datosR": datosR,
+            "puntosEstrategicos": datos_puntos_estrategicos,
+            "puntosInternacion": datos_puntos_internacion,
+            "municipios": datos_municipios,
+            "res_aero": types_PRescateA,
+            "res_carre": types_PRescateC,
+            "res_central": types_PRescateCA,
+            "res_ferro": types_PRescateF,
+            "municipio": types_PRescateM,
+            "nacion": types_Naciona,
+            'tiposPNombre': tiposPNombre,
+        }
+        
+        return render(request, "dashboard/editarDato.html", context=context)
+    
+    elif request.method == 'POST':
+        form = RegistroNewForm(request.POST)
+        if form.is_valid():
+            form.cleaned_data['idRescate'] = pk
+            if not request.user.is_superuser:
+                form.cleaned_data['oficinaR'] = user_ofi
+            form.save()
+            messages.success(request, "El registro ha sido modificado")
+            fecha_form = form.cleaned_data['fecha']
+            try:
+                fecha_sel = datetime.strptime(f"{fecha_form}", "%d-%m-%y")
+                return redirect('tabla_registros_fecha', year=fecha_sel.year, month=fecha_sel.month, day=fecha_sel.day)
+            except ValueError:
+                return redirect('/dashboard')
+        else:
+            # Si el formulario es inválido, reconstruimos el contexto completo para no perder la estructura del formulario
+            ofiRep = request.POST.get('oficinaR', str(rescate.oficinaRepre))
+            
+            punto_attr_map = {
+                'aeropuerto': 'aeropuerto',
+                'carretero': 'carretero',
+                'central de autobus': 'centralAutobus',
+                'disuadidos': 'casaSeguridad',
+                'ferrocarril': 'ferrocarril',
+                'visitas de verificación': 'hotel',
+                'puestos a disposición': 'puestosADispo',
+                'voluntarios': 'voluntarios',
+            }
+            tiposPNombre = list(punto_attr_map.keys())
+            
+            # Recargar listas dinámicas
+            datos_puntos_estrategicos = {}
+            types_PRescateC = []
+            types_PRescateCA = []
+            types_PRescateF = []
+            for ef in EstadoFuerza.objects.all():
+                oficina = ef.oficinaR
+                tipo = ef.tipoP
+                nombre = ef.nomPuntoRevision.strip()
+                if oficina not in datos_puntos_estrategicos:
+                    datos_puntos_estrategicos[oficina] = {}
+                if tipo not in datos_puntos_estrategicos[oficina]:
+                    datos_puntos_estrategicos[oficina][tipo] = []
+                datos_puntos_estrategicos[oficina][tipo].append(nombre)
+                if oficina == ofiRep:
+                    if tipo == "Carretero":
+                        types_PRescateC.append(nombre)
+                    elif tipo == "Central de autobús":
+                        types_PRescateCA.append(nombre)
+                    elif tipo == "Ferroviario":
+                        types_PRescateF.append(nombre)
+
+            types_PRescateA = []
+            datos_puntos_internacion = {}
+            for pi in PuntosInternacion.objects.all():
+                est = pi.estadoPunto
+                tipo = pi.tipoPunto
+                nom = pi.nombrePunto.strip()
+                if est not in datos_puntos_internacion:
+                    datos_puntos_internacion[est] = {}
+                if tipo not in datos_puntos_internacion[est]:
+                    datos_puntos_internacion[est][tipo] = []
+                datos_puntos_internacion[est][tipo].append(nom)
+                if est == ofiRep and tipo == "AEREOS":
+                    types_PRescateA.append(nom)
+
+            types_PRescateM = []
+            datos_municipios = {}
+            for mun in Municipios.objects.all():
+                est = mun.estado
+                nom = mun.nomMunicipio.strip()
+                if est not in datos_municipios:
+                    datos_municipios[est] = []
+                datos_municipios[est].append(nom)
+                if est == ofiRep:
+                    types_PRescateM.append(nom)
+
+            types_Naciona = [p.nombre_pais.strip() for p in Paises.objects.all()]
+
+            datosR = {
+                'idRescate': pk,
+                'fecha': request.POST.get('fecha', rescate.fecha),
+                'hora': request.POST.get('hora', rescate.hora),
+                'tipo_punto': request.POST.get('tipo_punto', ''),
+                'puntoEstra': request.POST.get('puntoEstra', ''),
+                'nacionalidad': request.POST.get('nacionalidad', ''),
+                'nombre': request.POST.get('nombre', ''),
+                'apellidos': request.POST.get('apellidos', ''),
+                'parentesco': request.POST.get('parentesco', ''),
+                'fechaNacimiento': request.POST.get('fechaNacimiento', ''),
+                'sexo': request.POST.get('sexo', ''),
+                'embarazo': request.POST.get('embarazo', ''),
+                'numFamilia': request.POST.get('numFamilia', 0),
+                'oficinaR': ofiRep
+            }
+
+            context = {
+                "form": form,
+                "value": rescate,
+                "datosR": datosR,
+                "puntosEstrategicos": datos_puntos_estrategicos,
+                "puntosInternacion": datos_puntos_internacion,
+                "municipios": datos_municipios,
+                "res_aero": types_PRescateA,
+                "res_carre": types_PRescateC,
+                "res_central": types_PRescateCA,
+                "res_ferro": types_PRescateF,
+                "municipio": types_PRescateM,
+                "nacion": types_Naciona,
+                'tiposPNombre': tiposPNombre,
+            }
+            messages.error(request, "Datos erróneos. Por favor verifica los campos.")
+            return render(request, "dashboard/editarDato.html", context=context)
+
+    return redirect("/dashboard")
+
+@login_required
+def agregarData(request, year, month, day):
+    try:
+        fecha_sel = datetime(year, month, day)
+        fecha_str = fecha_sel.strftime('%d-%m-%y')
+    except ValueError:
+        fecha_sel = datetime.today()
+        fecha_str = fecha_sel.strftime('%d-%m-%y')
+
+    user_profile = getattr(request.user, 'usuarioL', None)
+    ofiRep = user_profile.oficinaR if user_profile else "CDMX"
+
+    if request.method == 'GET':
+        punto_attr_map = {
+            'aeropuerto': 'aeropuerto',
+            'carretero': 'carretero',
+            'central de autobus': 'centralAutobus',
+            'disuadidos': 'casaSeguridad',
+            'ferrocarril': 'ferrocarril',
+            'visitas de verificación': 'hotel',
+            'puestos a disposición': 'puestosADispo',
+            'voluntarios': 'voluntarios',
+        }
+        tiposPNombre = list(punto_attr_map.keys())
+
+        datosR = {
+            'idRescate': None,
+            'fecha': fecha_str,
+            'hora': datetime.now().strftime("%H:%M"),
+            'tipo_punto': 'aeropuerto',
+            'puntoEstra': 'Sin Información',
+            'nacionalidad': 'GUATEMALA',
+            'nombre': '',
+            'apellidos': '',
+            'parentesco': '',
+            'fechaNacimiento': '',
+            'sexo': 'True',
+            'embarazo': 'False',
+            'numFamilia': 0,
+            'oficinaR': ofiRep,
+            'nombreAgente': request.user.get_full_name() or request.user.username
+        }
+
+        form = RegistroCreateForm(initial=datosR)
+
+        # Optimización: Consultas únicas y procesamiento en memoria
+        datos_puntos_estrategicos = {}
+        types_PRescateC = []
+        types_PRescateCA = []
+        types_PRescateF = []
+
+        for ef in EstadoFuerza.objects.all():
+            oficina = ef.oficinaR
+            tipo = ef.tipoP
+            nombre = ef.nomPuntoRevision.strip()
+            nombre_upper = nombre
+
+            if oficina not in datos_puntos_estrategicos:
+                datos_puntos_estrategicos[oficina] = {}
+            if tipo not in datos_puntos_estrategicos[oficina]:
+                datos_puntos_estrategicos[oficina][tipo] = []
+            datos_puntos_estrategicos[oficina][tipo].append(nombre)
+
+            if oficina == ofiRep:
+                if tipo == "Carretero":
+                    types_PRescateC.append(nombre_upper)
+                elif tipo == "Central de autobús":
+                    types_PRescateCA.append(nombre_upper)
+                elif tipo == "Ferroviario":
+                    types_PRescateF.append(nombre_upper)
+
+        # Puntos de Internación
+        types_PRescateA = []
+        datos_puntos_internacion = {}
+        for pi in PuntosInternacion.objects.all():
+            est = pi.estadoPunto
+            tipo = pi.tipoPunto
+            nom = pi.nombrePunto.strip()
+            
+            if est not in datos_puntos_internacion:
+                datos_puntos_internacion[est] = {}
+            if tipo not in datos_puntos_internacion[est]:
+                datos_puntos_internacion[est][tipo] = []
+            datos_puntos_internacion[est][tipo].append(nom)
+
+            if est == ofiRep and tipo == "AEREOS":
+                types_PRescateA.append(nom)
+
+        # Municipios
+        types_PRescateM = []
+        datos_municipios = {}
+        for mun in Municipios.objects.all():
+            est = mun.estado
+            nom = mun.nomMunicipio.strip()
+            
+            if est not in datos_municipios:
+                datos_municipios[est] = []
+            datos_municipios[est].append(nom)
+
+            if est == ofiRep:
+                types_PRescateM.append(nom)
+
+        # Nacionalidades
+        types_Naciona = [p.nombre_pais.strip() for p in Paises.objects.all()]
+
+        context = {
+            "form": form,
+            "datosR": datosR,
+            "puntosEstrategicos": datos_puntos_estrategicos,
+            "puntosInternacion": datos_puntos_internacion,
+            "municipios": datos_municipios,
+            "res_aero": types_PRescateA,
+            "res_carre": types_PRescateC,
+            "res_central": types_PRescateCA,
+            "res_ferro": types_PRescateF,
+            "municipio": types_PRescateM,
+            "nacion": types_Naciona,
+            'tiposPNombre': tiposPNombre,
+        }
+        return render(request, "dashboard/agregarDato.html", context=context)
+
+    elif request.method == 'POST':
+        form = RegistroCreateForm(request.POST)
+        if form.is_valid():
+            if not request.user.is_superuser:
+                form.cleaned_data['oficinaR'] = ofiRep
+            nuevo_registro = form.save()
+            messages.success(request, "El registro ha sido creado exitosamente.")
+            fecha_form = form.cleaned_data['fecha']
+            try:
+                fecha_sel = datetime.strptime(f"{fecha_form}", "%d-%m-%y")
+                return redirect('tabla_registros_fecha', year=fecha_sel.year, month=fecha_sel.month, day=fecha_sel.day)
+            except ValueError:
+                return redirect('/dashboard')
+        else:
+            ofiRep = request.POST.get('oficinaR', ofiRep)
+            punto_attr_map = {
+                'aeropuerto': 'aeropuerto',
+                'carretero': 'carretero',
+                'central de autobus': 'centralAutobus',
+                'disuadidos': 'casaSeguridad',
+                'ferrocarril': 'ferrocarril',
+                'visitas de verificación': 'hotel',
+                'puestos a disposición': 'puestosADispo',
+                'voluntarios': 'voluntarios',
+            }
+            tiposPNombre = list(punto_attr_map.keys())
+
+            # Recargar listas dinámicas
+            datos_puntos_estrategicos = {}
+            types_PRescateC = []
+            types_PRescateCA = []
+            types_PRescateF = []
+            for ef in EstadoFuerza.objects.all():
+                oficina = ef.oficinaR
+                tipo = ef.tipoP
+                nombre = ef.nomPuntoRevision.strip()
+                if oficina not in datos_puntos_estrategicos:
+                    datos_puntos_estrategicos[oficina] = {}
+                if tipo not in datos_puntos_estrategicos[oficina]:
+                    datos_puntos_estrategicos[oficina][tipo] = []
+                datos_puntos_estrategicos[oficina][tipo].append(nombre)
+                if oficina == ofiRep:
+                    if tipo == "Carretero":
+                        types_PRescateC.append(nombre)
+                    elif tipo == "Central de autobús":
+                        types_PRescateCA.append(nombre)
+                    elif tipo == "Ferroviario":
+                        types_PRescateF.append(nombre)
+
+            types_PRescateA = []
+            datos_puntos_internacion = {}
+            for pi in PuntosInternacion.objects.all():
+                est = pi.estadoPunto
+                tipo = pi.tipoPunto
+                nom = pi.nombrePunto.strip()
+                if est not in datos_puntos_internacion:
+                    datos_puntos_internacion[est] = {}
+                if tipo not in datos_puntos_internacion[est]:
+                    datos_puntos_internacion[est][tipo] = []
+                datos_puntos_internacion[est][tipo].append(nom)
+                if est == ofiRep and tipo == "AEREOS":
+                    types_PRescateA.append(nom)
+
+            types_PRescateM = []
+            datos_municipios = {}
+            for mun in Municipios.objects.all():
+                est = mun.estado
+                nom = mun.nomMunicipio.strip()
+                if est not in datos_municipios:
+                    datos_municipios[est] = []
+                datos_municipios[est].append(nom)
+                if est == ofiRep:
+                    types_PRescateM.append(nom)
+
+            types_Naciona = [p.nombre_pais.strip() for p in Paises.objects.all()]
+
+            datosR = {
+                'idRescate': None,
+                'fecha': request.POST.get('fecha', fecha_str),
+                'hora': request.POST.get('hora', ''),
+                'tipo_punto': request.POST.get('tipo_punto', ''),
+                'puntoEstra': request.POST.get('puntoEstra', ''),
+                'nacionalidad': request.POST.get('nacionalidad', ''),
+                'nombre': request.POST.get('nombre', ''),
+                'apellidos': request.POST.get('apellidos', ''),
+                'parentesco': request.POST.get('parentesco', ''),
+                'fechaNacimiento': request.POST.get('fechaNacimiento', ''),
+                'sexo': request.POST.get('sexo', ''),
+                'embarazo': request.POST.get('embarazo', ''),
+                'numFamilia': request.POST.get('numFamilia', 0),
+                'oficinaR': ofiRep,
+                'nombreAgente': request.POST.get('nombreAgente', '')
+            }
+
+            context = {
+                "form": form,
+                "datosR": datosR,
+                "puntosEstrategicos": datos_puntos_estrategicos,
+                "puntosInternacion": datos_puntos_internacion,
+                "municipios": datos_municipios,
+                "res_aero": types_PRescateA,
+                "res_carre": types_PRescateC,
+                "res_central": types_PRescateCA,
+                "res_ferro": types_PRescateF,
+                "municipio": types_PRescateM,
+                "nacion": types_Naciona,
+                'tiposPNombre': tiposPNombre,
+            }
+            messages.error(request, "Datos erróneos. Por favor verifica los campos.")
+            return render(request, "dashboard/agregarDato.html", context=context)
+
+    return redirect("/dashboard")
+
+@login_required
+def mostrarData(request):
+    if request.user.is_authenticated:
+        if request.method == 'POST':
+            user_profile = getattr(request.user, 'usuarioL', None)
+            userDataI = [user_profile] if user_profile else []
+            
+            form = ExcelForm(request.POST)
+            form1 = RegistroNewForm(request.POST)
+            
+            if(form.is_valid()):
+                dia = request.POST["fechaDescarga_day"]
+                mes = request.POST["fechaDescarga_month"]
+                year = request.POST["fechaDescarga_year"]
+
+                fechaR = datetime.strptime(f"{dia}/{mes}/{year}", "%d/%m/%Y").strftime('%d-%m-%y')
+
+                if request.user.is_superuser:
+                    valores = RescatePunto.objects.filter(fecha=fechaR)
+                    template = "dashboard/datos_diaSU.html"
+                else:
+                    oficina = userDataI[0].oficinaR if userDataI else None
+                    valores = RescatePunto.objects.filter(fecha=fechaR, oficinaRepre=oficina)
+                    template = "dashboard/datos_dia.html"
+
+                registros = list(valores)
+                reincidentes_ids = marcar_reincidentes(registros)
+
+                data = {
+                'usuario' : userDataI,
+                'form': form,
+                'values' : registros,
+                'reincidentes_ids': reincidentes_ids,
+                'fecha_P' : fechaR,
+                'fecha_inicio_api': f"{year}-{int(mes):02d}-{int(dia):02d}",
+                'fecha_fin_api': f"{year}-{int(mes):02d}-{int(dia):02d}",
+                }
+
+                return render(request, template, context=data)
+
+            if form1.is_valid():
+                idR = form1.cleaned_data.get('idRescate')
+                rescate_obj = RescatePunto.objects.filter(idRescate=idR).first()
+                oficina_usr = user_profile.oficinaR if user_profile else None
+                if not rescate_obj or (not request.user.is_superuser and rescate_obj.oficinaRepre != oficina_usr):
+                    messages.error(request, "No tienes permiso para modificar este registro.")
+                    return redirect('/dashboard')
+                if not request.user.is_superuser:
+                    form1.cleaned_data['oficinaR'] = oficina_usr
+                fechaR = request.POST["fecha"]
+                form1.save()
+
+                if request.user.is_superuser:
+                    valores = RescatePunto.objects.filter(fecha=fechaR)
+                else:
+                    oficina = user_profile.oficinaR if user_profile else None
+                    valores = RescatePunto.objects.filter(fecha=fechaR, oficinaRepre=oficina)
+
+                registros = list(valores)
+                reincidentes_ids = marcar_reincidentes(registros)
+
+                data = {
+                'usuario' : userDataI,
+                'form': form,
+                'values' : registros,
+                'reincidentes_ids': reincidentes_ids,
+                }
+                messages.success(request, "El registro ha sido modificado")
+                return render(request, "dashboard/datos_dia.html", context=data)
+            else:
+                print("datos erroneos en mostrarData")
+                print(form1.errors)
+                idR = request.POST.get("idRescate")
+                # Redireccionamos a la vista editarData pasándole los errores en los mensajes de la sesión
+                # para que la vista editarData se encargue de inyectar todo el contexto correctamente.
+                for field, errors in form1.errors.items():
+                    for error in errors:
+                        messages.error(request, f"{field.capitalize()}: {error}")
+                if idR:
+                    return redirect('editarData', pk=idR)
+                return redirect('/dashboard')
+
+
+    else:
+        messages.success(request, "Necesitas ingresar para poder modificar la informacion")
+        return redirect('')
+
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
+def puntosI(request):
+    data = PuntosInternacion.objects.all().order_by('estadoPunto',"nombrePunto")
+    form = CargarArchivoForm()
+    context = {"puntosI": data,
+               "form": form,
+               }
+    return render(request, "dashboard/puntosInternacion.html", context)
+
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
+def agregar_puntoInternacion(request):
+    ultimo = PuntosInternacion.objects.order_by('-idPuntoInter').first()
+    idUltimo = ultimo.idPuntoInter if ultimo else 0
+    # print(idUltimo)
+    if request.method == 'POST':
+        
+        try:
+            # oficinaR = request.POST.get('estadoPunto'),
+            # print("El id de oficinaR = "),
+            # print(oficinaR),
+            PuntosInternacion.objects.create(
+                idPuntoInter = idUltimo+1,
+                estadoPunto = request.POST.get('estadoPunto'),
+                nombrePunto = request.POST.get('nombrePunto'),
+                tipoPunto = request.POST.get('tipoPunto'),
+
+            )
+            print('Agregado éxitosamente')
+            return redirect('paginaPuntosI')
+        except:
+            print('No se ha podido agregar')
+    return render(request, 'dashboard/anadirPuntoInternacion.html')
+
+
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
+def editar_puntoInternacion(request, id_puntoI):
+
+    puntoI = get_object_or_404(PuntosInternacion, idPuntoInter=id_puntoI)
+
+    data = {
+        'form': puntoI
+    }
+    if request.method == 'POST':
+        print("Entró al POST")
+        formulario = puntosIForm(data = request.POST, instance=puntoI)
+
+        if formulario.is_valid():
+            print("Entró a la validación")
+            formulario.save()
+            data['message'] = "Datos Modificados correctamente"
+            data['form'] = formulario
+            return redirect('paginaPuntosI')
+        else:
+            print("Entró al ELSE")
+            print(formulario.errors)
+
+    return render(request, 'editarPuntosI.html', context= data)
+
+
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
+@require_POST
+def eliminarPuntoI(request, id_puntoI):
+    registro = get_object_or_404( PuntosInternacion, idPuntoInter=id_puntoI)
+    registro.delete()
+    return redirect('paginaPuntosI')
+
+
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
+def edoFuerza(request):
+    data = EstadoFuerza.objects.all().order_by('oficinaR',"nomPuntoRevision")
+    form = CargarArchivoForm()
+    context = {"edoFuerza": data,
+               "form": form,
+               }
+    return render(request, "dashboard/edoFuerza.html", context)
+
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
+def agregar_punto(request):
+    ultimo = EstadoFuerza.objects.order_by('-idEdoFuerza').first()
+    idUltimo = ultimo.idEdoFuerza if ultimo else 0
+    print(idUltimo)
+    if request.method == 'POST':
+        
+        try:
+            oficinaR = request.POST.get('oficinaR'),
+            print("El id de oficinaR = "),
+            print(oficinaR),
+            EstadoFuerza.objects.create(
+                idEdoFuerza = idUltimo+1,
+                oficinaR = request.POST.get('oficinaR'),
+                numPunto = request.POST.get('numPunto'),
+                nomPuntoRevision = request.POST.get('nomPuntoRevision'),
+                tipoP = request.POST.get('tipoP'),
+                ubicacion = request.POST.get('ubicacion'),
+                coordenadasTexto = request.POST.get('coordenadasTexto'),
+                latitud = request.POST.get('latitud'),
+                longitud = request.POST.get('longitud'),
+                personalINM = request.POST.get('personalINM'),
+                personalSEDENA = request.POST.get('personalSEDENA'),
+                personalMarina = request.POST.get('personalMarina'),
+                personalGuardiaN = request.POST.get('personalGuardiaN'),
+                personalOTROS = request.POST.get('personalOTROS'),
+                vehiculos = request.POST.get('vehiculos'),
+                seccion = request.POST.get('seccion'),
+            )
+            print('Agregado éxitosamente')
+            return redirect('pagina_pruebas_edoFuerza')
+        except:
+            print('No se ha podido agregar')
+    return render(request, 'dashboard/anadirPunto.html')
+
+
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
+def editar_estado_fuerza(request, id_edo_fuerza):
+    estado_fuerza = get_object_or_404(EstadoFuerza, idEdoFuerza=id_edo_fuerza)
+
+    data = {
+        'form': estado_fuerza
+    }
+    if request.method == 'POST':
+        print("Entró al POST")
+        formulario = EstadoFuerzaForm(data = request.POST, instance=estado_fuerza)
+
+        if formulario.is_valid():
+            print("Entró a la validación")
+            formulario.save()
+            data['message'] = "Datos Modificados correctamente"
+            data['form'] = formulario
+            return redirect('pagina_pruebas_edoFuerza')
+        else:
+            print("Entró al ELSE")
+            print(formulario.errors)
+
+
+
+    return render(request, 'editarEdoFuerza.html', context= data)
+
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
+@require_POST
+def eliminarEdoFuerza(request, id_edo_fuerza):
+    registro = get_object_or_404( EstadoFuerza, idEdoFuerza=id_edo_fuerza )
+    registro.delete()
+    return redirect('pagina_pruebas_edoFuerza')
+
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
+def Usuarios(request):
+    data = list(Usuario.objects.all().order_by("estado"))
+    for item in data:
+        item.str_pass = decrypt_str_pass(item.str_pass, user=request.user)
+    form = CargarArchivoForm()
+    context = {"usuario": data,
+               "form": form,
+               }
+    return render(request, "dashboard/usuarios.html", context)
+
+
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
+def agregar_usuario(request):
+    ultimo = Usuario.objects.order_by('-idUser').first()
+    idUltimo = ultimo.idUser if ultimo else 0
+    if request.method == 'POST':
+        try:
+            raw_password = request.POST.get('password') or ''
+            raw_str_pass = request.POST.get('str_pass') or raw_password
+            Usuario.objects.create(
+                idUser = idUltimo + 1,
+                nickname = request.POST.get('nickname'),
+                nombre = request.POST.get('nombre'),
+                apellido = request.POST.get('apellido'),
+                password = raw_password,
+                estado = request.POST.get('estado'),
+                tipo = request.POST.get('tipo'),
+                str_pass = encrypt_str_pass(raw_str_pass),
+                tipo_disp = request.POST.get('tipo_disp'),
+            )
+            return redirect('pagina_pruebas_usuarios')
+        except Exception:
+            print('No se ha podido agregar')
+    return render(request, 'dashboard/anadirUsuario.html')
+
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
+def editar_usuario(request, id_usuario):
+    usuario = get_object_or_404(Usuario, idUser=id_usuario)
+
+    if request.method == 'POST':
+        # Caso 1: Formulario modal de cambio exclusivo de contraseña (solo envía idUser y password)
+        if 'nickname' not in request.POST and request.POST.get('password'):
+            nueva_password = request.POST.get('password')
+            Usuario.objects.filter(idUser=usuario.idUser).update(
+                password=make_password(nueva_password),
+                str_pass=encrypt_str_pass(nueva_password),
+            )
+            return redirect('pagina_pruebas_usuarios')
+
+        # Caso 2: Edición de datos generales del usuario
+        formulario = UsuarioForm(data=request.POST, instance=usuario)
+        if formulario.is_valid():
+            update_fields = {
+                'nickname': request.POST.get('nickname'),
+                'nombre': request.POST.get('nombre'),
+                'apellido': request.POST.get('apellido'),
+                'estado': request.POST.get('estado'),
+                'tipo': request.POST.get('tipo'),
+                'tipo_disp': request.POST.get('tipo_disp'),
+            }
+            if request.user.is_superuser and 'str_pass' in request.POST:
+                update_fields['str_pass'] = encrypt_str_pass(request.POST.get('str_pass', ''))
+            Usuario.objects.filter(idUser=id_usuario).update(**update_fields)
+            return redirect('pagina_pruebas_usuarios')
+
+    # Descifrar en memoria únicamente si quien consulta es superusuario
+    usuario.str_pass = decrypt_str_pass(usuario.str_pass, user=request.user)
+    data = {
+        'form': usuario
+    }
+    return render(request, 'editarUsuario.html', context=data)
+
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
+@require_POST
+def eliminarUsuario(request, id_usuario):
+    usuario = get_object_or_404(Usuario, idUser=id_usuario)
+    usuario.delete()
+    return redirect('pagina_pruebas_usuarios')
+
+@user_passes_test(lambda u: u.is_superuser)
+def correccion_puntos(request):
+    oficina_filtro = request.GET.get('oficina', '')
+    
+    # Obtener todas las oficinas únicas y su conteo de registros para el módulo de unificación por oficina
+    oficinas_con_conteo = RescatePunto.objects.values('oficinaRepre').annotate(total=Count('idRescate')).exclude(oficinaRepre='').order_by('oficinaRepre')
+    oficinas = [item['oficinaRepre'] for item in oficinas_con_conteo]
+    
+    # Agrupar puntos por puntoEstra y contar registros
+    puntos_query = RescatePunto.objects.values('puntoEstra').annotate(total=Count('idRescate'))
+    if oficina_filtro:
+        puntos_query = puntos_query.filter(oficinaRepre=oficina_filtro)
+    
+    # Excluir puntos vacíos y ordenar por volumen (mayor a menor)
+    puntos_query = puntos_query.exclude(puntoEstra='').order_by('-total')
+    
+    context = {
+        'puntos': puntos_query,
+        'oficinas': oficinas,
+        'oficinas_con_conteo': oficinas_con_conteo,
+        'oficina_seleccionada': oficina_filtro,
+    }
+    return render(request, 'dashboard/correccion.html', context)
+
+
+@user_passes_test(lambda u: u.is_superuser)
+def ejecutar_correccion(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            valores_origen = data.get('valores_origen', [])
+            valor_destino = data.get('valor_destino', '').strip()
+            oficina = data.get('oficina', '')
+            
+            if not valores_origen or not valor_destino:
+                return JsonResponse({'success': False, 'error': 'Faltan parámetros requeridos.'}, status=400)
+                
+            # Construir filtro base
+            queryset = RescatePunto.objects.filter(puntoEstra__in=valores_origen)
+            if oficina:
+                queryset = queryset.filter(oficinaRepre=oficina)
+                
+            # Al hacer update directo en base de datos, PostgreSQL realiza el cambio en milisegundos 
+            # sin importar si son 5 o miles de registros, sin sobrecargar la memoria de Python
+            cantidad_actualizada = queryset.update(puntoEstra=valor_destino)
+            
+            return JsonResponse({
+                'success': True,
+                'afectados': cantidad_actualizada,
+                'quedan_pendientes': False
+            })
+                
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=500)
+            
+    return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+
+
+@user_passes_test(lambda u: u.is_superuser)
+def ejecutar_unificacion_oficinas(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            puntos_origen = data.get('puntos_origen', [])
+            oficinas_origen = data.get('oficinas_origen', [])
+            oficina_destino = data.get('oficina_destino', '').strip()
+            
+            if not oficina_destino:
+                return JsonResponse({'success': False, 'error': 'Falta indicar la oficina destino.'}, status=400)
+                
+            if puntos_origen:
+                queryset = RescatePunto.objects.filter(puntoEstra__in=puntos_origen)
+            elif oficinas_origen:
+                queryset = RescatePunto.objects.filter(oficinaRepre__in=oficinas_origen)
+            else:
+                return JsonResponse({'success': False, 'error': 'Faltan elementos origen a modificar.'}, status=400)
+
+            cantidad_actualizada = queryset.update(oficinaRepre=oficina_destino)
+            
+            return JsonResponse({
+                'success': True,
+                'afectados': cantidad_actualizada,
+                'quedan_pendientes': False
+            })
+                
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=500)
+            
+    return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+
+
+
+# def update_record(request, pk):
+#     if request.user.is_authenticated:
+#         registro = RescatePunto.objects.get(idRescate=pk)
+#         form = addRegistro(request.POST or None, instance = registro)
+#         if form.is_valid():
+#             form.save()
+#             messages.success(request, "El registro ha sido modificado")
+#             redirect('dashboard')
+#         return render(request, 'dashboard/editarDato.html', {'form' : form})
+#     else: 
+#         messages.success(request, "Necesitas ingresar para poder modificar la informacion")
+#         return redirect('')
+
+@login_required
+def mexicanos(request):
+    user_profile = getattr(request.user, 'usuarioL', None)
+    userDataI = [user_profile] if user_profile else []
+    data = {
+        'usuario': userDataI,
+    }
+    return render(request, "dashboard/mexicanos.html", context=data)

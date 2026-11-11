@@ -1,0 +1,28 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}
+    Mexicanos - {{usuario.0.oficinaR}}
+{% endblock title %}
+
+{% block navigation %}
+    Panel de Control - Mexicanos ({{usuario.0.oficinaR}})
+{% endblock navigation %}
+
+{% block styles %}
+{% endblock styles %}
+
+{% block estadistica %}
+    {% if request.user.is_superuser %}
+        <a href="{% url 'estadistica' %}" class="bg-inm-verde-100 text-white px-6 py-3 rounded-xl hover:bg-inm-marron-200">Estadistica</a>
+    {% endif %}
+{% endblock estadistica %}
+
+{% block content %}
+<div class="grow p-6">
+    <div class="bg-white rounded-2xl shadow-md p-6 border border-gray-100">
+        <h1 class="text-2xl font-bold text-[#4E232E] mb-2">Módulo de Mexicanos</h1>
+        <p class="text-gray-600">Bienvenido al módulo de administración de Mexicanos.</p>
+    </div>
+</div>
+{% endblock content %}

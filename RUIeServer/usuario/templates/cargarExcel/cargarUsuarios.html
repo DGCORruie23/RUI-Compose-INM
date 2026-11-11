@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cargar Usuarios</title>
+</head>
+<body>
+    {% if request.user.is_superuser %}
+    <center>
+        <h3>
+            Carga el archivo de los Usuarios
+        </h3>
+    </center>
+    <form action="" method="post" enctype="multipart/form-data">{% csrf_token %}
+        <p>
+            {{ form.archivo }}
+        </p>
+        <p>
+            <input type="submit" value="Cargar" />
+        </p>
+    </form>
+    {% endif %}
+</body>
+</html>

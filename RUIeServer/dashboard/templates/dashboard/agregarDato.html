@@ -1,0 +1,327 @@
+{% extends "base/base.html" %}
+
+{% block title %}
+Agregar Registro
+{% endblock title %}
+
+{% block navigation %}
+Añadir registro
+{% endblock navigation %}
+
+{% block content %}
+{% if user.is_authenticated %}
+
+<!-- Inyectando diccionarios de forma segura para JS -->
+{{ puntosEstrategicos|json_script:"datosEstrategicos" }}
+{{ puntosInternacion|json_script:"datosInternacion" }}
+{{ municipios|json_script:"datosMunicipios" }}
+
+<div class="flex-grow flex justify-center py-12 px-4 bg-[#ffffff00] text-black min-h-screen">
+    <div class="w-full max-w-lg bg-[#D4C19C] rounded-xl shadow-lg p-6">
+        <h2 class="text-2xl font-bold text-center mb-6 text-[#4E232E]">Agregar Rescate</h2>
+
+        {% if messages %}
+        <div class="mb-4 space-y-2">
+            {% for message in messages %}
+            <div class="p-3 rounded text-white {% if message.tags == 'error' %}bg-red-600{% else %}bg-[#285C4D]{% endif %} font-semibold text-center">
+                {{ message }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if form.errors %}
+        <div class="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded text-sm">
+            <strong class="font-bold">Por favor corrige los siguientes errores:</strong>
+            <ul class="list-disc list-inside mt-1">
+                {% for field, errors in form.errors.items %}
+                    {% for error in errors %}
+                        <li>{{ field|capfirst }}: {{ error }}</li>
+                    {% endfor %}
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        <form method="post" action="" enctype="multipart/form-data" class="space-y-4">
+            {% csrf_token %}
+
+            <input type="hidden" name="idRescate" value="" id="id_idRescate">
+            
+            <div class="flex flex-col {% if not request.user.is_superuser %} hidden {% endif %}">
+                <label for="id_oficinaRepre" class="font-bold mb-1">Oficina:</label>
+                <select name="oficinaR" id="id_oficinaRepre"
+                    class="w-full p-1 border-2 border-[#4E232E] rounded bg-[#285C4D] text-white outline-none focus:ring-2 focus:ring-[#9F2241]">
+                    <option value="AGUASCALIENTES" {% if datosR.oficinaR == 'AGUASCALIENTES' %}selected{% endif %}>AGUASCALIENTES</option>
+                    <option value="BAJA CALIFORNIA" {% if datosR.oficinaR == 'BAJA CALIFORNIA' %}selected{% endif %}>BAJA CALIFORNIA</option>
+                    <option value="BAJA CALIFORNIA SUR" {% if datosR.oficinaR == 'BAJA CALIFORNIA SUR' %}selected{% endif %}>BAJA CALIFORNIA SUR</option>
+                    <option value="CAMPECHE" {% if datosR.oficinaR == 'CAMPECHE' %}selected{% endif %}>CAMPECHE</option>
+                    <option value="CDMX" {% if datosR.oficinaR == 'CDMX' %}selected{% endif %}>CDMX</option>
+                    <option value="CHIAPAS" {% if datosR.oficinaR == 'CHIAPAS' %}selected{% endif %}>CHIAPAS</option>
+                    <option value="CHIHUAHUA" {% if datosR.oficinaR == 'CHIHUAHUA' %}selected{% endif %}>CHIHUAHUA</option>
+                    <option value="COAHUILA" {% if datosR.oficinaR == 'COAHUILA' %}selected{% endif %}>COAHUILA</option>
+                    <option value="COLIMA" {% if datosR.oficinaR == 'COLIMA' %}selected{% endif %}>COLIMA</option>
+                    <option value="DURANGO" {% if datosR.oficinaR == 'DURANGO' %}selected{% endif %}>DURANGO</option>
+                    <option value="EDOMEX" {% if datosR.oficinaR == 'EDOMEX' %}selected{% endif %}>EDOMEX</option>
+                    <option value="GUERRERO" {% if datosR.oficinaR == 'GUERRERO' %}selected{% endif %}>GUERRERO</option>
+                    <option value="GUANAJUATO" {% if datosR.oficinaR == 'GUANAJUATO' %}selected{% endif %}>GUANAJUATO</option>
+                    <option value="HIDALGO" {% if datosR.oficinaR == 'HIDALGO' %}selected{% endif %}>HIDALGO</option>
+                    <option value="JALISCO" {% if datosR.oficinaR == 'JALISCO' %}selected{% endif %}>JALISCO</option>
+                    <option value="MICHOACÁN" {% if datosR.oficinaR == 'MICHOACÁN' %}selected{% endif %}>MICHOACÁN</option>
+                    <option value="MORELOS" {% if datosR.oficinaR == 'MORELOS' %}selected{% endif %}>MORELOS</option>
+                    <option value="NAYARIT" {% if datosR.oficinaR == 'NAYARIT' %}selected{% endif %}>NAYARIT</option>
+                    <option value="NUEVO LEÓN" {% if datosR.oficinaR == 'NUEVO LEÓN' %}selected{% endif %}>NUEVO LEÓN</option>
+                    <option value="OAXACA" {% if datosR.oficinaR == 'OAXACA' %}selected{% endif %}>OAXACA</option>
+                    <option value="PUEBLA" {% if datosR.oficinaR == 'PUEBLA' %}selected{% endif %}>PUEBLA</option>
+                    <option value="QUERÉTARO" {% if datosR.oficinaR == 'QUERÉTARO' %}selected{% endif %}>QUERÉTARO</option>
+                    <option value="QUINTANA ROO" {% if datosR.oficinaR == 'QUINTANA ROO' %}selected{% endif %}>QUINTANA ROO</option>
+                    <option value="SAN LUIS POTOSÍ" {% if datosR.oficinaR == 'SAN LUIS POTOSÍ' %}selected{% endif %}>SAN LUIS POTOSÍ</option>
+                    <option value="SINALOA" {% if datosR.oficinaR == 'SINALOA' %}selected{% endif %}>SINALOA</option>
+                    <option value="SONORA" {% if datosR.oficinaR == 'SONORA' %}selected{% endif %}>SONORA</option>
+                    <option value="TABASCO" {% if datosR.oficinaR == 'TABASCO' %}selected{% endif %}>TABASCO</option>
+                    <option value="TAMAULIPAS" {% if datosR.oficinaR == 'TAMAULIPAS' %}selected{% endif %}>TAMAULIPAS</option>
+                    <option value="TLAXCALA" {% if datosR.oficinaR == 'TLAXCALA' %}selected{% endif %}>TLAXCALA</option>
+                    <option value="VERACRUZ" {% if datosR.oficinaR == 'VERACRUZ' %}selected{% endif %}>VERACRUZ</option>
+                    <option value="YUCATÁN" {% if datosR.oficinaR == 'YUCATÁN' %}selected{% endif %}>YUCATÁN</option>
+                    <option value="ZACATECAS" {% if datosR.oficinaR == 'ZACATECAS' %}selected{% endif %}>ZACATECAS</option>
+                </select>
+                <label for="id_fecha" class="font-bold mb-1">Fecha:</label>
+                <input type="text" name="fecha" value="{{datosR.fecha}}" id="id_fecha">
+            </div>
+
+            <!-- Si no es superusuario, igual enviamos la oficina y fecha actuales del día de forma oculta para el form -->
+            {% if not request.user.is_superuser %}
+                <input type="hidden" name="oficinaR" value="{{datosR.oficinaR}}">
+                <input type="hidden" name="fecha" value="{{datosR.fecha}}">
+            {% endif %}
+
+            <div class="flex flex-col {% if not request.user.is_superuser %} hidden {% endif %}">
+                <label for="id_nombreAgente" class="font-bold mb-1">Nombre del Agente:</label>
+                <input type="text" name="nombreAgente" value="{{datosR.nombreAgente}}" required id="id_nombreAgente"
+                    class="w-full p-1 border-2 border-[#4E232E] rounded bg-[#285C4D] text-white uppercase">
+            </div>
+
+            <div class="flex flex-col">
+                <label for="id_hora" class="font-bold mb-1">Hora:</label>
+                <input type="time" name="hora" value="{{datosR.hora}}" required id="id_hora"
+                    class="w-full p-1 border-2 border-[#4E232E] rounded bg-[#285C4D] text-white [color-scheme:dark]">
+            </div>
+
+            <div class="flex flex-col">
+                <label for="id_tipo_punto" class="font-bold mb-1">Tipo de punto de Rescate:</label>
+                <select name="tipo_punto" id="id_tipo_punto"
+                    class="w-full p-1 border-2 border-[#4E232E] rounded bg-[#285C4D] text-white">
+                    {% for val in tiposPNombre %}
+                    <option value="{{val}}" {% if datosR.tipo_punto == val %}selected{% endif %}>{{val}}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="flex flex-col">
+                <label for="id_puntoEstra" class="font-bold mb-1">Nombre punto de Rescate:</label>
+                <select name="puntoEstra" id="id_puntoEstra"
+                    class="w-full p-1 border-2 border-[#4E232E] rounded bg-[#285C4D] text-white">
+                    <!-- Llenado por Javascript -->
+                </select>
+            </div>
+
+            <div class="flex flex-col">
+                <label for="id_nacionalidad" class="font-bold mb-1">Nacionalidad:</label>
+                <select name="nacionalidad" id="id_nacionalidad"
+                    class="w-full p-1 border-2 border-[#4E232E] rounded bg-[#285C4D] text-white">
+                    {% for val in nacion %}
+                    <option value="{{val}}" {% if datosR.nacionalidad == val %}selected{% endif %}>{{val}}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="flex flex-col">
+                <label for="id_nombre" class="font-bold mb-1">Nombre:</label>
+                <input type="text" name="nombre" value="{{datosR.nombre}}" maxlength="100" required id="id_nombre"
+                    class="w-full p-1 border-2 border-[#4E232E] rounded bg-[#285C4D] text-white uppercase">
+            </div>
+
+            <div class="flex flex-col">
+                <label for="id_apellidos" class="font-bold mb-1">Apellidos:</label>
+                <input type="text" name="apellidos" value="{{datosR.apellidos}}" maxlength="150" required
+                    id="id_apellidos" class="w-full p-1 border-2 border-[#4E232E] rounded bg-[#285C4D] text-white uppercase">
+            </div>
+
+            <div class="flex flex-col">
+                <label for="id_parentesco" class="font-bold mb-1">Parentesco:</label>
+                <input type="text" name="parentesco" value="{{datosR.parentesco|default_if_none:''}}" maxlength="50"
+                    id="id_parentesco" class="w-full p-1 border-2 border-[#4E232E] rounded bg-[#285C4D] text-white uppercase">
+            </div>
+
+            <div class="flex flex-col">
+                <label for="id_fechaNacimiento" class="font-bold mb-1">Fecha de Nacimiento:</label>
+                <input type="date" name="fechaNacimiento" value="{{datosR.fechaNacimiento}}" required
+                    id="id_fechaNacimiento" min="1920-01-01"
+                    class="w-full p-1 border-2 border-[#4E232E] rounded bg-[#285C4D] text-white [color-scheme:dark]">
+            </div>
+
+            <div class="flex flex-col">
+                <label for="id_sexo" class="font-bold mb-1">Sexo:</label>
+                <select name="sexo" id="id_sexo"
+                    class="w-full p-2.5 border-2 border-[#4E232E] rounded bg-[#285C4D] text-white">
+                    <option value="True" {% if datosR.sexo == 'True' %}selected{% endif %}>Hombre</option>
+                    <option value="False" {% if datosR.sexo == 'False' %}selected{% endif %}>Mujer</option>
+                </select>
+            </div>
+
+            <div class="flex flex-col">
+                <label for="id_embarazo" class="font-bold mb-1">Embarazo:</label>
+                <select name="embarazo" id="id_embarazo"
+                    class="w-full p-2.5 border-2 border-[#4E232E] rounded bg-[#285C4D] text-white">
+                    <option value="True" {% if datosR.embarazo == 'True' %}selected{% endif %}>Si</option>
+                    <option value="False" {% if datosR.embarazo == 'False' %}selected{% endif %}>No</option>
+                </select>
+            </div>
+
+            <div class="flex flex-col">
+                <label for="id_numFamilia" class="font-bold mb-1">Numero de Familia:</label>
+                <input type="number" name="numFamilia" value="{{datosR.numFamilia}}" required id="id_numFamilia"
+                    class="w-full p-2.5 border-2 border-[#4E232E] rounded bg-[#285C4D] text-white">
+            </div>
+
+            <div class="pt-4 text-center">
+                <button type="submit"
+                    class="w-full bg-[#285C4D] hover:bg-[#1f473b] text-white font-bold py-3 px-4 rounded transition-colors shadow-md">
+                    Guardar Registro
+                </button>
+                <a href="/dashboard" id="btn-cancelar"
+                    class="block w-full text-center mt-3 bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-4 rounded transition-colors shadow-md">
+                    Cancelar
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // 1. Configurar botón Cancelar dinámicamente si hay fecha
+        const btnCancelar = document.getElementById('btn-cancelar');
+        const fechaOriginal = "{{ datosR.fecha }}".trim(); // ej. "17-07-26"
+        if (btnCancelar && fechaOriginal) {
+            const parts = fechaOriginal.split('-');
+            if (parts.length === 3) {
+                let day = parts[0];
+                let month = parts[1];
+                let year = parts[2];
+                if (year.length === 2) {
+                    year = "20" + year;
+                }
+                btnCancelar.href = `/dashboard/datos/${year}/${month}/${day}/`;
+            }
+        }
+
+        // 2. Mayúsculas automáticas al escribir
+        ['id_nombre', 'id_apellidos', 'id_parentesco', 'id_nombreAgente'].forEach(id => {
+            const input = document.getElementById(id);
+            if (input) {
+                input.addEventListener('input', function() {
+                    this.value = this.value.toUpperCase();
+                });
+            }
+        });
+
+        // 3. Prevenir selección de fechas de nacimiento futuras
+        const inputFechaNacimiento = document.getElementById('id_fechaNacimiento');
+        if (inputFechaNacimiento) {
+            inputFechaNacimiento.max = new Date().toISOString().split("T")[0];
+        }
+
+        // 4. Leer diccionarios embebidos de Django json_script
+        const elEstra = document.getElementById('datosEstrategicos');
+        const elInter = document.getElementById('datosInternacion');
+        const elMun = document.getElementById('datosMunicipios');
+
+        const estraAll = elEstra ? JSON.parse(elEstra.textContent) : {};
+        const interAll = elInter ? JSON.parse(elInter.textContent) : {};
+        const munAll = elMun ? JSON.parse(elMun.textContent) : {};
+
+        const selectOficina = document.getElementById('id_oficinaRepre');
+        const selectTipo = document.getElementById('id_tipo_punto');
+        const selectPunto = document.getElementById('id_puntoEstra');
+
+        if (!selectOficina || !selectTipo || !selectPunto) {
+            console.warn("Algunos selectores no se encontraron en el DOM.");
+            return;
+        }
+
+        const inicialPuntoEstra = "{{ datosR.puntoEstra|escapejs }}".trim();
+
+        function getPuntosParaTipo(oficina, tipoSeleccionado) {
+            let opciones = [];
+
+            if (tipoSeleccionado === "aeropuerto") {
+                const est = (estraAll[oficina] && estraAll[oficina]['Aeropuerto']) || [];
+                const int = (interAll[oficina] && interAll[oficina]['AEREOS']) || [];
+                opciones = [...est, ...int];
+            }
+            else if (tipoSeleccionado === "carretero") {
+                const est = (estraAll[oficina] && estraAll[oficina]['Carretero']) || [];
+                const int = (interAll[oficina] && interAll[oficina]['TERRESTRES']) || [];
+                opciones = [...est, ...int];
+            }
+            else if (tipoSeleccionado === "central de autobus") {
+                opciones = (estraAll[oficina] && estraAll[oficina]['Central de autobús']) || [];
+            }
+            else if (tipoSeleccionado === "disuadidos" || tipoSeleccionado === "visitas de verificación") {
+                opciones = munAll[oficina] || [];
+            }
+            else if (tipoSeleccionado === "ferrocarril") {
+                opciones = (estraAll[oficina] && estraAll[oficina]['Ferroviario']) || [];
+            }
+            else if (tipoSeleccionado === "puestos a disposición" || tipoSeleccionado === "voluntarios") {
+                opciones = ["Sin Información"];
+            }
+
+            return [...new Set(opciones)];
+        }
+
+        function poblarPuntos(opcionesArray, preseleccionar) {
+            selectPunto.innerHTML = "";
+
+            if (opcionesArray.length === 0) {
+                const opt = document.createElement('option');
+                opt.value = "Sin Información";
+                opt.text = "Sin Información";
+                selectPunto.add(opt);
+                return;
+            }
+
+            opcionesArray.forEach(val => {
+                const opt = document.createElement('option');
+                opt.value = val;
+                opt.text = val;
+                if (val.trim() === preseleccionar) {
+                    opt.selected = true;
+                }
+                selectPunto.add(opt);
+            });
+        }
+
+        function onSelectChange() {
+            const tipo = selectTipo.value;
+            const oficina = selectOficina.value;
+            const puntosDisponibles = getPuntosParaTipo(oficina, tipo);
+
+            poblarPuntos(puntosDisponibles, inicialPuntoEstra);
+        }
+
+        selectOficina.addEventListener('change', () => {
+            const puntos = getPuntosParaTipo(selectOficina.value, selectTipo.value);
+            poblarPuntos(puntos, puntos.length > 0 ? puntos[0] : "Sin Información");
+        });
+        selectTipo.addEventListener('change', () => {
+            const puntos = getPuntosParaTipo(selectOficina.value, selectTipo.value);
+            poblarPuntos(puntos, puntos.length > 0 ? puntos[0] : "Sin Información");
+        });
+
+        onSelectChange();
+    });
+</script>
+{% endif %}
+{% endblock content %}

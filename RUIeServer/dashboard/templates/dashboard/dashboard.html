@@ -1,0 +1,911 @@
+
+{% extends "base/base.html" %}
+{% load static %}
+{% block title %}
+    {% comment %} {% for user in usuario %}
+    Dashboard de {{user.oficinaR}}
+    {% endfor %} {% endcomment %}
+    Dashboard de {{usuario.0.oficinaR}}
+{% endblock title %}
+
+{% block navigation %}
+    Panel de Control de {{usuario.0.oficinaR}}
+{% endblock navigation %}
+
+{% block styles %}
+    <style>
+        
+            #popupBody{
+                boxi-sizing: border-box;
+                border-radius: 15px;
+                box-shadow: 0 0 5px #CCC;
+                background: #FFF;
+                position: relative;
+                transition: all 0.3s ease-in-out;
+
+            }
+
+            @media (max-width: 639px) {
+                #popupBody {
+                    width: 100%;
+                    max-width: 420 px;
+                    max-height: 90dvh; 
+                    overflow-y: auto;
+                    padding: 16px;  
+                    margin: 0;
+                }
+            }
+
+            #cerrar{
+                position: absolute;
+                top: 20px;
+                right: 30px;
+                font-size: 30px;
+                font-weight: bold;
+                text-decoration: none;
+                color: #F00;
+                transition: all 100ms;
+            }
+
+            .overlay { 
+                position: fixed;
+                inset: 0;
+                background: rgba(0, 0, 0, 0.7);
+                transition: opacity 500ms;
+                visibility: hidden;
+                opacity: 0;
+                z-index: 65;
+
+                display: flex;
+                justify-content: center;
+                align-items: center;
+
+                padding: 12px;
+                box-sizing: border-box;
+                overflow-y: auto;
+            }
+
+            .overlay:target{
+                visibility: visible;
+                opacity: 1;
+            }
+
+            .contIcons{
+                width: 55%;
+                margin-bottom: 2%;
+            }
+            
+    </style>
+{% endblock styles %}
+
+{% block estadistica %}
+    {% if request.user.is_superuser %}
+                <!--<h1 style="font-famiy: 'Georgia', font-size: 28px;">Carga de Información</h1>-->
+                <a href="{% url 'estadistica' %}" class="btn-estadistica-responsive flex items-center justify-center gap-1 sm:gap-2 bg-inm-verde-100 text-white 
+                                                        px-2 sm:px-4 lg:px-6 py-2 sm:py-3 rounded-xl hover:bg-inm-marron-200 transition">
+                    <svg class="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 3v18h18"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M7 16l4-5 3 3 5-7"/>
+                    </svg>
+                    <span class="text-xs sm:text-sm font-medium whitespace-nowrap">
+                            Estadística
+                    </span>
+                </a>
+    {% endif %}
+{% endblock estadistica %}
+
+{% block content %}
+<div class="grow">
+    {% if request.user.username|slice:":5" == "MAPA_" %}
+        <div class="flex flex-col items-center justify-center min-h-[60vh] px-4 sm:px-5 py-8 sm:py-12">
+            <div class="bg-white p-5 sm:p-8 rounded-2xl shadow-xl border border-gray-100 text-center max-w-md w-full">
+                <div class="w-16 h-16 sm:w-20 sm:h-20 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-5 text-purple-800">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 sm:h-10 sm:w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                    </svg>
+                </div>
+                <h2 class="text x-l sm:text-2xl font-bold text-gray-800 mb-2">Bienvenido al Sistema</h2>
+                <p class="text-gray-600 mb-5 sm:mb-6 text-sm">Tu cuenta de usuario está asignada al visor cartográfico interactivo.</p>
+                <a href="{% url 'mostrar_mapa_int' %}" class="inline-flex items-center justify-center w-full px-4 sm:px-6 py-3 sm:py-3.5 text-sm sm:text-base font-bold text-white bg-purple-700 
+                                                                hover:bg-purple-800 rounded-xl shadow-lg transition duration-200 transform hover:-translate-y-0.5">
+                    🗺️ Ir al Mapa Interactivo
+                </a>
+            </div>
+        </div>
+    {% else %}
+    {% if request.user.is_superuser %}
+        <div class="py-6 w-full px-4 sm:px-8 lg:px-12 xl:px-20">
+            <div class="w-full max-w-[1600px] mx-auto mb-8 sm:mb-12">
+                    <div class="flex items-center gap-2 sm:gap-3">
+                        <div class="flex-shrink-0">
+                            <svg class="w-9 h-9 sm:w-12 sm:h-12" viewBox="0 0 24 24" fill="none" stroke="#00443f" stroke-width="1.5" xmlns="http://www.w3.org/2000/svg">
+                                <circle cx="10.5" cy="10.5" r="6.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M15.5 15.5L21 21" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M5.5 10.5H7L8.2 8L9.5 13L11 6.5L12.5 12L13.5 10.5H15.5" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </div>
+                        <div class="flex flex-col flex-1 items-start">
+                            <h2 class="text-xl sm:text-2xl font-bold text-black">
+                                    Carga de Información
+                            </h2>
+                            <div class="h-[3px] bg-[#00443f] w-full mt-1 sm:mt-2"></div>
+                        </div>
+                    </div>
+                </div>
+            <center>
+                        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 sm:gap-6 lg:gap-12 w-full max-w-[1600px] mx-auto">
+                            <div class="relative w-full min-h-[200px] bg-gray-200/70 rounded-2xl text-black overflow-hidden">
+                                <div class="relative z-10 flex flex-col min-[768px]:flex-row items-center justify-center 
+                                            min-[768px]:justify-start h-full px-4 sm:px-5 lg:px-7 py-6 min-[768px]:py-4 pr-8 sm:pr-9 lg:pr-10 gap-4 min-[768px]:gap-3">
+                                    <div class="flex-shrink-0 w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-[#c49da8] flex items-center justify-center">
+                                        <img class="w-14 h-14 sm:w-16 sm:h-16 object-contain" src="{% static 'icons/INSUMOS/Edodefuerza.svg' %}" alt="logo">
+                                    </div>
+                                        <div class="flex flex-col items-center min-[768px]:items-start text-center min-[768px]:text-left min-w-0 flex-1">
+                                            <h2 class="text-sm font-bold">
+                                                Estado de Fuerza
+                                            </h2>
+                                            <p class="mt-2 text-sm leading-6 sm:leading-7 max-w-[300px]">
+                                                Consulta y carga la información del estado de fuerza.
+                                            </p>
+                                                <a href="{% url 'pagina_pruebas_edoFuerza' %}" class="mt-5 inline-flex items-center justify-between w-[135px] max-w-full px-4 py-3 
+                                                                                    bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-full text-white text-xs 
+                                                                                    transition-colors duration-200">
+                                                    <span class="ml-3">Ver/Cargar</span>
+                                                    <span class="text-sm">→</span>
+                                                </a>
+                                        </div>       
+                                            <div class="absolute right-4 top-0 h-full w-4 sm:w-4 md:w-6 bg-[#c49da8]"></div>
+                                </div>
+                            </div>
+                            <div class="relative w-full min-h-[200px] bg-gray-200/70 rounded-2xl text-black overflow-hidden">
+                                <div class="relative z-10 flex flex-col min-[768px]:flex-row items-center justify-center 
+                                            min-[768px]:justify-start h-full px-4 sm:px-5 lg:px-7 py-6 min-[768px]:py-4 pr-8 sm:pr-9 lg:pr-10 gap-4 min-[768px]:gap-3">
+                                    <div class="flex-shrink-0 w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-[#00443f] flex items-center justify-center">
+                                        <img class="w-14 h-14 sm:w-16 sm:h-16 object-contain" src="{% static 'icons/INSUMOS/Puntos de internacion.svg' %}" alt="logo">
+                                    </div>
+                                        <div class="flex flex-col items-center min-[768px]:items-start text-center min-[768px]:text-left min-w-0 flex-1">
+                                            <h2 class="text-sm font-bold">
+                                                Puntos de Interacción
+                                            </h2>
+                                            <p class="mt-2 text-sm leading-6 sm:leading-7 max-w-[300px]">
+                                                Consulta y carga la información de los puntos 
+                                                de internación.
+                                            </p>
+                                                <a href="{% url 'paginaPuntosI' %}" class="mt-5 inline-flex items-center justify-between w-[135px] max-w-full px-4 py-3 
+                                                                                    bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-full text-white text-xs 
+                                                                                    transition-colors duration-200">
+                                                    <span class="ml-3">Ver/Cargar</span>
+                                                    <span class="text-sm">→</span>    
+                                                </a>
+                                        </div>
+                                            <div class="absolute right-4 top-0 h-full w-4 md:w-6 bg-[#00443f]"></div>
+                                </div>
+                            </div>
+                            <div class="relative w-full min-h-[200px] bg-gray-200/70 rounded-2xl text-black overflow-hidden">
+                                <div class="relative z-10 flex flex-col min-[768px]:flex-row items-center justify-center 
+                                            min-[768px]:justify-start h-full px-4 sm:px-5 lg:px-7 py-6 min-[768px]:py-4 pr-8 sm:pr-9 lg:pr-10 gap-4 min-[768px]:gap-3">
+                                    <div class="flez-shrink-0 w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-[#8fc7df] flex items-center justify-center">
+                                        <img class="w-14 h-14 sm:w-16 sm:h-16 object-contain" src="{% static 'icons/INSUMOS/USUARIOS.svg' %}" alt="logo">
+                                    </div>
+                                        <div class="flex flex-col items-center min-[768px]:items-start text-center min-[768px]:text-left min-w-0 flex-1">
+                                            <h2 class="text-sm font-bold">
+                                                Usuarios
+                                            </h2>
+                                            <p class="mt-2 text-sm leading-6 sm:leading-7 max-w-[300px]">
+                                                Consulta y administra la información 
+                                                de los usuarios del sistema.
+                                            </p>
+                                                <a href="{% url 'pagina_pruebas_usuarios' %}" class="mt-5 inline-flex items-center justify-between w-[135px] max-w-full px-4 py-3 
+                                                                                    bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-full text-white text-xs 
+                                                                                    transition-colors duration-200">
+                                                    <span class="ml-3">Ver/Cargar</span>
+                                                    <span class="text-sm">→</span>
+                                                </a>
+                                        </div>
+                                            <div class="absolute right-4 top-0 h-full w-4 md:w-6 bg-[#8fc7df]"></div>
+                                </div>
+                            </div>
+                        </div>
+            </center>
+        </div>
+
+        <!-- Punto de Interacción
+        Bloque Intermedio de para realizar la correción-->
+        <!--<div class="w-full bg-[#c49da8] px-4 py-2 mt-8 mb-12">
+            <div class="flex items-center gap-6">
+                <div class="shrink-0">
+                        <img class="w-12 h-12 object-contain" src="{% static 'icons/INSUMOS/iniciar-sesion.png' %}" alt="logo">
+                </div>
+                <div class="flex flex-col">
+                    <h2 class="text-sm font-bold text-[#8a002f]">
+                             Correción de Puntos
+                    </h2>
+                    <p class="mt-2 text-xs text-black">
+                             Realizar la corrección de información en los puntos de registro.
+                    </p>
+                </div>
+            </div>
+        </div> (ESTO NO VA DE CORRECIÓN DE PUNTOS)-->
+
+        <!-- <div id="popupPI" class="overlay">
+            <div id="popupBody">
+                <a href="#" id="cerrar">&times;</a>
+                <div class="popupContent">
+                    {% if user.is_authenticated %}
+                    <center>
+                        <h3>
+                            Carga el archivo de los Puntos de Internación
+                        </h3>
+                        <br>
+                    </center>
+                    <form action="{% url 'cargar_puntoI' %}" method="post" enctype="multipart/form-data">{% csrf_token %}
+                        <p>
+                            {{ formCargar1.archivo }}
+                        </p>
+                        <br>
+                        <p>
+                            <input class="py-2 px-5 mx-1 bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-xl text-white" type="submit" value="Cargar" />
+                        </p>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div> -->
+
+        <div class="py-6 w-full px-4 sm:px-8 lg:px-12 xl:px-20">
+            <center>
+                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 sm:gap-8 lg:gap-12 w-full max-w-[1600px] mx-auto">
+                    <div class="relative w-full min-h-[200px] bg-gray-200/70 rounded-2xl text-black overflow-hidden">
+                        <div class="relative z-10 flex flex-col min-[768px]:flex-row items-center justify-center 
+                                    min-[768px]:justify-start h-full px-4 sm:px-5 lg:px-7 py-6 min-[768px]:py-4 pr-8 sm:pr-9 lg:pr-10 gap-4 min-[768px]:gap-3">
+                            <div class="flex-shrink-0 w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-[#f9df75] flex items-center justify-center">
+                                <img class="w-14 h-14 sm:w-16 sm:h-16 object-contain" src="{% static 'icons/INSUMOS/INADMITIDOS.svg' %}" alt="logo">
+                            </div>
+                                <div class="flex flex-col items-center min-[768px]:items-start text-center min-[768px]:text-left min-w-0 flex-1">
+                                    <h2 class="text-sm font-bold">
+                                        Inadmitidos
+                                    </h2>
+                                    <p class="mt-2 text-sm leading-6 leading-7 max-w-[300px]">
+                                        Consulta y carga la información de los inadmitidos.
+                                    </p>
+                                        <a href="#popupInadmitidos" class="mt-5 inline-flex items-center justify-between w-[135px] max-w-full px-4 py-3 
+                                                                                    bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-full text-white text-xs 
+                                                                                    transition-colors duration-200">
+                                            <span class="ml-3">Ver/Cargar</span>
+                                            <span class="text-sm">→</span>    
+                                        </a>
+                                </div>
+                                    <div class="absolute right-4 top-0 h-full w-4 md:w-6 bg-[#f9df75]"></div>
+                        </div>
+                    </div>
+
+                    <div class="relative w-full min-h-[200px] bg-gray-200/70 rounded-2xl text-black overflow-hidden">
+                        <div class="relative z-10 flex flex-col min-[768px]:flex-row items-center justify-center 
+                                    min-[768px]:justify-start h-full px-4 sm:px-5 lg:px-7 py-6 min-[768px]:py-4 pr-8 sm:pr-9 lg:pr-10 gap-4 min-[768px]:gap-3">
+                            <div class="flex-shrink-0 w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-[#ff7043] flex items-center justify-center">
+                                <img class="w-14 h-14 sm:w-16 sm:h-16 object-contain" src="{% static 'icons/INSUMOS/NACIONALIDADES.svg' %}" alt="logo">
+                            </div>
+                                <div class="flex flex-col items-center min-[768px]:items-start text-center min-[768px]:text-left min-w-0 flex-1">
+                                    <h2 class="text-sm font-bold">
+                                        Nacionalidades
+                                    </h2>
+                                    <p class="mt-2 text-sm leading-6 leading-7 max-w-[300px]">
+                                        Consulta y carga la información de las nacionalidades.
+                                    </p>
+                                        <a href="#popupNacionalidades" class="mt-5 inline-flex items-center justify-between w-[135px] max-w-full px-4 py-3 
+                                                                                    bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-full text-white text-xs 
+                                                                                    transition-colors duration-200">
+                                            <span class="ml-3">Ver/Cargar</span>
+                                            <span class="text-sm">→</span>    
+                                        </a>
+                                </div>
+                                    <div class="absolute right-4 top-0 h-full w-4 md:w-6 bg-[#ff7043]"></div>
+                        </div>
+                    </div>
+
+                    <div class="relative w-full min-h-[200px] bg-gray-200/70 rounded-2xl text-black overflow-hidden">
+                        <div class="relative z-10 flex flex-col min-[768px]:flex-row items-center justify-center 
+                                    min-[768px]:justify-start h-full px-4 sm:px-5 lg:px-7 py-6 min-[768px]:py-4 pr-8 sm:pr-9 lg:pr-10 gap-4 min-[768px]:gap-3">
+                            <div class="flex-shrink-0 w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-[#dfc48e] flex items-center justify-center">
+                                <img class="w-14 h-14 sm:w-16 sm:h-16 object-contain" src="{% static 'icons/INSUMOS/Municipio.svg' %}" alt="logo">
+                            </div>
+                                <div class="flex flex-col items-center min-[768px]:items-start text-center min-[768px]:text-left min-w-0 flex-1">
+                                    <h2 class="text-sm font-bold">
+                                        Municipios
+                                    </h2>
+                                    <p class="mt-2 text-sm leading-6 sm:leading-7 max-w-[300px]">
+                                        Consulta y carga la información de los municipios.
+                                    </p>
+                                        <a href="#popupMunicipios" class="mt-5 inline-flex items-center justify-between w-[135px] max-w-full px-4 py-3 
+                                                                                    bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-full text-white text-xs 
+                                                                                    transition-colors duration-200">
+                                            <span class="ml-3">Ver/Cargar</span>
+                                            <span class="text-sm">→</span>    
+                                        </a>
+                                </div>
+                                    <div class="absolute right-4 top-0 h-full w-4 md:w-6 bg-[#dfc48e]"></div>
+                        </div>
+                    </div>
+                </div>
+            </center>
+        </div>
+
+        <div id="popupInadmitidos" class="overlay z-[100]">
+            <div id="popupBody" class="relative z-[110] w-full max-w-2xl max-h-[90dvh] overflow-y-auto bg-white rounded-2xl shadow-2xl p-4 sm:p-6 mx-auto transition-all">
+                <a href="#" id="cerrar" class="absolute top-2 right-3 sm:top-3 sm:right-4 text-2xl font-bold text-red-500 hover:text-red-600 transition-colors z-10">&times;</a>
+                <div class="popupContent">
+                    {% if user.is_authenticated %}
+                        <h2 class="text-xl font-bold text-center text-[#4E232E] mb-4">Gestión de Inadmitidos</h2>
+                        
+                        <!-- Pestañas de Navegación -->
+                        <div class="grid grid-cols-3 items-stretch w-full border-b border-gray-200 mb-5">
+                            <button type="button" onclick="switchInadTab('secCarga')" id="tab-secCarga" class="tab-inad-btn min-w-0 px-1 py-3 text-xs sm:text-sm font-semibold leading-tight text-center text-[#4E232E] border-b-2 border-[#4E232E] focus:outline-none">
+                                1. Carga
+                            </button>
+                            <button type="button" onclick="switchInadTab('secVis')" id="tab-secVis" class="tab-inad-btn min-w-0 px-1 py-3 text-xs sm:text-sm font-semibold leading-tight text-center text-gray-500 hover:text-[#4E232E] border-b-2 border-transparent focus:outline-none">
+                                2. Visualizar Datos
+                            </button>
+                            <button type="button" onclick="switchInadTab('secDescarga')" id="tab-secDescarga" class="tab-inad-btn min-w-0 px-1 py-3 text-xs sm:text-sm font-semibold leading-tight text-center text-gray-500 hover:text-[#4E232E] border-b-2 border-transparent focus:outline-none">
+                                3. Descarga
+                            </button>
+                        </div>
+
+                        <!-- Sección 1: Carga -->
+                        <div id="secCarga" class="inad-tab-content">
+                            <center>
+                                <h3 class="text-md font-medium text-gray-700 mb-3">Carga el archivo de los Inadmitidos</h3>
+                            </center>
+                            <form action="{% url 'cargar_Inadmitidos' %}" method="post" enctype="multipart/form-data" class="flex flex-col items-center">
+                                {% csrf_token %}
+                                <div class="mb-4">
+                                    {{ formCargar1.archivo }}
+                                </div>
+                                <div>
+                                    <input class="py-2 px-6 bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-xl text-white font-bold cursor-pointer transition-colors shadow" type="submit" value="Cargar" />
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- Sección 2: Visualizar datos -->
+                        <div id="secVis" class="inad-tab-content hidden">
+                            <form action="{% url 'datos_inadmitidos' %}" method="post" enctype="multipart/form-data" class="flex flex-col items-center justify-center">
+                                {% csrf_token %}
+                                <p class="py-2 text-sm font-medium text-gray-700">Seleccionar la fecha para visualizar los datos de Inadmitidos</p>
+                                <div class="my-3">
+                                    <input type="date" name="fechaDescarga" id="fechaInadmitidosVis" required class="px-3 py-2 border-2 border-[#D4C19C] rounded-xl text-gray-800 focus:outline-none focus:border-[#4E232E]">
+                                </div>
+                                <div class="py-2">
+                                    <button class="py-2 px-5 bg-inm-verde-100 hover:bg-inm-verde-200 rounded-xl text-white font-bold transition-colors shadow" type="submit">
+                                        Visualizar Datos
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- Sección 3: Descarga -->
+                        <div id="secDescarga" class="inad-tab-content hidden">
+                            <form action="{% url 'generar_excel_inadmitidos' %}" method="post" enctype="multipart/form-data" class="flex flex-col items-center" onsubmit="return validarFechasInadmitidos()">
+                                {% csrf_token %}
+                                <p class="text-sm font-medium text-gray-700 mb-4 text-center">Selecciona el rango de fechas para generar el archivo Excel de Inadmitidos</p>
+                                <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-5">
+                                    <div class="flex flex-col">
+                                        <label for="fechaInicioInad" class="text-xs font-semibold text-gray-600 mb-1">Fecha de inicio:</label>
+                                        <input type="date" name="fechaInicio" id="fechaInicioInad" min="2026-01-01" required class="px-3 py-2 border-2 border-[#D4C19C] rounded-xl text-gray-800 focus:outline-none focus:border-[#4E232E] text-sm">
+                                    </div>
+                                    <div class="flex flex-col">
+                                        <label for="fechaFinInad" class="text-xs font-semibold text-gray-600 mb-1">Fecha de fin:</label>
+                                        <input type="date" name="fechaFin" id="fechaFinInad" min="2026-01-01" required class="px-3 py-2 border-2 border-[#D4C19C] rounded-xl text-gray-800 focus:outline-none focus:border-[#4E232E] text-sm">
+                                    </div>
+                                </div>
+                                <button class="py-2 px-6 bg-inm-verde-100 hover:bg-inm-verde-200 rounded-xl text-white font-bold transition-colors shadow" type="submit">
+                                    Descargar Excel
+                                </button>
+                            </form>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <script>
+            function switchInadTab(tabId) {
+                const tabs = ['secCarga', 'secVis', 'secDescarga'];
+                tabs.forEach(t => {
+                    const content = document.getElementById(t);
+                    const btn = document.getElementById('tab-' + t);
+                    if (t === tabId) {
+                        content.classList.remove('hidden');
+                        btn.classList.remove('text-gray-500', 'border-transparent');
+                        btn.classList.add('text-[#4E232E]', 'border-[#4E232E]');
+                    } else {
+                        content.classList.add('hidden');
+                        btn.classList.remove('text-[#4E232E]', 'border-[#4E232E]');
+                        btn.classList.add('text-gray-500', 'border-transparent');
+                    }
+                });
+            }
+
+            function validarFechasInadmitidos() {
+                const fInicio = document.getElementById('fechaInicioInad').value;
+                const fFin = document.getElementById('fechaFinInad').value;
+                const minFecha = "2026-01-01";
+                const hoyStr = obtenerFechaActual();
+
+                if (!fInicio || !fFin) {
+                    alert('Por favor, seleccione ambas fechas.');
+                    return false;
+                }
+
+                if (fInicio < minFecha || fFin < minFecha) {
+                    alert('La fecha no puede ser menor al 01/01/2026.');
+                    return false;
+                }
+
+                if (fInicio > hoyStr || fFin > hoyStr) {
+                    alert('La fecha no puede ser mayor a la fecha actual.');
+                    return false;
+                }
+
+                if (fInicio > fFin) {
+                    alert('La fecha de inicio no puede ser mayor que la fecha de fin.');
+                    return false;
+                }
+
+                return true;
+            }
+
+            document.addEventListener('DOMContentLoaded', function() {
+                const hoy = obtenerFechaActual();
+                const visInput = document.getElementById('fechaInadmitidosVis');
+                const finInadInput = document.getElementById('fechaFinInad');
+                const iniInadInput = document.getElementById('fechaInicioInad');
+                
+                if (visInput) {
+                    visInput.max = hoy;
+                    visInput.value = hoy;
+                }
+                if (finInadInput) {
+                    finInadInput.max = hoy;
+                    finInadInput.value = hoy;
+                }
+                if (iniInadInput) {
+                    iniInadInput.max = hoy;
+                }
+            });
+        </script>
+
+        <div id="popupNacionalidades" class="overlay">
+            <div id="popupBody" class="relative w-full max-w-2xl max-h-[90dvh] overflow-y-auto bg-white rounded-2xl shadow-2xl p-4 sm:p-6 mx-auto">
+                <a href="#" id="cerrar">&times;</a>
+                <div class="popupContent">
+                    {% if user.is_authenticated %}
+                    <center>
+                        <h3>
+                            Carga el archivo de las Nacionalidades disponibles
+                        </h3>
+                        <br>
+                    </center>
+                    <form action="{% url 'cargar_pais' %}" method="post" enctype="multipart/form-data">{% csrf_token %}
+                        <p class="">
+                            {{ formCargar1.archivo }}
+                        </p>
+                        <br>
+                        <p>
+                            <input class="py-2 px-5 mx-1 bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-xl text-white" type="submit" value="Cargar" />
+                        </p>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div id="popupMunicipios" class="overlay">
+            <div id="popupBody" class="relative w-full max-w-2xl max-h-[90dvh] overflow-y-auto bg-white rounded-2xl shadow-2xl p-4 sm:p-6 mx-auto">
+                <a href="#" id="cerrar">&times;</a>
+                <div class="popupContent">
+                    {% if user.is_authenticated %}
+                    <center>
+                        <h3>
+                            Carga el archivo de los Municipios
+                        </h3>
+                        <br>
+                    </center>
+                    <form action="{% url 'cargar_municipios' %}" method="post" enctype="multipart/form-data">{% csrf_token %}
+                        <p>
+                            {{ formCargar1.archivo }}
+                        </p>
+                        <br>
+                        <p>
+                            <input class="py-2 px-5 mx-1 bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-xl text-white" type="submit" value="Cargar" />
+                        </p>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        {# @FADAR -- Tarjetas de acceso a Reportes y Rescates #}
+
+        <!-- <div class="py-5 contIcons flex flex-row basis-1/2">
+                        <div class="ml-5 basis-1/3 flex justify-center items-center">
+                            <svg class="w-20 h-20" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="1.3" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 17V9m3 8V5m3 12v-4m-9 4v-2M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                            </svg>
+                        </div>
+                        <div class="ml-5 basis-1/3 flex justify-center items-center">
+                            <svg class="w-20 h-20" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="1.3" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="py-5 contIcons flex items-center basis-1/2">
+                            <div class="ml-5 basis-1/3 py-5 px-5 mx-1 bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-xl text-white">
+                                <a href="{% url 'Reportes_Analisis:rescates_dashboard' %}" class="">Reportes operación migratoria</a>
+                            </div>
+                            <div class="ml-5 basis-1/3 py-5 px-5 mx-1 bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-xl text-white">
+                                <a href="#popupRescates" class="">Rescates</a>
+                            </div>
+                </div>-->
+
+        <!-- Contenedor de reportes -->
+        <div class=" py-6 w-full px-4 sm:px-8 lg:px-12 xl:px-20 mt-8 sm:mt-12 lg:mt-16 mb-8 sm:mb-12 lg:mb-16">
+                <div class="w-full max-w-[1600px] mx-auto mb-8 sm:mb-12">
+                    <div class="flex items-center gap-2 sm:gap-3">
+                        <div class="flex-shrink-0">
+                            <svg class="w-9 h-9 sm:w-12 sm:h-12" viewBox="0 0 24 24" fill="none" stroke="#941b4c" stroke-width="1.5" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 21h18M4 21V9l5-3v15M9 21V5l5-3v19M14 21V9l6-3v15M6 12h1M6 15h1M11 9h1M11 12h1M11 15h1M16 12h1M16 15h1" />
+                            </svg>
+                        </div>
+                        <div class="flex flex-col flex-1 items-start">
+                            <h2 class="text-xl sm:text-2xl font-bold text-black">
+                                    Reportes
+                            </h2>
+                            <div class="h-[3px] bg-[#941b4c] w-full mt-1 sm:mt-2"></div>
+                        </div>
+                    </div>
+                </div>
+            <center>
+                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 sm:gap-6 lg:gap-12 w-full max-w-[1600px] mx-auto">
+                    <div class="relative w-full min-h-[200px] bg-gray-200/70 rounded-2xl text-black overflow-hidden">
+                        <div class="relative z-10 flex flex-col min-[768px]:flex-row items-center justify-center 
+                                    min-[768px]:justify-start h-full px-4 sm:px-5 lg:px-7 py-6 min-[768px]:py-4 pr-8 sm:pr-9 lg:pr-10 gap-4 min-[768px]:gap-3">
+                            <div class="flex-shrink-0 w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-[#941b4c] flex items-center justify-center">
+                                <img class="w-14 h-14 sm:w-16 sm:h-16 object-contain" src="{% static 'icons/INSUMOS/OPERACION MIGRATORIA.svg' %}" alt="logo">
+                            </div>
+                            <div class="flex flex-col items-center min-[768px]:items-start text-center min-[768px]:text-left min-w-0 flex-1">
+                                <h2 class="text-sm font-bold">
+                                        Operación migratoria
+                                </h2>
+                                <p class="mt-2 text-sm leading-6 sm:leading-7 max-w-[300px]">
+                                        Consulta la información de la operación migratoria.
+                                </p>
+                                    <a href="{% url 'Reportes_Analisis:rescates_dashboard' %}" class="mt-5 inline-flex items-center justify-between w-[135px] max-w-full px-4 py-3 
+                                                                                    bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-full text-white text-xs 
+                                                                                    transition-colors duration-200">
+                                    <span class="ml-3">Ver/Cargar</span>
+                                    <span class="text-sm">→</span>
+                                    </a>
+                            </div>
+                            <div class="absolute right-4 top-0 h-full w-4 md:w-6 bg-[#941b4c]"></div>
+                        </div>
+                    </div>
+                    <div class="relative w-full min-h-[200px] bg-gray-200/70 rounded-2xl text-black overflow-hidden">
+                        <div class="relative z-10 flex flex-col min-[768px]:flex-row items-center justify-center 
+                                    min-[768px]:justify-start h-full px-4 sm:px-5 lg:px-7 py-6 min-[768px]:py-4 pr-8 sm:pr-9 lg:pr-10 gap-4 min-[768px]:gap-3">
+                            <div class="flex-shrink-0 w20 h-20 sm:w-24 sm:h-24 rounded-full bg-[#9BCF8F] flex items-center justify-center">
+                                <img class="w-14 h-14 sm:w-16 sm:h-16 object-contain" src="{% static 'icons/INSUMOS/Rescates.svg' %}" alt="logo">
+                            </div>
+                            <div class="flex flex-col items-center min-[768px]:items-start text-center min-[768px]:text-left min-w-0 flex-1">
+                                <h2 class="text-sm font-bold">
+                                        Rescates
+                                </h2>
+                                <p class="mt-2 text-sm leading-6 sm:leading-7 max-w-[300px]">
+                                        Consulta la información de los rescates.
+                                </p>
+                                    <a href="#popupRescates" class="mt-5 inline-flex items-center justify-between w-[135px] max-w-full px-4 py-3 
+                                                                        bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-full text-white text-xs 
+                                                                        transition-colors duration-200">
+                                    <span class="ml-3">Ver/Cargar</span>
+                                    <span class="text-sm">→</span>
+                                    </a>
+                            </div>
+                            <div class="absolute right-4 top-0 h-full w-4 md:w-6 bg-[#9BCF8F]"></div>
+                        </div>
+                    </div>
+                    <div class="relative w-full min-h-[200px] bg-gray-200/70 rounded-2xl text-black overflow-hidden">
+                        <div class="frelative z-10 flex flex-col min-[768px]:flex-row items-center justify-center 
+                                    min-[768px]:justify-start h-full px-4 sm:px-5 lg:px-7 py-6 min-[768px]:py-4 pr-8 sm:pr-9 lg:pr-10 gap-4 min-[768px]:gap-3">
+                            <div class="flex-shrink-0 w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-[#D1D5DB] flex items-center justify-center">
+                                <img class="w-14 h-14 sm:w-16 sm:h-16 object-contain" src="{% static 'icons/INSUMOS/Mexicanos retornados.svg' %}" alt="logo">
+                            </div>
+                            <div class="flex flex-col items-center min-[768px]:items-start text-center min-[768px]:text-left min-w-0 flex-1">
+                                <h2 class="text-sm font-bold">
+                                        Mexicanos
+                                </h2>
+                                <p class="mt-2 text-sm leading-6 sm:leading-7 max-w-[300px]">
+                                        Consulta la información de los mexicanos.
+                                </p>
+                                    <a class="mt-5 inline-flex items-center justify-between w-[135px] px-4 py-3 
+                                                                        bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-full text-white text-xs 
+                                                                        transition-colors duration-200">
+                                    <span class="ml-3">Ver/Cargar</span>
+                                    <span class="text-sm">→</span>
+                                    </a>
+                            </div>
+                            <div class="absolute right-4 top-0 h-full w-4 md:w-6 bg-[#D1D5DB]"></div>
+                        </div>
+                    </div>
+                </div>  
+            </center>
+        </div>
+
+        <!-- Modal Popup Rescates -->
+        <div id="popupRescates" class="overlay">
+            <div id="popupBody" class="w-full max-w-2xl max-h-[90dvh] overflow-y-auto bg-white rounded-2xl shadow-2xl p-4 sm:p-6 relative mx-auto transition-all">
+                <a href="#" id="cerrar" class="absolute top-2 right-3 sm:top-4 sm:right-5 text-2xl font-bold text-red-500 hover:text-red-600 transition-colors z-10">&times;</a>
+                <div class="popupContent">
+                    {% if user.is_authenticated %}
+                        <h2 class="text-lg sm:text-xl font-bold text-center text-[#4E232E] mb-4 px-5">Gestión de Rescates</h2>
+                        
+                        <!-- Pestañas de Navegación -->
+                        <div class="grid grid-cols-3 items-stretch border-b border-gray-200 mb-5 w-full">
+                            <button type="button" onclick="switchRescTab('secRescVis')" id="tab-secRescVis" class="tab-resc-btn min-w-0 px-1 py-3 text-xs sm:text-sm font-semibold text-[#4E232E] border-b-2 border-[#4E232E] focus:outline-none">
+                                1. Visualización
+                            </button>
+                            <button type="button" onclick="switchRescTab('secRescDescarga')" id="tab-secRescDescarga" class="tab-resc-btn min-w-0 px-1 py-3 text-sm font-semibold text-gray-500 hover:text-[#4E232E] border-b-2 border-transparent focus:outline-none">
+                                2. Descargas
+                            </button>
+                            <button type="button" onclick="switchRescTab('secRescCorreccion')" id="tab-secRescCorreccion" class="tab-resc-btn min-w-0 px-1 py-3 text-sm font-semibold text-gray-500 hover:text-[#4E232E] border-b-2 border-transparent focus:outline-none">
+                                3. Corrección de Puntos
+                            </button>
+                        </div>
+
+                        <!-- Sección 1: Visualización -->
+                        <div id="secRescVis" class="resc-tab-content">
+                            <form action="{% url 'datos_por_fecha' %}" method="post" enctype="multipart/form-data" class="flex flex-col items-center justify-center">
+                                {% csrf_token %}
+                                <p class="py-2 text-sm font-medium text-gray-700">Seleccionar la fecha para visualizar los rescates</p>
+                                <div class="my-3">
+                                    {{ form.fechaDescarga }}
+                                </div>
+                                <div class="py-2">
+                                    <input class="py-2 px-6 bg-inm-verde-100 hover:bg-inm-verde-200 rounded-xl text-white font-bold transition-colors shadow cursor-pointer" type="submit" value="Visualizar Datos" />
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- Sección 2: Descargas -->
+                        <div id="secRescDescarga" class="resc-tab-content hidden">
+                            {% if request.user.is_superuser %}
+                                <form action="{% url 'fechas_descarga' %}" method="post" enctype="multipart/form-data"
+                                    class="flex flex-col items-center" onsubmit="return descargarExcelOptimizado(event, 'downloadStatusModal')">{% csrf_token %}
+                                    <p class="text-sm font-medium text-gray-700 mb-4 text-center">Descargar archivo de rescates por fechas</p>
+                                    <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-4">
+                                        <div class="flex flex-col">
+                                            <label for="fechaInicio" class="text-xs font-semibold text-gray-600 mb-1">Fecha de inicio:</label>
+                                            <input class="px-3 py-2 border-2 border-[#D4C19C] rounded-xl text-gray-800 focus:outline-none focus:border-[#4E232E] text-sm" type="date" name="fechaInicio" id="fechaInicio" required="">
+                                        </div>
+                                        <div class="flex flex-col">
+                                            <label for="fechaFin" class="text-xs font-semibold text-gray-600 mb-1">Fecha de fin:</label>
+                                            <input class="px-3 py-2 border-2 border-[#D4C19C] rounded-xl text-gray-800 focus:outline-none focus:border-[#4E232E] text-sm" type="date" name="fechaFin" id="fechaFin" required="">
+                                        </div>
+                                    </div>
+                                    <input type="hidden" value="TODAS" id="oficinaR" name="oficinaR"> 
+                                    <button class="py-2 px-6 bg-inm-verde-100 hover:bg-inm-verde-200 rounded-xl text-white font-bold transition-colors shadow" type="submit">Descargar</button>
+                                </form>
+                                <div id="downloadStatusModal" style="display: none;" class="mx-auto max-w-lg mt-4"></div>
+                            {% else %}
+                                <form action="{% url 'fechas_OR' %}" method="post" enctype="multipart/form-data"
+                                    class="flex flex-col items-center" onsubmit="return descargarExcelOptimizado(event, 'downloadStatusORModal')">{% csrf_token %}
+                                    <p class="text-sm font-medium text-gray-700 mb-4 text-center">Descargar archivo de rescates por fechas ({{usuario.0.oficinaR}})</p>
+                                    <input type="hidden" value="{{usuario.0.oficinaR}}" id="oficinaR" name="oficinaR"> 
+                                    <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-4">
+                                        <div class="flex flex-col">
+                                            <label for="fechaInicio" class="text-xs font-semibold text-gray-600 mb-1">Fecha de inicio:</label>
+                                            <input class="px-3 py-2 border-2 border-[#D4C19C] rounded-xl text-gray-800 focus:outline-none focus:border-[#4E232E] text-sm" type="date" name="fechaInicio" id="fechaInicio" required="">
+                                        </div>
+                                        <div class="flex flex-col">
+                                            <label for="fechaFin" class="text-xs font-semibold text-gray-600 mb-1">Fecha de fin:</label>
+                                            <input class="px-3 py-2 border-2 border-[#D4C19C] rounded-xl text-gray-800 focus:outline-none focus:border-[#4E232E] text-sm" type="date" name="fechaFin" id="fechaFin" required="">
+                                        </div>
+                                    </div>
+                                    <button class="py-2 px-6 bg-inm-verde-100 hover:bg-inm-verde-200 rounded-xl text-white font-bold transition-colors shadow" type="submit">Descargar</button>
+                                </form>
+                                <div id="downloadStatusORModal" style="display: none;" class="mx-auto max-w-lg mt-4"></div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Sección 3: Corrección de Puntos -->
+                        <div id="secRescCorreccion" class="resc-tab-content hidden flex flex-col items-center justify-center py-4">
+                            <p class="text-sm font-medium text-gray-700 mb-4 text-center">Acceso al módulo de corrección masiva de puntos estratégicos</p>
+                            <div class="w-full sm:w-2/3 py-4 px-5 bg-yellow-600 hover:bg-yellow-700 rounded-xl text-white text-center font-bold shadow-md transition-colors">
+                                <a href="{% url 'correccion_puntos' %}" class="flex items-center justify-center gap-2">
+                                    <svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                    </svg>
+                                    Corrección de Puntos
+                                </a>
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <script>
+            function switchRescTab(tabId) {
+                const tabs = ['secRescVis', 'secRescDescarga', 'secRescCorreccion'];
+                tabs.forEach(t => {
+                    const content = document.getElementById(t);
+                    const btn = document.getElementById('tab-' + t);
+                    if (t === tabId) {
+                        content.classList.remove('hidden');
+                        btn.classList.remove('text-gray-500', 'border-transparent');
+                        btn.classList.add('text-[#4E232E]', 'border-[#4E232E]');
+                    } else {
+                        content.classList.add('hidden');
+                        btn.classList.remove('text-[#4E232E]', 'border-[#4E232E]');
+                        btn.classList.add('text-gray-500', 'border-transparent');
+                    }
+                });
+            }
+        </script>
+    {% endif %}
+</div>
+
+<script>
+
+    if (document.getElementById('fechaReincidencia')) {
+        document.getElementById('fechaReincidencia').innerText = obtenerFechaActual();
+    }
+    // Función para obtener la fecha actual en formato 'YYYY-MM-DD'
+    function obtenerFechaActual() {
+        var hoy = new Date();
+        var dd = String(hoy.getDate()).padStart(2, '0');
+        var mm = String(hoy.getMonth() + 1).padStart(2, '0'); // Enero es 0
+        var yyyy = hoy.getFullYear();
+        return yyyy + '-' + mm + '-' + dd;
+    }
+
+    // Establecer la fecha de fin como la fecha actual al cargar la página
+    if (document.getElementById('fechaFin')) {
+        document.getElementById('fechaFin').value = obtenerFechaActual();
+    }
+
+    function validarFechas() {
+        var fechaInicio = document.getElementById('fechaInicio').value;
+        var fechaFin = document.getElementById('fechaFin').value;
+
+        var fechaInicioObj = new Date(fechaInicio);
+        var fechaFinObj = new Date(fechaFin);
+
+        if (fechaInicioObj > fechaFinObj) {
+            alert('La fecha de inicio no puede ser mayor que la fecha de fin.');
+            return false;
+        }
+
+        return true;
+    }
+</script>
+
+<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+<script>
+    async function descargarExcelOptimizado(event, statusId) {
+        event.preventDefault();
+        if (!validarFechas()) return false;
+
+        const form = event.target;
+        const fechaInicio = form.querySelector('[name="fechaInicio"]').value;
+        const fechaFin = form.querySelector('[name="fechaFin"]').value;
+        const oficinaR = form.querySelector('#oficinaR') ? form.querySelector('#oficinaR').value : 'TODAS';
+
+        const statusDiv = document.getElementById(statusId);
+        statusDiv.style.display = 'block';
+        statusDiv.className = 'mt-4 p-4 bg-blue-100 text-blue-800 rounded-xl text-center border-2 border-blue-300 shadow-md';
+        statusDiv.innerHTML = '<strong>Iniciando descarga optimizada...</strong><br>Preparando conexión con el servidor.';
+
+        const start = new Date(fechaInicio + 'T00:00:00');
+        const end = new Date(fechaFin + 'T00:00:00');
+        const totalDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+
+        let allRecords = [];
+        let totalRowsAccumulated = 0;
+        let chunkPart = 1;
+        const MAX_CHUNK_ROWS = 100000;
+
+        const headers = [
+            "Oficina Representación", "Fecha", "Hora", "Nombre Agente", "Aeropuerto", "Carretero", 
+            "Tipo Vehículo", "Línea Autobús", "Número Económico", "Placas", "Vehículo Asegurado", 
+            "Casa Seguridad", "Central Autobús", "Ferrocarril", "Empresa", "Hotel", 
+            "Nombre Hotel", "Puestos a Disposición", "Juez Calificador", "Reclusorio", 
+            "Policía Federal", "DIF", "Policía Estatal", "Policía Municipal", 
+            "Guardia Nacional", "Fiscalía", "Otras Autoridades", "Voluntarios", 
+            "Otro", "Presuntos Delincuentes", "Num Presuntos Delincuentes", "Municipio", 
+            "Punto Estratégico", "Nacionalidad", "ISO3", "Nombre", "Apellidos", 
+            "No Identidad", "Parentesco", "Fecha Nacimiento", "Sexo", "Embarazo", 
+            "Num Familia", "Edad"
+        ];
+
+        for (let d = 0; d < totalDays; d++) {
+            const currentDate = new Date(start);
+            currentDate.setDate(currentDate.getDate() + d);
+            const dateStr = currentDate.toISOString().split('T')[0];
+
+            statusDiv.innerHTML = `<strong>Procesando descarga:</strong><br>Día ${d + 1} de ${totalDays} (${dateStr})<br>Filas actuales: ${totalRowsAccumulated.toLocaleString()}`;
+
+            try {
+                const params = new URLSearchParams({ fecha: dateStr, oficinaR: oficinaR });
+                const response = await fetch(`/info/api/rescates_json?${params.toString()}`);
+                const data = await response.json();
+
+                if (data.error) {
+                    console.error("Error en fecha " + dateStr + ":", data.error);
+                    continue;
+                }
+
+                if (Array.isArray(data) && data.length > 0) {
+                    const formattedRecords = data.map(v => [
+                        v.oficinaRepre, v.fecha, v.hora, v.nombreAgente,
+                        v.aeropuerto ? "1" : "", v.carretero ? "1" : "",
+                        v.tipoVehic, v.lineaAutobus, v.numeroEcono, v.placas,
+                        v.vehiculoAseg ? "1" : "", v.casaSeguridad ? "1" : "",
+                        v.centralAutobus ? "1" : "", v.ferrocarril ? "1" : "",
+                        v.empresa, v.hotel ? "1" : "", v.nombreHotel,
+                        v.puestosADispo ? "1" : "", v.juezCalif ? "1" : "",
+                        v.reclusorio ? "1" : "", v.policiaFede ? "1" : "",
+                        v.dif ? "1" : "", v.policiaEsta ? "1" : "",
+                        v.policiaMuni ? "1" : "", v.guardiaNaci ? "1" : "",
+                        v.fiscalia ? "1" : "", v.otrasAuto ? "1" : "",
+                        v.voluntarios ? "1" : "", v.otro ? "1" : "",
+                        v.presuntosDelincuentes ? "1" : "", 
+                        v.numPresuntosDelincuentes !== 0 ? v.numPresuntosDelincuentes : "",
+                        v.municipio, v.puntoEstra, v.nacionalidad, v.iso3,
+                        v.nombre, v.apellidos, v.noIdentidad, v.parentesco,
+                        v.fechaNacimiento, v.sexo ? "Hombre" : "Mujer",
+                        v.embarazo ? "1" : "",
+                        v.numFamilia !== 0 ? v.numFamilia : "",
+                        v.edad
+                    ]);
+
+                    allRecords = allRecords.concat(formattedRecords);
+                    totalRowsAccumulated += formattedRecords.length;
+
+                    if (allRecords.length >= MAX_CHUNK_ROWS) {
+                        statusDiv.innerHTML = `<strong>Generando bloque ${chunkPart}...</strong><br>Espere un momento.`;
+                        downloadChunkXLSX(allRecords, headers, `Rescates_${oficinaR}_${fechaInicio}_${fechaFin}_Parte${chunkPart}.xlsx`);
+                        chunkPart++;
+                        allRecords = [];
+                    }
+                }
+            } catch (error) {
+                console.error("Error de red en fecha " + dateStr + ":", error);
+            }
+        }
+
+        if (allRecords.length > 0) {
+            downloadChunkXLSX(allRecords, headers, `Rescates_${oficinaR}_${fechaInicio}_${fechaFin}${chunkPart > 1 ? '_Parte' + chunkPart : ''}.xlsx`);
+        } else if (totalRowsAccumulated === 0) {
+            statusDiv.innerHTML = "<strong>Atención:</strong> No se encontraron registros en el periodo seleccionado.";
+            statusDiv.className = "mt-4 p-4 bg-yellow-100 text-yellow-800 rounded-xl text-center border-2 border-yellow-300";
+            return false;
+        }
+
+        statusDiv.innerHTML = `<strong>¡Descarga completada!</strong><br>Se procesaron ${totalRowsAccumulated.toLocaleString()} registros.`;
+        statusDiv.className = "mt-4 p-4 bg-green-100 text-green-800 rounded-xl text-center border-2 border-green-300 shadow-md";
+        setTimeout(() => { 
+            statusDiv.style.opacity = '0';
+            setTimeout(() => { statusDiv.style.display = 'none'; statusDiv.style.opacity = '1'; }, 1000);
+        }, 8000);
+        
+        return false;
+    }
+
+    function downloadChunkXLSX(data, headers, fileName) {
+        const worksheet = XLSX.utils.aoa_to_sheet([headers, ...data]);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Rescates");
+        XLSX.writeFile(workbook, fileName);
+    }
+</script>
+{% endif %}
+{% endblock content %}

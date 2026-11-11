@@ -1,0 +1,26 @@
+{% extends "base/base.html" %}
+
+{% load static %}
+
+{% block title %}No se encontro la pagina{% endblock title %}
+
+{% block content %}
+<!-- <section class="grow bg-gray-50 dark:bg-gray-900"> -->
+<section class="grow bg-gray-60">
+        <div class="flex flex-col items-center justify-center px-6 py-8 mx-auto md:h-full lg:py-0">
+        <div class="columns-2">
+            <!-- <div class="w-full bg-white rounded-lg shadow dark:border sm:mt-0 sm:max-w-md xl:p-0 dark:bg-gray-800 dark:border-gray-700"> -->
+                <div class="">
+                    <img class="w-30" src="{% static 'imgs/inami.png' %}" width="250" alt="logo">
+                </div>
+                <div class="flex flex-col justify-between">
+                    <h1 class="text-4xl">
+                        La pagina solicitada <br> no se encuentra
+                    </h1>
+                </div>
+                </div>
+            <!-- </div> -->
+        </div>
+</section>
+ 
+{% endblock content %}

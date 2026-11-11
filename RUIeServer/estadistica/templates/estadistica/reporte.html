@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Reporte de Retornos</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        @page {
+            size: A4 landscape; /* Establecer formato horizontal */
+            margin: 10mm;
+        }
+
+        body {
+            font-family: 'Montserrat', sans-serif;
+            padding: 0;
+        }
+        h2 {
+            text-align: center;
+        }
+        .fecha {
+            text-align: right;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        table, th, td {
+            border: 1px solid black;
+        }
+        th, td {
+            text-align: center;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .letra {
+            font-size: 3pt;
+            
+        }
+        .colorFondo {
+            background-color: #794207;
+            text-align: center;
+            color: #f2f2f2;
+        }
+
+        
+        .letraT1 { 
+            color: #ffffff;
+            background-color: #f48209; /* Color de fondo */
+            writing-mode: vertical-lr; /* Texto en vertical (de abajo hacia arriba) */
+            font-size: 3pt;
+            border: 1px solid rgb(255, 255, 255); 
+            text-align: center;
+        }
+
+        .letraT2 { 
+            color: #000000;
+            background-color: #a0a0a0; /* Color de fondo */
+            writing-mode: vertical-lr; /* Texto en vertical (de abajo hacia arriba) */
+            font-size: 3pt;
+            border: 1px solid rgb(255, 255, 255); 
+            text-align: center;
+        }
+
+        
+    </style>
+</head>
+<body>
+
+    <p class="letra">INSTITUTO NACIONAL DE MIGRACIÓN<br>DIRECCIÓN GENERAL DE OFICINAS DE REPRESENTACION</p>
+    <div class="colorFondo">
+        <h6 class="letra">Informe Diario de Rescatados<br>{{ fecha_actual}}</h6>
+    </div>
+
+    <div>
+        <table>
+            <thead class="letraT1">
+                <tr>
+                    <th class="letraT1">Rubro</th>
+                    {% for dato in oficinas %}
+                    <th class="letraT1">{{ dato }}</th>
+                    {% empty %}
+                    <th>No hay datos disponibles.</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+            <tr>
+                <td class="letraT2"><strong>MIGRANTES RESCATADOS</strong></td>
+                {% for oficina, dato in rescates %}
+                <td class="letraT2">{{ dato }}</td>
+                {% empty %}
+                <td>No hay datos disponibles.</td>
+                {% endfor %}
+            </tr>
+            <tr>
+                <td class="letraT2"><strong>Aeropuertos</strong></td>
+                {% for oficina, dato in rescates_a %}
+                <td class="letraT2">{{ dato }}</td>
+                {% empty %}
+                <td>No hay datos disponibles.</td>
+                {% endfor %}
+            </tr>
+            <tr>
+                <td class="letraT2"><strong>Carreteros</strong></td>
+                {% for oficina, dato in rescates_c %}
+                <td class="letraT2">{{ dato }}</td>
+                {% empty %}
+                <td>No hay datos disponibles.</td>
+                {% endfor %}
+            </tr>
+        </tbody>
+        </table>
+    </div>
+
+    <h2>Reporte de Estado de Fuerza</h2>
+    <p class="fecha">Fecha: {{ fecha_actual }}</p>
+
+</body>
+</html>
