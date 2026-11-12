@@ -23,5 +23,6 @@ importar_DB_Django.txt
 .promps
 docker-compose.override.yaml
 
-data/
+/data/
+!/RUIeServer/mapa/static/mapa/data/
 postgres-data/
