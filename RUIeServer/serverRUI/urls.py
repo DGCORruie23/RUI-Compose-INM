@@ -18,7 +18,7 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf.urls import handler404
 from usuario import views
-from usuarioL.views import index, pagina404
+from usuarioL.views import index, pagina404, CaptchaLoginView, captcha_image
 from dashboard import views as viewsDash
 from django.contrib.auth import views as viewsL
 from django.conf.urls.static import static
@@ -29,7 +29,8 @@ urlpatterns = [
 
     path('admin/', admin.site.urls),
     path('dashboard/', include('dashboard.urls')),
-    path('log-in/', viewsL.LoginView.as_view(template_name= 'base/log_in.html'), name='log-in'),
+    path('log-in/', CaptchaLoginView.as_view(), name='log-in'),
+    path('captcha/math.png', captcha_image, name='captcha-image'),
     path('log-out', viewsL.LogoutView.as_view(), name="logout" ),
 
     path('login/validar/', views.login_user),

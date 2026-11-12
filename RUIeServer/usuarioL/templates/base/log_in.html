@@ -19,19 +19,50 @@
                         Ingresa al sistema
                     </h1>
 
+                    {% if form.errors %}
+                        <div class="p-3 text-sm text-red-800 rounded-lg bg-red-50 border border-red-200" role="alert">
+                            {% for error in form.non_field_errors %}
+                                <p>{{ error }}</p>
+                            {% endfor %}
+                            {% for field in form %}
+                                {% for error in field.errors %}
+                                    <p>{{ error }}</p>
+                                {% endfor %}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+
                     <form class="space-y-4 md:space-y-6" action="." method="post">
                         {% csrf_token %}
                         <div>
                             <label for="email" class="block mb-2 text-sm font-medium text-gray-800">
                                     Nombre de Usuario
                             </label>
-                            <input type="text" name="username" id="email" class="bg-white border border-gray-300 text-gray-900 text-sm 
-                                    rounded-lg focus:ring-2 focus:ring-teal-600 focus:border-teal-600 block w-full p-3"required>
+                            <input type="text" name="username" id="email" value="{{ form.username.value|default:'' }}" class="bg-white border border-gray-300 text-gray-900 text-sm 
+                                    rounded-lg focus:ring-2 focus:ring-teal-600 focus:border-teal-600 block w-full p-3" required>
                         </div>
                         <div>
                             <label for="password" class="block mb-2 text-sm font-medium text-gray-800">Contraseña</label>
-                            <input type="password" name="password" id="password" placeholder="••••••••" class="bg-white border border border-gray-300 text-gray-900 
+                            <input type="password" name="password" id="password" placeholder="••••••••" class="bg-white border border-gray-300 text-gray-900 
                                     text-sm rounded-lg focus:ring-2 focus:border-teal-600 block w-full p-3" required>
+                        </div>
+
+                        <div>
+                            <label for="captcha" class="block mb-2 text-sm font-medium text-gray-800">
+                                Verificación de seguridad (resuelve la operación)
+                            </label>
+                            <div class="flex items-center gap-3 mb-2">
+                                <img id="captcha-img" src="{% url 'captcha-image' %}" alt=" Operación matemática de seguridad"
+                                     class="h-[60px] w-[200px] rounded-lg border border-gray-300 select-none bg-[#f2f7f6]" />
+                                <button type="button" id="reload-captcha"
+                                        title="Generar nueva operación"
+                                        class="px-3 py-2 text-xs font-medium text-[#10312B] bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg transition-colors">
+                                    ↻ Cambiar
+                                </button>
+                            </div>
+                            <input type="text" name="captcha" id="captcha" inputmode="numeric" autocomplete="off"
+                                   placeholder="Escribe el resultado numérico"
+                                   class="bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-2 focus:ring-teal-600 focus:border-teal-600 block w-full p-3" required>
                         </div>
                         
                         <button type="submit" class="w-full text-white bg-[#009688] hover:bg-[#00796B] focus:outline-none focus:ring-teal-300 font-medium rounded-lg 
@@ -43,6 +74,23 @@
             </div>
         </div>
       </section>
+
+      <script>
+        (function() {
+            var reloadBtn = document.getElementById('reload-captcha');
+            var captchaImg = document.getElementById('captcha-img');
+            var captchaInput = document.getElementById('captcha');
+            if (reloadBtn && captchaImg) {
+                reloadBtn.addEventListener('click', function() {
+                    captchaImg.src = "{% url 'captcha-image' %}?t=" + Date.now();
+                    if (captchaInput) {
+                        captchaInput.value = '';
+                        captchaInput.focus();
+                    }
+                });
+            }
+        })();
+      </script>
       
 {% endblock content %}
 

@@ -31,7 +31,7 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
 from django.conf import settings
-from django.core.cache import cache  # @FADAR
+from django.core.cache import cache  
 from django.db import connection, transaction
 from django.db.models import CharField, Count, F, Func, Max, Q, Sum, Value
 from django.db.models.functions import TruncDay, TruncWeek
