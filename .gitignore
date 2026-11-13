@@ -16,6 +16,7 @@ db.sqlite3
 /RUIeServer/entorno
 /RUIeServer/tmp
 /test_files/*.xlsx
+/test_files/*.json
 /certificados
 *.zip
 importar_DB_Django.txt
