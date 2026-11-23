@@ -36,5 +36,10 @@ urlpatterns = [
 
      # Módulo Mexicanos
      path('mexicanos/', views.mexicanos, name="mexicanos"),
+     path('mexicanos/config/agregar/', views.mexicanos_config_agregar, name="mexicanos_config_agregar"),
+     path('mexicanos/config/editar/<int:pk>/', views.mexicanos_config_editar, name="mexicanos_config_editar"),
+     path('mexicanos/config/eliminar/<int:pk>/', views.mexicanos_config_eliminar, name="mexicanos_config_eliminar"),
+     path('mexicanos/config/mover/<int:pk>/', views.mexicanos_config_mover, name="mexicanos_config_mover"),
+     path('mexicanos/cargar/', views.mexicanos_cargar_excel, name="mexicanos_cargar_excel"),
 ]
 

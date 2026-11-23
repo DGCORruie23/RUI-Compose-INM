@@ -1,10 +1,14 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.http import JsonResponse
-from django.db.models import Count
+from django.db.models import Count, Sum, Min, Max
+from django.db import connection, transaction
 from usuarioL.models import usuarioL
-from .forms import ExcelForm, RegistroForm, RegistroNewForm, puntosIForm, RegistroCreateForm
-from usuario.models import RescatePunto, EstadoFuerza, PuntosInternacion, Municipios, Paises, Usuario, Inadmitido, encrypt_str_pass, decrypt_str_pass
+from .forms import ExcelForm, RegistroForm, RegistroNewForm, puntosIForm, RegistroCreateForm, types_ORS
+from usuario.models import RescatePunto, EstadoFuerza, PuntosInternacion, Municipios, Paises, Usuario, Inadmitido, RegistroMex, ConfigColumnaMex, encrypt_str_pass, decrypt_str_pass
+import openpyxl as opxl
+from openpyxl.utils import get_column_letter, column_index_from_string
+import re
 from django.contrib import messages
 from datetime import *
 
@@ -1302,11 +1306,397 @@ def ejecutar_unificacion_oficinas(request):
 #         messages.success(request, "Necesitas ingresar para poder modificar la informacion")
 #         return redirect('')
 
+def _reordenar_bloques_mex():
+    """Normaliza el campo orden (1, 2, 3...) de ConfigColumnaMex de forma consecutiva."""
+    bloques = list(ConfigColumnaMex.objects.all().order_by("orden", "id"))
+    for idx, bloque in enumerate(bloques, start=1):
+        if bloque.orden != idx:
+            ConfigColumnaMex.objects.filter(pk=bloque.pk).update(orden=idx)
+
+
+def _parse_excel_date(val):
+    """Convierte el valor de una celda de Excel en un objeto date, o retorna None si no es fecha."""
+    if val is None:
+        return None
+    if isinstance(val, datetime):
+        return val.date()
+    if isinstance(val, date):
+        return val
+    if isinstance(val, (int, float)):
+        # Serial de fecha de Excel (ej. 45566 -> 2024-10-01)
+        if 30000 <= int(val) <= 70000:
+            return (datetime(1899, 12, 30) + timedelta(days=int(val))).date()
+        return None
+    if isinstance(val, str):
+        texto = val.strip()
+        if not texto:
+            return None
+        if texto.isdigit() and 30000 <= int(texto) <= 70000:
+            return (datetime(1899, 12, 30) + timedelta(days=int(texto))).date()
+        for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%d/%m/%y", "%d-%m-%y"):
+            try:
+                return datetime.strptime(texto.split(" ")[0], fmt).date()
+            except ValueError:
+                continue
+    return None
+
+
+def _parse_int_cell(val):
+    """Convierte el valor numérico de una celda en entero >= 0; celdas vacías o inválidas devuelven 0."""
+    if val is None or isinstance(val, bool):
+        return 0
+    if isinstance(val, (int, float)):
+        try:
+            return max(0, int(round(val)))
+        except (ValueError, TypeError):
+            return 0
+    texto = str(val).strip().replace(",", "")
+    if not texto or texto.startswith("#"):
+        return 0
+    try:
+        return max(0, int(round(float(texto))))
+    except (ValueError, TypeError):
+        return 0
+
+
+def _obtener_pais_mexico():
+    """Obtiene o crea el registro de MÉXICO en el catálogo Paises."""
+    pais = (
+        Paises.objects.filter(iso3__iexact="MEX").first()
+        or Paises.objects.filter(nombre_pais__iexact="MÉXICO").first()
+        or Paises.objects.filter(nombre_pais__iexact="MEXICO").first()
+        or Paises.objects.filter(nombre_pais__icontains="MEXIC").first()
+    )
+    if not pais:
+        ultimo = Paises.objects.order_by("-idPais").first()
+        nuevo_id = (ultimo.idPais + 1) if ultimo else 1
+        pais = Paises.objects.create(idPais=nuevo_id, nombre_pais="MÉXICO", iso3="MEX")
+    return pais
+
+
 @login_required
+@user_passes_test(lambda u: u.is_superuser)
 def mexicanos(request):
-    user_profile = getattr(request.user, 'usuarioL', None)
+    user_profile = getattr(request.user, "usuarioL", None)
     userDataI = [user_profile] if user_profile else []
+
+    _reordenar_bloques_mex()
+    configs = list(
+        ConfigColumnaMex.objects.select_related("puntoInternación").order_by("orden", "id")
+    )
+
+    # Calcular las letras de columnas de Excel para cada bloque de 4 (asumiendo inicio de fecha en B -> datos desde C=3)
+    col_base = 3  # Columna C por defecto
+    for idx, cfg in enumerate(configs):
+        c_start = col_base + (idx * 4)
+        cfg.col_h = get_column_letter(c_start)
+        cfg.col_ninos = get_column_letter(c_start + 1)
+        cfg.col_m = get_column_letter(c_start + 2)
+        cfg.col_ninas = get_column_letter(c_start + 3)
+        cfg.rango_cols = f"{cfg.col_h} - {cfg.col_ninas}"
+
+    oficinas_choices = [o[0] for o in types_ORS]
+    puntos_internacion = PuntosInternacion.objects.all().order_by("estadoPunto", "nombrePunto")
+
+    # Resumen de la carga actual en RegistroMex
+    totales_globales = RegistroMex.objects.aggregate(
+        total_registros=Count("id"),
+        fecha_min=Min("fecha"),
+        fecha_max=Max("fecha"),
+        sum_hombres=Sum("hombres"),
+        sum_mujeres=Sum("mujeres"),
+        sum_ninos=Sum("ninos"),
+        sum_ninas=Sum("ninas"),
+        sum_total=Sum("total"),
+    )
+
+    resumen_por_oficina = (
+        RegistroMex.objects.values("oficina", "puntoInternación__nombrePunto")
+        .annotate(
+            registros=Count("id"),
+            hombres=Sum("hombres"),
+            ninos=Sum("ninos"),
+            mujeres=Sum("mujeres"),
+            ninas=Sum("ninas"),
+            total=Sum("total"),
+        )
+        .order_by("oficina", "puntoInternación__nombrePunto")
+    )
+
+    ultimos_registros = (
+        RegistroMex.objects.select_related("puntoInternación", "nacionalidad")
+        .order_by("-fecha", "oficina")[:150]
+    )
+
     data = {
-        'usuario': userDataI,
+        "usuario": userDataI,
+        "configs": configs,
+        "oficinas_choices": oficinas_choices,
+        "puntos_internacion": puntos_internacion,
+        "totales_globales": totales_globales,
+        "resumen_por_oficina": resumen_por_oficina,
+        "ultimos_registros": ultimos_registros,
     }
     return render(request, "dashboard/mexicanos.html", context=data)
+
+
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
+@require_POST
+def mexicanos_config_agregar(request):
+    oficina = (request.POST.get("oficina") or "").strip()
+    punto_id = (request.POST.get("puntoInternacion") or "").strip()
+    posicion = (request.POST.get("orden") or "").strip()
+
+    if not oficina:
+        messages.error(request, "Debes seleccionar una Oficina de Representación.")
+        return redirect("mexicanos")
+
+    punto_obj = None
+    if punto_id and punto_id.isdigit():
+        punto_obj = PuntosInternacion.objects.filter(pk=int(punto_id)).first()
+
+    total_actual = ConfigColumnaMex.objects.count()
+    if posicion and posicion.isdigit():
+        orden_destino = max(1, min(int(posicion), total_actual + 1))
+        # Desplazar los bloques siguientes
+        for b in ConfigColumnaMex.objects.filter(orden__gte=orden_destino).order_by("-orden"):
+            ConfigColumnaMex.objects.filter(pk=b.pk).update(orden=b.orden + 1)
+    else:
+        orden_destino = total_actual + 1
+
+    ConfigColumnaMex.objects.create(
+        orden=orden_destino,
+        oficina=oficina,
+        puntoInternación=punto_obj,
+        activo=True,
+    )
+    _reordenar_bloques_mex()
+    messages.success(request, f"Bloque #{orden_destino} ({oficina}) agregado correctamente.")
+    return redirect("mexicanos")
+
+
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
+@require_POST
+def mexicanos_config_editar(request, pk):
+    bloque = get_object_or_404(ConfigColumnaMex, pk=pk)
+    oficina = (request.POST.get("oficina") or "").strip()
+    punto_id = (request.POST.get("puntoInternacion") or "").strip()
+
+    if not oficina:
+        messages.error(request, "La oficina no puede estar vacía.")
+        return redirect("mexicanos")
+
+    punto_obj = None
+    if punto_id and punto_id.isdigit():
+        punto_obj = PuntosInternacion.objects.filter(pk=int(punto_id)).first()
+
+    bloque.oficina = oficina
+    bloque.puntoInternación = punto_obj
+    bloque.save()
+    messages.success(request, f"Bloque #{bloque.orden} actualizado correctamente.")
+    return redirect("mexicanos")
+
+
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
+@require_POST
+def mexicanos_config_eliminar(request, pk):
+    bloque = get_object_or_404(ConfigColumnaMex, pk=pk)
+    nombre_ofi = bloque.oficina
+    bloque.delete()
+    _reordenar_bloques_mex()
+    messages.success(request, f"Bloque '{nombre_ofi}' eliminado y columnas reordenadas.")
+    return redirect("mexicanos")
+
+
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
+@require_POST
+def mexicanos_config_mover(request, pk):
+    bloque = get_object_or_404(ConfigColumnaMex, pk=pk)
+    direccion = request.POST.get("direccion", "")
+    _reordenar_bloques_mex()
+    bloque.refresh_from_db()
+
+    if direccion == "up" and bloque.orden > 1:
+        anterior = ConfigColumnaMex.objects.filter(orden=bloque.orden - 1).first()
+        if anterior:
+            anterior.orden, bloque.orden = bloque.orden, anterior.orden
+            anterior.save()
+            bloque.save()
+    elif direccion == "down":
+        siguiente = ConfigColumnaMex.objects.filter(orden=bloque.orden + 1).first()
+        if siguiente:
+            siguiente.orden, bloque.orden = bloque.orden, siguiente.orden
+            siguiente.save()
+            bloque.save()
+
+    _reordenar_bloques_mex()
+    return redirect("mexicanos")
+
+
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
+@require_POST
+def mexicanos_cargar_excel(request):
+    excel_file = request.FILES.get("archivo")
+    celda_inicio = (request.POST.get("celda_inicio") or "B10").strip().upper()
+
+    if not excel_file:
+        messages.error(request, "Por favor selecciona un archivo Excel (.xlsx).")
+        return redirect("mexicanos")
+
+    extension = excel_file.name.split(".")[-1].lower() if "." in excel_file.name else ""
+    if extension not in ("xlsx", "xlsm"):
+        messages.error(request, "Formato de archivo inválido. Solo se permiten archivos .xlsx o .xlsm.")
+        return redirect("mexicanos")
+
+    configs = list(
+        ConfigColumnaMex.objects.filter(activo=True)
+        .select_related("puntoInternación")
+        .order_by("orden", "id")
+    )
+    if not configs:
+        messages.error(
+            request,
+            "Antes de subir el archivo debes configurar al menos un bloque de Oficina / Punto de Internación en el panel.",
+        )
+        return redirect("mexicanos")
+
+    # Parsear coordenada inicial (ej. B10 -> col='B', row=10)
+    match_celda = re.match(r"^([A-Z]+)(\d+)$", celda_inicio)
+    if not match_celda:
+        messages.error(
+            request,
+            f"La celda inicial '{celda_inicio}' no tiene un formato válido (ejemplo válido: B10).",
+        )
+        return redirect("mexicanos")
+
+    col_letra, fila_str = match_celda.groups()
+    col_fecha_idx = column_index_from_string(col_letra)
+    fila_inicio = int(fila_str)
+
+    try:
+        wb = opxl.load_workbook(excel_file, data_only=True)
+        ws = wb.worksheets[0]
+    except Exception as e:
+        messages.error(request, f"No fue posible abrir el archivo Excel: {e}")
+        return redirect("mexicanos")
+
+    # Si la celda indicada no tiene una fecha válida, intentar detectar automáticamente
+    # hacia abajo en la misma columna la primera celda con fecha válida
+    fecha_inicial = _parse_excel_date(ws.cell(row=fila_inicio, column=col_fecha_idx).value)
+    if not fecha_inicial:
+        for r_scan in range(1, min(ws.max_row + 1, 60)):
+            posible_fecha = _parse_excel_date(ws.cell(row=r_scan, column=col_fecha_idx).value)
+            if posible_fecha:
+                fila_inicio = r_scan
+                fecha_inicial = posible_fecha
+                break
+
+    if not fecha_inicial:
+        messages.error(
+            request,
+            f"No se encontró una fecha válida en la celda {celda_inicio} ni en la columna {col_letra}. Verifica la celda de inicio.",
+        )
+        return redirect("mexicanos")
+
+    pais_mexico = _obtener_pais_mexico()
+    col_datos_inicio = col_fecha_idx + 1  # Si fecha está en B (2), datos empiezan en C (3)
+
+    # Detectar si existe una columna cuyo encabezado en fila 4 o 5 sea "Total general" para omitir las últimas 4 columnas de totales
+    col_total_general = None
+    for c_scan in range(col_datos_inicio, ws.max_column + 1):
+        h4 = str(ws.cell(row=4, column=c_scan).value or "").strip().lower()
+        h5 = str(ws.cell(row=5, column=c_scan).value or "").strip().lower()
+        if "total general" in h4 or "total general" in h5:
+            col_total_general = c_scan
+            break
+
+    nuevos_registros = []
+    registros_omitidos_cero = 0
+    filas_procesadas = 0
+    fecha_vigente = fecha_inicial
+
+    for row_idx in range(fila_inicio, ws.max_row + 1):
+        raw_date_cell = ws.cell(row=row_idx, column=col_fecha_idx).value
+
+        # Si la celda de fecha dice "Total", detener o saltar fila de totales
+        if isinstance(raw_date_cell, str) and "total" in raw_date_cell.lower():
+            continue
+
+        parsed_date = _parse_excel_date(raw_date_cell)
+        if parsed_date:
+            fecha_vigente = parsed_date
+
+        # Verificar si la fila tiene algún dato en los bloques configurados
+        fila_tiene_valores = False
+        registros_fila = []
+
+        for idx, cfg in enumerate(configs):
+            c_start = col_datos_inicio + (idx * 4)
+
+            # Si llegamos al bloque de las últimas 4 columnas de "Total general", lo omitimos
+            if col_total_general and c_start >= col_total_general:
+                break
+            if c_start + 3 > ws.max_column:
+                break
+
+            v_h = ws.cell(row=row_idx, column=c_start).value
+            v_ninos = ws.cell(row=row_idx, column=c_start + 1).value
+            v_m = ws.cell(row=row_idx, column=c_start + 2).value
+            v_ninas = ws.cell(row=row_idx, column=c_start + 3).value
+
+            if any(v is not None and str(v).strip() != "" for v in (v_h, v_ninos, v_m, v_ninas)):
+                fila_tiene_valores = True
+
+            hombres = _parse_int_cell(v_h)
+            ninos = _parse_int_cell(v_ninos)
+            mujeres = _parse_int_cell(v_m)
+            ninas = _parse_int_cell(v_ninas)
+            total = hombres + mujeres + ninos + ninas
+
+            # Omitir registros donde las 4 columnas tengan 0 para no llenar la BD de ceros
+            if total == 0:
+                if fila_tiene_valores or parsed_date:
+                    registros_omitidos_cero += 1
+                continue
+
+            registros_fila.append(
+                RegistroMex(
+                    fecha=fecha_vigente,
+                    oficina=cfg.oficina,
+                    puntoInternación=cfg.puntoInternación,
+                    nacionalidad=pais_mexico,
+                    hombres=hombres,
+                    mujeres=mujeres,
+                    ninos=ninos,
+                    ninas=ninas,
+                    total=total,
+                )
+            )
+
+        if parsed_date or fila_tiene_valores:
+            filas_procesadas += 1
+            nuevos_registros.extend(registros_fila)
+
+    if not nuevos_registros and filas_procesadas == 0:
+        messages.warning(
+            request,
+            "No se encontraron filas con datos numéricos mayores a 0 a partir de la celda indicada.",
+        )
+        return redirect("mexicanos")
+
+    # Punto 3: Borrar toda la información previa y guardar la nueva carga dentro de una transacción atómica
+    with transaction.atomic():
+        eliminados, _ = RegistroMex.objects.all().delete()
+        RegistroMex.objects.bulk_create(nuevos_registros, batch_size=2000)
+
+    messages.success(
+        request,
+        f"Carga completada: Se eliminaron {eliminados} registros anteriores y se guardaron {len(nuevos_registros)} nuevos registros "
+        f"({filas_procesadas} fechas procesadas, {registros_omitidos_cero} bloques en cero omitidos).",
+    )
+    return redirect("mexicanos")

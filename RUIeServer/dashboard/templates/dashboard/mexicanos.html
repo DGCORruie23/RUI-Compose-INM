@@ -2,11 +2,11 @@
 {% load static %}
 
 {% block title %}
-    Mexicanos - {{usuario.0.oficinaR}}
+    Mexicanos Repatriados - {{ usuario.0.oficinaR }}
 {% endblock title %}
 
 {% block navigation %}
-    Panel de Control - Mexicanos ({{usuario.0.oficinaR}})
+    Panel de Control - Mexicanos Repatriados ({{ usuario.0.oficinaR }})
 {% endblock navigation %}
 
 {% block styles %}
@@ -19,10 +19,380 @@
 {% endblock estadistica %}
 
 {% block content %}
-<div class="grow p-6">
-    <div class="bg-white rounded-2xl shadow-md p-6 border border-gray-100">
-        <h1 class="text-2xl font-bold text-[#4E232E] mb-2">Módulo de Mexicanos</h1>
-        <p class="text-gray-600">Bienvenido al módulo de administración de Mexicanos.</p>
+<div class="grow p-4 md:p-6 space-y-6 max-w-7xl mx-auto w-full">
+
+    <!-- Mensajes de retroalimentación -->
+    {% if messages %}
+        <div class="space-y-2">
+            {% for message in messages %}
+                <div class="p-4 rounded-xl border text-sm font-medium
+                    {% if message.tags == 'error' %}bg-red-50 border-red-200 text-red-800
+                    {% elif message.tags == 'warning' %}bg-amber-50 border-amber-200 text-amber-800
+                    {% else %}bg-emerald-50 border-emerald-200 text-emerald-800{% endif %}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <!-- Encabezado principal -->
+    <div class="bg-white rounded-2xl shadow-md p-6 border border-gray-100 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-[#4E232E]">Informe Diario de Mexicanas y Mexicanos Repatriados</h1>
+            <p class="text-sm text-gray-600 mt-1">
+                Configura el orden de las oficinas/puntos de internación por bloques de 4 columnas y realiza la carga diaria del archivo Excel.
+            </p>
+        </div>
+        <div class="flex items-center gap-3">
+            <span class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#10312B] text-white">
+                Nacionalidad por defecto: MÉXICO (MEX)
+            </span>
+            <span class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-100 text-amber-900 border border-amber-300">
+                Bloques configurados: {{ configs|length }}
+            </span>
+        </div>
     </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- PANEL 1: Configurador del Orden de Oficinas y Puntos de Internación -->
+        <div class="lg:col-span-7 bg-white rounded-2xl shadow-md p-6 border border-gray-100 space-y-5">
+            <div class="border-b border-gray-100 pb-3">
+                <h2 class="text-lg font-bold text-[#10312B]">1. Orden de Oficinas y Puntos en el Excel</h2>
+                <p class="text-xs text-gray-500 mt-1">
+                    Cada bloque representa <strong>4 columnas consecutivas</strong> en el Excel:
+                    <span class="text-gray-700 font-medium">(1) Hombres Adultos, (2) Hombres Menores, (3) Mujeres Adultas y (4) Mujeres Menores</span>.
+                    Las últimas 4 columnas de totales se omiten automáticamente.
+                </p>
+            </div>
+
+            <!-- Formulario para agregar un nuevo bloque -->
+            <form action="{% url 'mexicanos_config_agregar' %}" method="post" class="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-3">
+                {% csrf_token %}
+                <div class="text-xs font-bold uppercase tracking-wider text-[#4E232E]">Agregar Bloque de 4 Columnas</div>
+                <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Posición</label>
+                        <input type="number" name="orden" min="1" placeholder="{{ configs|length|add:1 }}"
+                               value="{{ configs|length|add:1 }}"
+                               class="w-full bg-white border border-gray-300 rounded-lg px-2.5 py-2 text-sm focus:ring-2 focus:ring-teal-600">
+                    </div>
+                    <div class="sm:col-span-4">
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Oficina (OR) *</label>
+                        <select name="oficina" required
+                                class="w-full bg-white border border-gray-300 rounded-lg px-2.5 py-2 text-sm focus:ring-2 focus:ring-teal-600">
+                            <option value="">-- Seleccionar Oficina --</option>
+                            {% for ofi in oficinas_choices %}
+                                <option value="{{ ofi }}">{{ ofi }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="sm:col-span-4">
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Punto de Internación (Opcional)</label>
+                        <select name="puntoInternacion"
+                                class="w-full bg-white border border-gray-300 rounded-lg px-2.5 py-2 text-sm focus:ring-2 focus:ring-teal-600">
+                            <option value="">-- General / Sin punto --</option>
+                            {% for pi in puntos_internacion %}
+                                <option value="{{ pi.idPuntoInter }}">{{ pi.estadoPunto }} - {{ pi.nombrePunto }} ({{ pi.tipoPunto }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <button type="submit"
+                                class="w-full bg-[#10312B] hover:bg-[#1b4d44] text-white font-semibold text-sm py-2 px-3 rounded-lg transition-colors">
+                            + Agregar
+                        </button>
+                    </div>
+                </div>
+            </form>
+
+            <!-- Tabla de bloques configurados -->
+            {% if configs %}
+                <div class="overflow-x-auto border border-gray-200 rounded-xl">
+                    <table class="min-w-full divide-y divide-gray-200 text-sm">
+                        <thead class="bg-[#10312B] text-white text-xs uppercase">
+                            <tr>
+                                <th class="px-3 py-2.5 text-center w-14">#</th>
+                                <th class="px-3 py-2.5 text-center w-28">Cols Excel</th>
+                                <th class="px-3 py-2.5 text-left">Oficina y Punto de Internación</th>
+                                <th class="px-3 py-2.5 text-center w-36">Orden / Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-100">
+                            {% for cfg in configs %}
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-3 py-2.5 text-center font-bold text-[#4E232E]">
+                                        {{ cfg.orden }}
+                                    </td>
+                                    <td class="px-3 py-2.5 text-center">
+                                        <span class="inline-block px-2 py-1 rounded bg-teal-50 text-teal-900 border border-teal-200 font-mono text-xs font-semibold"
+                                              title="{{ cfg.col_h }}: H. Adultos | {{ cfg.col_ninos }}: H. Menores | {{ cfg.col_m }}: M. Adultas | {{ cfg.col_ninas }}: M. Menores">
+                                            {{ cfg.rango_cols }}
+                                        </span>
+                                    </td>
+                                    <td class="px-3 py-2">
+                                        <form action="{% url 'mexicanos_config_editar' cfg.id %}" method="post" class="flex flex-col sm:flex-row gap-2 items-center">
+                                            {% csrf_token %}
+                                            <select name="oficina" required
+                                                    class="w-full sm:w-44 bg-white border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:ring-1 focus:ring-teal-600">
+                                                {% for ofi in oficinas_choices %}
+                                                    <option value="{{ ofi }}" {% if cfg.oficina == ofi %}selected{% endif %}>{{ ofi }}</option>
+                                                {% endfor %}
+                                            </select>
+                                            <select name="puntoInternacion"
+                                                    class="w-full sm:flex-1 bg-white border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:ring-1 focus:ring-teal-600">
+                                                <option value="">-- General / Sin punto --</option>
+                                                {% for pi in puntos_internacion %}
+                                                    <option value="{{ pi.idPuntoInter }}" {% if cfg.puntoInternación_id == pi.idPuntoInter %}selected{% endif %}>
+                                                        {{ pi.estadoPunto }} - {{ pi.nombrePunto }}
+                                                    </option>
+                                                {% endfor %}
+                                            </select>
+                                            <button type="submit"
+                                                    title="Guardar cambios de este bloque"
+                                                    class="px-2.5 py-1.5 bg-teal-700 hover:bg-teal-800 text-white text-xs font-medium rounded-lg transition-colors">
+                                                Guardar
+                                            </button>
+                                        </form>
+                                    </td>
+                                    <td class="px-3 py-2 text-center">
+                                        <div class="flex items-center justify-center gap-1">
+                                            <form action="{% url 'mexicanos_config_mover' cfg.id %}" method="post" class="inline">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="direccion" value="up">
+                                                <button type="submit" {% if forloop.first %}disabled{% endif %}
+                                                        title="Subir posición"
+                                                        class="px-2 py-1 rounded border border-gray-300 text-xs font-bold {% if forloop.first %}text-gray-300 cursor-not-allowed{% else %}text-gray-700 hover:bg-gray-100{% endif %}">
+                                                    ↑
+                                                </button>
+                                            </form>
+                                            <form action="{% url 'mexicanos_config_mover' cfg.id %}" method="post" class="inline">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="direccion" value="down">
+                                                <button type="submit" {% if forloop.last %}disabled{% endif %}
+                                                        title="Bajar posición"
+                                                        class="px-2 py-1 rounded border border-gray-300 text-xs font-bold {% if forloop.last %}text-gray-300 cursor-not-allowed{% else %}text-gray-700 hover:bg-gray-100{% endif %}">
+                                                    ↓
+                                                </button>
+                                            </form>
+                                            <form action="{% url 'mexicanos_config_eliminar' cfg.id %}" method="post" class="inline"
+                                                  onsubmit="return confirm('¿Eliminar el bloque #{{ cfg.orden }} ({{ cfg.oficina }})?');">
+                                                {% csrf_token %}
+                                                <button type="submit"
+                                                        title="Eliminar bloque"
+                                                        class="px-2 py-1 rounded border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold">
+                                                    ✕
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="p-6 text-center bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-sm">
+                    Aún no hay bloques configurados. Agrega arriba las oficinas y puntos de internación en el orden en que aparecen en tu archivo Excel antes de realizar la carga.
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- PANEL 2: Formulario de Carga del Archivo Excel -->
+        <div class="lg:col-span-5 bg-white rounded-2xl shadow-md p-6 border border-gray-100 space-y-5 flex flex-col justify-between">
+            <div class="space-y-4">
+                <div class="border-b border-gray-100 pb-3">
+                    <h2 class="text-lg font-bold text-[#4E232E]">2. Subir Archivo Excel Diario</h2>
+                    <p class="text-xs text-gray-500 mt-1">
+                        Al cargar el archivo se <strong>eliminarán todos los registros anteriores</strong> de <code>RegistroMex</code> y se insertarán únicamente los bloques cuya suma sea mayor a 0.
+                    </p>
+                </div>
+
+                <form action="{% url 'mexicanos_cargar_excel' %}" method="post" enctype="multipart/form-data" class="space-y-4"
+                      onsubmit="return confirm('Al subir el archivo se borrarán todos los registros actuales de RegistroMex para ser reemplazados por la nueva carga. ¿Deseas continuar?');">
+                    {% csrf_token %}
+
+                    <div>
+                        <label for="celda_inicio" class="block text-sm font-medium text-gray-800 mb-1">
+                            Celda donde inicia la primera fecha
+                        </label>
+                        <input type="text" name="celda_inicio" id="celda_inicio" value="B10" required
+                               placeholder="Ej. B10"
+                               class="w-full sm:w-40 bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono uppercase focus:ring-2 focus:ring-teal-600">
+                        <p class="text-xs text-gray-500 mt-1">
+                            Normalmente inicia en <code>B10</code>. Si en el Excel se desplaza a otra fila o columna, indícala aquí; la fecha se replicará en las filas de datos siguientes.
+                        </p>
+                    </div>
+
+                    <div>
+                        <label for="archivo_excel" class="block text-sm font-medium text-gray-800 mb-1">
+                            Archivo Excel (<code>.xlsx</code>)
+                        </label>
+                        <input type="file" name="archivo" id="archivo_excel" accept=".xlsx,.xlsm" required
+                               class="w-full text-sm text-gray-700 border border-gray-300 rounded-lg p-2 bg-gray-50 focus:outline-none">
+                    </div>
+
+                    <div class="p-3.5 rounded-xl bg-gray-50 border border-gray-200 text-xs text-gray-600 space-y-1">
+                        <div class="font-semibold text-gray-800">Reglas aplicadas durante la carga:</div>
+                        <ul class="list-disc list-inside space-y-0.5">
+                            <li>Cada bloque lee 4 columnas: <strong>C (H. Adultos), D (H. Menores), E (M. Adultas), F (M. Menores)</strong> y así sucesivamente.</li>
+                            <li>Se omiten los bloques donde las 4 columnas sumen <strong>0</strong>.</li>
+                            <li>Se omiten las últimas 4 columnas de <strong>Total general</strong>.</li>
+                            <li>Nacionalidad asignada a todos los registros: <strong>MÉXICO</strong>.</li>
+                        </ul>
+                    </div>
+
+                    <button type="submit" {% if not configs %}disabled{% endif %}
+                            class="w-full py-3 px-5 rounded-xl font-semibold text-sm text-white transition-colors
+                            {% if configs %}bg-[#4E232E] hover:bg-[#3b1a22]{% else %}bg-gray-400 cursor-not-allowed{% endif %}">
+                        Reemplazar Datos y Cargar Excel
+                    </button>
+                </form>
+            </div>
+
+            <!-- Tarjeta de Estado Actual en Base de Datos -->
+            <div class="bg-[#f7faf9] border border-teal-200 rounded-xl p-4 space-y-2">
+                <div class="text-xs font-bold uppercase tracking-wider text-[#10312B]">Estado Actual en Base de Datos</div>
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 text-center">
+                    <div class="bg-white p-2.5 rounded-lg border border-gray-200">
+                        <div class="text-xs text-gray-500">Registros Activos</div>
+                        <div class="text-lg font-bold text-[#10312B]">{{ totales_globales.total_registros|default:0 }}</div>
+                    </div>
+                    <div class="bg-white p-2.5 rounded-lg border border-gray-200">
+                        <div class="text-xs text-gray-500">Total Personas</div>
+                        <div class="text-lg font-bold text-[#4E232E]">{{ totales_globales.sum_total|default:0 }}</div>
+                    </div>
+                    <div class="bg-white p-2.5 rounded-lg border border-gray-200 col-span-2 sm:col-span-1">
+                        <div class="text-xs text-gray-500">Periodo Cargado</div>
+                        <div class="text-xs font-semibold text-gray-800 mt-1">
+                            {% if totales_globales.fecha_min %}
+                                {{ totales_globales.fecha_min|date:"d/m/Y" }} al {{ totales_globales.fecha_max|date:"d/m/Y" }}
+                            {% else %}
+                                Sin datos
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- PANEL 3: Tabla Resumen de la Carga Realizada -->
+    <div class="bg-white rounded-2xl shadow-md p-6 border border-gray-100 space-y-5">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-gray-100 pb-3">
+            <div>
+                <h2 class="text-lg font-bold text-[#10312B]">3. Resumen de la Carga Realizada</h2>
+                <p class="text-xs text-gray-500">
+                    Desglose acumulado por Oficina y Punto de Internación de los registros actualmente almacenados en <code>RegistroMex</code>.
+                </p>
+            </div>
+            {% if totales_globales.total_registros %}
+                <div class="flex flex-wrap gap-2 text-xs font-semibold">
+                    <span class="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-900 border border-blue-200">
+                        H. Adultos: {{ totales_globales.sum_hombres|default:0 }}
+                    </span>
+                    <span class="px-2.5 py-1 rounded-lg bg-sky-50 text-sky-900 border border-sky-200">
+                        H. Menores (Niños): {{ totales_globales.sum_ninos|default:0 }}
+                    </span>
+                    <span class="px-2.5 py-1 rounded-lg bg-rose-50 text-rose-900 border border-rose-200">
+                        M. Adultas: {{ totales_globales.sum_mujeres|default:0 }}
+                    </span>
+                    <span class="px-2.5 py-1 rounded-lg bg-pink-50 text-pink-900 border border-pink-200">
+                        M. Menores (Niñas): {{ totales_globales.sum_ninas|default:0 }}
+                    </span>
+                </div>
+            {% endif %}
+        </div>
+
+        {% if resumen_por_oficina %}
+            <div class="overflow-x-auto border border-gray-200 rounded-xl">
+                <table class="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead class="bg-[#10312B] text-white text-xs uppercase">
+                        <tr>
+                            <th class="px-4 py-2.5 text-left">Oficina (OR)</th>
+                            <th class="px-4 py-2.5 text-left">Punto de Internación</th>
+                            <th class="px-4 py-2.5 text-right">Días con Eventos</th>
+                            <th class="px-4 py-2.5 text-right">Hombres Adultos</th>
+                            <th class="px-4 py-2.5 text-right">Hombres Menores</th>
+                            <th class="px-4 py-2.5 text-right">Mujeres Adultas</th>
+                            <th class="px-4 py-2.5 text-right">Mujeres Menores</th>
+                            <th class="px-4 py-2.5 text-right font-bold">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-100">
+                        {% for item in resumen_por_oficina %}
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-2.5 font-semibold text-gray-900">{{ item.oficina }}</td>
+                                <td class="px-4 py-2.5 text-gray-600">{{ item.puntoInternación__nombrePunto|default:"General / No especificado" }}</td>
+                                <td class="px-4 py-2.5 text-right text-gray-700">{{ item.registros }}</td>
+                                <td class="px-4 py-2.5 text-right">{{ item.hombres }}</td>
+                                <td class="px-4 py-2.5 text-right">{{ item.ninos }}</td>
+                                <td class="px-4 py-2.5 text-right">{{ item.mujeres }}</td>
+                                <td class="px-4 py-2.5 text-right">{{ item.ninas }}</td>
+                                <td class="px-4 py-2.5 text-right font-bold text-[#4E232E]">{{ item.total }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="bg-gray-100 font-bold text-gray-900 text-sm">
+                        <tr>
+                            <td colspan="2" class="px-4 py-2.5 text-left">TOTAL GENERAL CARGADO</td>
+                            <td class="px-4 py-2.5 text-right">{{ totales_globales.total_registros }} reg.</td>
+                            <td class="px-4 py-2.5 text-right">{{ totales_globales.sum_hombres|default:0 }}</td>
+                            <td class="px-4 py-2.5 text-right">{{ totales_globales.sum_ninos|default:0 }}</td>
+                            <td class="px-4 py-2.5 text-right">{{ totales_globales.sum_mujeres|default:0 }}</td>
+                            <td class="px-4 py-2.5 text-right">{{ totales_globales.sum_ninas|default:0 }}</td>
+                            <td class="px-4 py-2.5 text-right text-[#4E232E]">{{ totales_globales.sum_total|default:0 }}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            <!-- Detalle de últimos registros individuales por fecha -->
+            <details class="group border border-gray-200 rounded-xl bg-gray-50 p-4">
+                <summary class="cursor-pointer text-sm font-semibold text-[#10312B] flex items-center justify-between">
+                    <span>Ver detalle individual por fecha y oficina (últimos {{ ultimos_registros|length }} registros)</span>
+                    <span class="text-xs text-gray-500 group-open:rotate-180 transition-transform">▼</span>
+                </summary>
+                <div class="mt-3 overflow-x-auto border border-gray-200 rounded-lg bg-white max-h-96">
+                    <table class="min-w-full divide-y divide-gray-200 text-xs">
+                        <thead class="bg-gray-100 text-gray-700 uppercase sticky top-0">
+                            <tr>
+                                <th class="px-3 py-2 text-left">Fecha</th>
+                                <th class="px-3 py-2 text-left">Oficina</th>
+                                <th class="px-3 py-2 text-left">Punto Internación</th>
+                                <th class="px-3 py-2 text-left">Nacionalidad</th>
+                                <th class="px-3 py-2 text-right">H. Adultos</th>
+                                <th class="px-3 py-2 text-right">Niños</th>
+                                <th class="px-3 py-2 text-right">M. Adultas</th>
+                                <th class="px-3 py-2 text-right">Niñas</th>
+                                <th class="px-3 py-2 text-right font-bold">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            {% for reg in ultimos_registros %}
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-3 py-1.5 font-mono">{{ reg.fecha|date:"d/m/Y" }}</td>
+                                    <td class="px-3 py-1.5 font-medium">{{ reg.oficina }}</td>
+                                    <td class="px-3 py-1.5 text-gray-600">{{ reg.puntoInternación.nombrePunto|default:"-" }}</td>
+                                    <td class="px-3 py-1.5 text-gray-600">{{ reg.nacionalidad.nombre_pais|default:"MÉXICO" }}</td>
+                                    <td class="px-3 py-1.5 text-right">{{ reg.hombres }}</td>
+                                    <td class="px-3 py-1.5 text-right">{{ reg.ninos }}</td>
+                                    <td class="px-3 py-1.5 text-right">{{ reg.mujeres }}</td>
+                                    <td class="px-3 py-1.5 text-right">{{ reg.ninas }}</td>
+                                    <td class="px-3 py-1.5 text-right font-bold text-[#4E232E]">{{ reg.total }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+        {% else %}
+            <div class="p-8 text-center text-gray-500 bg-gray-50 rounded-xl border border-dashed border-gray-300 text-sm">
+                No hay registros cargados actualmente en <code>RegistroMex</code>. Configura el orden de las columnas y sube un archivo Excel para visualizar el resumen.
+            </div>
+        {% endif %}
+    </div>
+
 </div>
 {% endblock content %}

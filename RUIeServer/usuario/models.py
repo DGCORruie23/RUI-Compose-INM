@@ -504,6 +504,27 @@ class RegistroMex(models.Model):
         verbose_name_plural = "Registros Mex"
 
 
+class ConfigColumnaMex(models.Model):
+    orden = models.PositiveIntegerField(default=1, db_index=True)
+    oficina = models.CharField(max_length=100, db_index=True)
+    puntoInternación = models.ForeignKey(
+        PuntosInternacion,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+    activo = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["orden", "id"]
+        verbose_name = "Configuración Columna Mex"
+        verbose_name_plural = "Configuraciones Columnas Mex"
+
+    def __str__(self):
+        punto_str = f" - {self.puntoInternación.nombrePunto}" if self.puntoInternación else ""
+        return f"#{self.orden}: {self.oficina}{punto_str}"
+
+
 # class Municipios(models.Model):
 #     idMunicipio = models.AutoField(primary_key=True)
 #     estado = models.CharField(max_length=250)

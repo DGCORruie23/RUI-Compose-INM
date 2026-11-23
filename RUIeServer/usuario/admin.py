@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Usuario, Paises, EstadoFuerza, Frases, Municipios, PuntosInternacion, RescatePunto, ConteoRapidoPunto, MsgUpdate, DisuadidosPunto, Inadmitido, ValidacionServidor, decrypt_str_pass
+from .models import Usuario, Paises, EstadoFuerza, Frases, Municipios, PuntosInternacion, RescatePunto, ConteoRapidoPunto, MsgUpdate, DisuadidosPunto, Inadmitido, ValidacionServidor, RegistroMex, ConfigColumnaMex, decrypt_str_pass
 
 class RescateAdmin(admin.ModelAdmin):
     list_display = ['idRescate', 'oficinaRepre', 'puntoEstra', 'fecha', 'hora', 'nacionalidad','iso3', 'fechaNacimiento', 'edad']
@@ -57,4 +57,6 @@ admin.site.register(ConteoRapidoPunto)
 admin.site.register(MsgUpdate)
 admin.site.register(Inadmitido, InadmitidoAdmin)
 admin.site.register(ValidacionServidor, ValidacionServidorAdmin)
+admin.site.register(RegistroMex)
+admin.site.register(ConfigColumnaMex)
 
