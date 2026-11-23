@@ -36,7 +36,8 @@
                 }
             }
 
-            #cerrar{
+            #cerrar,
+            #cerrarInadmitidos {
                 position: absolute;
                 top: 20px;
                 right: 30px;
@@ -45,6 +46,48 @@
                 text-decoration: none;
                 color: #F00;
                 transition: all 100ms;
+                background: transparent;
+                border: none;
+                cursor: pointer;
+            }
+
+            #cerrarNacionalidades {
+                position: absolute;
+                top: 20px;
+                right: 30px;
+                font-size: 30px;
+                font-weight: bold;
+                color: #F00;
+                transition: all 100ms;
+                background: transparent;
+                border: none;
+                cursor: pointer;
+            }
+
+            #cerrarMunicipios {
+                position: absolute;
+                top: 20px;
+                right: 30px;
+                font-size: 30px;
+                font-weight: bold;
+                color: #F00;
+                transition: all 100ms;
+                background: transparent;
+                border: none;
+                cursor: pointer;
+            }
+
+            #cerrarRescates {
+                position: absolute;
+                top: 20px;
+                right: 30px;
+                font-size: 30px;
+                font-weight: bold;
+                color: #F00;
+                transition: all 100ms;
+                background: transparent;
+                border: none;
+                cursor: pointer;
             }
 
             .overlay { 
@@ -268,12 +311,17 @@
                                     <p class="mt-2 text-sm leading-6 leading-7 max-w-[300px]">
                                         Consulta y carga la información de los inadmitidos.
                                     </p>
-                                        <a href="#popupInadmitidos" class="mt-5 inline-flex items-center justify-between w-[135px] max-w-full px-4 py-3 
+                                        <!--<a href="#popupInadmitidos" class="mt-5 inline-flex items-center justify-between w-[135px] max-w-full px-4 py-3 
                                                                                     bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-full text-white text-xs 
                                                                                     transition-colors duration-200">
                                             <span class="ml-3">Ver/Cargar</span>
                                             <span class="text-sm">→</span>    
-                                        </a>
+                                        </a>-->
+                                        <button type="button" onclick="abrirPopupInadmitidos()" class="mt-5 inline-flex items-center justify-between w-[135px] 
+                                                max-w-full px-4 py-3 bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-full text-white text-xs transition-colors duration-200">
+                                                <span class="ml-3">Ver/Cargar</span>
+                                                <span class="text-sm">→</span>
+                                        </button>
                                 </div>
                                     <div class="absolute right-4 top-0 h-full w-4 md:w-6 bg-[#f9df75]"></div>
                         </div>
@@ -292,12 +340,17 @@
                                     <p class="mt-2 text-sm leading-6 leading-7 max-w-[300px]">
                                         Consulta y carga la información de las nacionalidades.
                                     </p>
-                                        <a href="#popupNacionalidades" class="mt-5 inline-flex items-center justify-between w-[135px] max-w-full px-4 py-3 
+                                        <!--<a href="#popupNacionalidades" class="mt-5 inline-flex items-center justify-between w-[135px] max-w-full px-4 py-3 
                                                                                     bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-full text-white text-xs 
                                                                                     transition-colors duration-200">
                                             <span class="ml-3">Ver/Cargar</span>
                                             <span class="text-sm">→</span>    
-                                        </a>
+                                        </a>-->
+                                        <button type="button" onclick="abrirPopupNacionalidades()" class="mt-5 inline-flex items-center justify-between w-[135px] 
+                                                max-w-full px-4 py-3 bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-full text-white text-xs transition-colors duration-200">
+                                            <span class="ml-3">Ver/Cargar</span>
+                                            <span class="text-sm">→</span>
+                                        </button>
                                 </div>
                                     <div class="absolute right-4 top-0 h-full w-4 md:w-6 bg-[#ff7043]"></div>
                         </div>
@@ -316,12 +369,17 @@
                                     <p class="mt-2 text-sm leading-6 sm:leading-7 max-w-[300px]">
                                         Consulta y carga la información de los municipios.
                                     </p>
-                                        <a href="#popupMunicipios" class="mt-5 inline-flex items-center justify-between w-[135px] max-w-full px-4 py-3 
+                                        <!--<a href="#popupMunicipios" class="mt-5 inline-flex items-center justify-between w-[135px] max-w-full px-4 py-3 
                                                                                     bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-full text-white text-xs 
                                                                                     transition-colors duration-200">
                                             <span class="ml-3">Ver/Cargar</span>
                                             <span class="text-sm">→</span>    
-                                        </a>
+                                        </a>-->
+                                        <button type="button" onclick="abrirPopupMunicipios()" class="mt-5 inline-flex items-center justify-between w-[135px] 
+                                                max-w-full px-4 py-3 bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-full text-white text-xs transition-colors duration-200">
+                                                <span class="ml-3">Ver/Cargar</span>
+                                                <span class="text-sm">→</span>
+                                        </button>
                                 </div>
                                     <div class="absolute right-4 top-0 h-full w-4 md:w-6 bg-[#dfc48e]"></div>
                         </div>
@@ -332,7 +390,11 @@
 
         <div id="popupInadmitidos" class="overlay z-[100]">
             <div id="popupBody" class="relative z-[110] w-full max-w-2xl max-h-[90dvh] overflow-y-auto bg-white rounded-2xl shadow-2xl p-4 sm:p-6 mx-auto transition-all">
-                <a href="#" id="cerrar" class="absolute top-2 right-3 sm:top-3 sm:right-4 text-2xl font-bold text-red-500 hover:text-red-600 transition-colors z-10">&times;</a>
+                <!-- <a href="#" id="cerrar" class="absolute top-2 right-3 sm:top-3 sm:right-4 text-2xl font-bold text-red-500 hover:text-red-600 transition-colors z-10">&times;</a> -->
+                <button type="button" id="cerrarInadmitidos" onclick="cerrarPopupInadmitidos()" 
+                        class="absolute top-2 right-3 sm:top-3 sm:right-4 text-2xl font-bold text-red-500 hover:text-red-600 transition-colors z-10">
+                        &times;
+                </button>
                 <div class="popupContent">
                     {% if user.is_authenticated %}
                         <h2 class="text-xl font-bold text-center text-[#4E232E] mb-4">Gestión de Inadmitidos</h2>
@@ -425,6 +487,20 @@
                 });
             }
 
+            function cerrarPopupInadmitidos() {
+                const posicionActual = window.scrollY;
+                const popup = document.getElementById('popupInadmitidos');
+                popup.style.visibility = 'hidden';
+                popup.style.opacity = '0';
+                window.scrollTo(0, posicionActual);
+            }
+
+            function abrirPopupInadmitidos() {
+                const popup = document.getElementById('popupInadmitidos');
+                popup.style.visibility = 'visible';
+                popup.style.opacity = '1';
+            }
+
             function validarFechasInadmitidos() {
                 const fInicio = document.getElementById('fechaInicioInad').value;
                 const fFin = document.getElementById('fechaFinInad').value;
@@ -476,7 +552,11 @@
 
         <div id="popupNacionalidades" class="overlay">
             <div id="popupBody" class="relative w-full max-w-2xl max-h-[90dvh] overflow-y-auto bg-white rounded-2xl shadow-2xl p-4 sm:p-6 mx-auto">
-                <a href="#" id="cerrar">&times;</a>
+                <!--<a href="#" id="cerrar">&times;</a>-->
+                <button type="button" id="cerrarNacionalidades" onclick="cerrarPopupNacionalidades()"
+                        class="absolute top-2 right-3 sm:top-3 sm:right-4 text-2xl font-bold text-red-500 hover:text-red-600 transition-colors z-10">
+                    &times;
+                </button>
                 <div class="popupContent">
                     {% if user.is_authenticated %}
                     <center>
@@ -501,7 +581,11 @@
 
         <div id="popupMunicipios" class="overlay">
             <div id="popupBody" class="relative w-full max-w-2xl max-h-[90dvh] overflow-y-auto bg-white rounded-2xl shadow-2xl p-4 sm:p-6 mx-auto">
-                <a href="#" id="cerrar">&times;</a>
+                <!--<a href="#" id="cerrar">&times;</a>-->
+                <button type="button" id="cerrarMunicipios" onclick="cerrarPopupMunicipios()" class="absolute top-2 right-3 sm:top-3 sm:right-4 text-2xl 
+                        font-bold text-red-500 hover:text-red-600 transition-colors z-10">
+                        &times;
+                </button>
                 <div class="popupContent">
                     {% if user.is_authenticated %}
                     <center>
@@ -602,12 +686,17 @@
                                 <p class="mt-2 text-sm leading-6 sm:leading-7 max-w-[300px]">
                                         Consulta la información de los rescates.
                                 </p>
-                                    <a href="#popupRescates" class="mt-5 inline-flex items-center justify-between w-[135px] max-w-full px-4 py-3 
+                                    <!--<a href="#popupRescates" class="mt-5 inline-flex items-center justify-between w-[135px] max-w-full px-4 py-3 
                                                                         bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-full text-white text-xs 
                                                                         transition-colors duration-200">
                                     <span class="ml-3">Ver/Cargar</span>
                                     <span class="text-sm">→</span>
-                                    </a>
+                                    </a>-->
+                                    <button type="button" onclick="abrirPopupRescates()" class="mt-5 inline-flex items-center justify-between w-[135px] max-w-full px-4 py-3
+                                                bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-full text-white text-xs transition-colors duration-200">
+                                            <span class="ml-3">Ver/Cargar</span>
+                                            <span class="text-sm">→</span>
+                                    </button>
                             </div>
                             <div class="absolute right-4 top-0 h-full w-4 md:w-6 bg-[#9BCF8F]"></div>
                         </div>
@@ -625,7 +714,7 @@
                                 <p class="mt-2 text-sm leading-6 sm:leading-7 max-w-[300px]">
                                         Consulta la información de los mexicanos.
                                 </p>
-                                    <a class="mt-5 inline-flex items-center justify-between w-[135px] px-4 py-3 
+                                    <a href="{% url 'mexicanos' %}" class="mt-5 inline-flex items-center justify-between w-[135px] px-4 py-3 
                                                                         bg-inm-rojo-300 hover:bg-inm-marron-100 rounded-full text-white text-xs 
                                                                         transition-colors duration-200">
                                     <span class="ml-3">Ver/Cargar</span>
@@ -642,7 +731,10 @@
         <!-- Modal Popup Rescates -->
         <div id="popupRescates" class="overlay">
             <div id="popupBody" class="w-full max-w-2xl max-h-[90dvh] overflow-y-auto bg-white rounded-2xl shadow-2xl p-4 sm:p-6 relative mx-auto transition-all">
-                <a href="#" id="cerrar" class="absolute top-2 right-3 sm:top-4 sm:right-5 text-2xl font-bold text-red-500 hover:text-red-600 transition-colors z-10">&times;</a>
+                <!--<a href="#" id="cerrar" class="absolute top-2 right-3 sm:top-4 sm:right-5 text-2xl font-bold text-red-500 hover:text-red-600 transition-colors z-10">&times;</a>-->
+                <button type="button" id="cerrarRescates" onclick="cerrarPopupRescates()" class="absolute top-2 right-3 sm:top-4 sm:right-5 text-2xl font-bold text-red-500 hover:text-red-600 transition-colors z-10">
+                    &times;
+                </button>
                 <div class="popupContent">
                     {% if user.is_authenticated %}
                         <h2 class="text-lg sm:text-xl font-bold text-center text-[#4E232E] mb-4 px-5">Gestión de Rescates</h2>
@@ -749,6 +841,43 @@
                     }
                 });
             }
+
+            function abrirPopupNacionalidades() {
+                const popup = document.getElementById('popupNacionalidades');
+                popup.style.visibility = 'visible';
+                popup.style.opacity = '1';
+            }
+
+            function cerrarPopupNacionalidades() {
+                const popup = document.getElementById('popupNacionalidades');
+                popup.style.visibility = 'hidden';
+                popup.style.opacity = '0';
+            }
+
+            function abrirPopupMunicipios() {
+                const popup = document.getElementById('popupMunicipios');
+                popup.style.visibility = 'visible';
+                popup.style.opacity = '1';
+            }
+
+            function cerrarPopupMunicipios() {
+                const popup = document.getElementById('popupMunicipios');
+                popup.style.visibility = 'hidden';
+                popup.style.opacity = '0';
+            }
+
+            function abrirPopupRescates() {
+                const popup = document.getElementById('popupRescates');
+                popup.style.visibility = 'visible';
+                popup.style.opacity = '1';
+            }
+
+            function cerrarPopupRescates() {
+                const popup = document.getElementById('popupRescates');
+                popup.style.visibility = 'hidden';
+                popup.style.opacity = '0';
+            }
+
         </script>
     {% endif %}
 </div>

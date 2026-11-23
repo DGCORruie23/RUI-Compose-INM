@@ -178,6 +178,12 @@
             padding-right: 8px;
         }
 
+        #myTable td:first-child {
+            white-space: normal;
+            overflow-wrap: break-word;
+            padding-right: 14px;
+        }
+
         #myTable th {
             color: #ffffff;
             font-weight: 600;
@@ -253,6 +259,14 @@
 
         #myTable tr:nth-child(odd):not(.header) {
             background-color: #d6c5a3;
+        }
+
+        .or-completo {
+            display: inline;
+        }
+
+        .or-abreviado {
+            display: none;
         }
 
         @media screen and (max-width: 800px) {
@@ -370,6 +384,14 @@
             #myTable td:nth-child(3) {
                 padding-left: 8px !important;
             }
+
+            .or-completo {
+                display: none;
+            }
+
+            .or-abreviado {
+                display: inline;
+            }
         }
 
         @media screen and (min-width: 600px) and (max-width: 800px) {
@@ -406,7 +428,7 @@
             }
 
             #myTable colgroup col:nth-child(1) {
-                width: 10% !important;
+                width: 20% !important;
             }
 
             #myTable colgroup col:nth-child(2) {
@@ -414,12 +436,12 @@
             }
 
             #myTable colgroup col:nth-child(3) {
-                width: 48% !important;
+                width: 42% !important;
             }
 
             #myTable colgroup col:nth-child(4),
             #myTable colgroup col:nth-child(5) {
-                width: 11% !important;
+                width: 9% !important;
             }
 
             #myTable .celda-accion a,
@@ -456,6 +478,21 @@
                 font-size: 14px;
                 line-height: 1;
                 white-space: nowrap;
+            }
+
+            #myTable th:nth-child(2) {
+                text-align: left !important;
+                padding-left: 16px;
+            }
+
+            #myTable td.celda-tipo-punto {
+                text-align: left !important;
+                padding-left: 16px !important;
+            }
+
+            #myTable td.celda-tipo-punto .contenido-tipo-punto {
+                justify-content: flex-start;
+                margin: 0;
             }
         }
 
@@ -601,9 +638,9 @@
     <div class="bdtable bg-inm-marron-100 mt-2">
         <table id="myTable">
             <colgroup>
-                <col style="width: 7%;">
+                <col style="width: 18%;">
                 <col style="width: 14%;">
-                <col style="width: 63%;">
+                <col style="width: 52%;">
                 <col style="width: 8%;">
                 <col style="width: 8%;">
             </colgroup>
@@ -616,40 +653,45 @@
             {% for item in edoFuerza %}
                 <tr>
                     <td>
-                        {% if item.oficinaR == "AGUASCALIENTES" %}AGS
-                        {% elif item.oficinaR == "BAJA CALIFORNIA" %}BC
-                        {% elif item.oficinaR == "BAJA CALIFORNIA SUR" %}BCS
-                        {% elif item.oficinaR == "CAMPECHE" %}CAMP
-                        {% elif item.oficinaR == "CDMX" or item.oficinaR == "CIUDAD DE MÉXICO" %}CDMX
-                        {% elif item.oficinaR == "CHIAPAS" %}CHIS
-                        {% elif item.oficinaR == "CHIHUAHUA" %}CHIH
-                        {% elif item.oficinaR == "COAHUILA" %}COAH
-                        {% elif item.oficinaR == "COLIMA" %}COL
-                        {% elif item.oficinaR == "DURANGO" %}DGO
-                        {% elif item.oficinaR == "EDOMEX" or item.oficinaR == "ESTADO DE MÉXICO" %}EDOMEX
-                        {% elif item.oficinaR == "GUANAJUATO" %}GTO
-                        {% elif item.oficinaR == "GUERRERO" %}GRO
-                        {% elif item.oficinaR == "HIDALGO" %}HGO
-                        {% elif item.oficinaR == "JALISCO" %}JAL
-                        {% elif item.oficinaR == "MICHOACÁN" %}MICH
-                        {% elif item.oficinaR == "MORELOS" %}MOR
-                        {% elif item.oficinaR == "NAYARIT" %}NAY
-                        {% elif item.oficinaR == "NUEVO LEÓN" %}NL
-                        {% elif item.oficinaR == "OAXACA" %}OAX
-                        {% elif item.oficinaR == "PUEBLA" %}PUE
-                        {% elif item.oficinaR == "QUERÉTARO" %}QRO
-                        {% elif item.oficinaR == "QUINTANA ROO" %}QROO
-                        {% elif item.oficinaR == "SAN LUIS POTOSÍ" %}SLP
-                        {% elif item.oficinaR == "SINALOA" %}SIN
-                        {% elif item.oficinaR == "SONORA" %}SON
-                        {% elif item.oficinaR == "TABASCO" %}TAB
-                        {% elif item.oficinaR == "TAMAULIPAS" %}TAMPS
-                        {% elif item.oficinaR == "TLAXCALA" %}TLAX
-                        {% elif item.oficinaR == "VERACRUZ" %}VER
-                        {% elif item.oficinaR == "YUCATÁN" %}YUC
-                        {% elif item.oficinaR == "ZACATECAS" %}ZAC
-                        {% else %}{{ item.oficinaR }}
-                        {% endif %}
+                        <span class="or-completo">
+                            {{ item.oficinaR }}
+                        </span>
+                        <span class="or-abreviado">
+                            {% if item.oficinaR == "AGUASCALIENTES" %}AGS
+                            {% elif item.oficinaR == "BAJA CALIFORNIA" %}BC
+                            {% elif item.oficinaR == "BAJA CALIFORNIA SUR" %}BCS
+                            {% elif item.oficinaR == "CAMPECHE" %}CAMP
+                            {% elif item.oficinaR == "CDMX" or item.oficinaR == "CIUDAD DE MÉXICO" %}CDMX
+                            {% elif item.oficinaR == "CHIAPAS" %}CHIS
+                            {% elif item.oficinaR == "CHIHUAHUA" %}CHIH
+                            {% elif item.oficinaR == "COAHUILA" %}COAH
+                            {% elif item.oficinaR == "COLIMA" %}COL
+                            {% elif item.oficinaR == "DURANGO" %}DGO
+                            {% elif item.oficinaR == "EDOMEX" or item.oficinaR == "ESTADO DE MÉXICO" %}EDOMEX
+                            {% elif item.oficinaR == "GUANAJUATO" %}GTO
+                            {% elif item.oficinaR == "GUERRERO" %}GRO
+                            {% elif item.oficinaR == "HIDALGO" %}HGO
+                            {% elif item.oficinaR == "JALISCO" %}JAL
+                            {% elif item.oficinaR == "MICHOACÁN" %}MICH
+                            {% elif item.oficinaR == "MORELOS" %}MOR
+                            {% elif item.oficinaR == "NAYARIT" %}NAY
+                            {% elif item.oficinaR == "NUEVO LEÓN" %}NL
+                            {% elif item.oficinaR == "OAXACA" %}OAX
+                            {% elif item.oficinaR == "PUEBLA" %}PUE
+                            {% elif item.oficinaR == "QUERÉTARO" %}QRO
+                            {% elif item.oficinaR == "QUINTANA ROO" %}QROO
+                            {% elif item.oficinaR == "SAN LUIS POTOSÍ" %}SLP
+                            {% elif item.oficinaR == "SINALOA" %}SIN
+                            {% elif item.oficinaR == "SONORA" %}SON
+                            {% elif item.oficinaR == "TABASCO" %}TAB
+                            {% elif item.oficinaR == "TAMAULIPAS" %}TAMPS
+                            {% elif item.oficinaR == "TLAXCALA" %}TLAX
+                            {% elif item.oficinaR == "VERACRUZ" %}VER
+                            {% elif item.oficinaR == "YUCATÁN" %}YUC
+                            {% elif item.oficinaR == "ZACATECAS" %}ZAC
+                            {% else %}{{ item.oficinaR }}
+                            {% endif %}
+                        </span>
                     </td>
                     <td class="celda-tipo-punto">
                         {% if item.tipoP == "Aeropuerto" %}
@@ -927,6 +969,12 @@
         document.addEventListener('keydown', function(event) {
             if (event.key === 'Escape') {
                 cerrarConfirmacion();
+            }
+        });
+        document.getElementById('cerrar').addEventListener('click', function(event) {
+            event.preventDefault();
+            if (window.location.hash === '#popup') {
+                window.history.back();
             }
         });
     </script>

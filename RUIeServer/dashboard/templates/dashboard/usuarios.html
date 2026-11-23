@@ -146,6 +146,15 @@
         #myTable tr:nth-child(odd):not(.header) {
             background-color: #d6c5a3;
         }
+
+        #myTable .col-id {
+            display: none;
+        }
+
+        #myTable th:first-child,
+        #myTable td:first-child {
+            display: none;
+        }
           
         .flex-container {
             display: flex;
@@ -224,6 +233,14 @@
 
         tr.header {
             background-color: #235B4E;
+        }
+
+        .or-completo {
+            display: inline;
+        }
+
+        .or-abreviado {
+            display: none;
         }
 
         @media screen and (max-width: 800px) {
@@ -348,6 +365,14 @@
                 top: 10px;
                 right: 15px;
             }
+
+            .or-completo {
+                display: none;
+            }
+
+            .or-abreviado {
+                display: inline;
+            }
         }
 
         @media screen and (min-width: 801px) and (max-width: 1100px) {
@@ -370,19 +395,19 @@
             }
 
             #myTable colgroup col:nth-child(1) {
-                width: 6% !important;
+                width: 0% !important;
             }
 
             #myTable colgroup col:nth-child(2) {
-                width: 8% !important;
+                width: 16% !important;
             }
 
             #myTable colgroup col:nth-child(3) {
-                width: 22% !important;
+                width: 19% !important;
             }
 
             #myTable colgroup col:nth-child(4) {
-                width: 28% !important;
+                width: 27% !important;
             }
 
             #myTable colgroup col:nth-child(5) {
@@ -391,12 +416,7 @@
 
             #myTable colgroup col:nth-child(6),
             #myTable colgroup col:nth-child(7) {
-                width: 10% !important;
-            }
-
-            #myTable th:nth-child(2),
-            #myTable td:nth-child(2) {
-                text-align: center;
+                width: 12% !important;
             }
 
             #myTable th:nth-child(3),
@@ -457,6 +477,23 @@
             }
         }
 
+        @media screen and (min-width: 801px) and (max-width: 1100px) and (orientation: landscape) and (max-height: 800px) {
+            .or-completo {
+                display: none;
+            }
+
+            .or-abreviado {
+                display: inline;
+            }
+        }
+
+        @media screen and (min-width: 1101px) {
+            #myTable th:nth-child(3),
+            #myTable td:nth-child(3) {
+            padding-left: 95px !important;
+            }
+        }
+
     </style>
     {% endblock styles %}
 
@@ -482,13 +519,13 @@
                             class="w-full rounded-xl border border-gray-300 bg-white px-3 py-3 text-gray-700 shadow-sm outline-none transition 
                             placeholder:text-gray-400 focus:border-[#941b4c] focus:ring-2 focus:ring-[#941b4c]/20">
             </div>
-                <!-- Carga masiva -->
-                <a href="#popup" class="inline-flex min-h-[52px] items-center justify-center rounded-xl bg-inm-rojo-300 px-5 py-3 text-center 
+                <!-- Carga masiva
+                <a href="#popup" class="inline-flex min-h-[52px] shrink-0 items-center justify-center rounded-xl bg-inm-rojo-300 px-5 py-3 text-center 
                                     font-medium text-white shadow-sm transition hover:bg-inm-marron-100">
                         Carga masiva
-                </a>
+                </a>-->
                 <!-- Agregar usuario --> 
-                <a href="{% url 'agregar_usuario' %}" class="inline-flex min-h-[52px] items-center justify-center rounded-xl bg-inm-rojo-300 px-5 py-3 text-center 
+                <a href="{% url 'agregar_usuario' %}" class="inline-flex min-h-[52px] shrink-0 items-center justify-center rounded-xl bg-inm-rojo-300 px-5 py-3 text-center 
                                                          font-medium text-white shadow-sm transition hover:bg-inm-marron-100">
                         Agregar Usuario
                 </a>
@@ -531,13 +568,13 @@
     <div class="bdtable bg-inm-marron-100 mt-2">
         <table id="myTable">
             <colgroup>
-                <col style="width: 7%;">
-                <col style="width: 8%;">
+                <col class="col-id" style="width: 0%;">
+                <col style="width: 10%;">
                 <col style="width: 20%;">
                 <col style="width: 30%;">
                 <col style="width: 17%;">
-                <col style="width: 8%;">
-                <col style="width: 8%;">
+                <col style="width: 7%;">
+                <col style="width: 7%;">
             </colgroup>
             <tr class="header">
                 <th>ID</th>
@@ -551,38 +588,75 @@
                 <tr>
                     <td>{{ item.idUser }}</td>
                     <td>
-                        {% if item.estado == '1' %}AGS{% endif %}
-                        {% if item.estado == '2' %}BC{% endif %}
-                        {% if item.estado == '3' %}BCS{% endif %}
-                        {% if item.estado == '4' %}CAMP{% endif %}
-                        {% if item.estado == '9' %}CDMX{% endif %}
-                        {% if item.estado == '7' %}CHIS{% endif %}
-                        {% if item.estado == '8' %}CHIH{% endif %}
-                        {% if item.estado == '5' %}COAH{% endif %}
-                        {% if item.estado == '6' %}COL{% endif %}
-                        {% if item.estado == '10' %}DGO{% endif %}
-                        {% if item.estado == '15' %}EDOMEX{% endif %}
-                        {% if item.estado == '12' %}GRO{% endif %}
-                        {% if item.estado == '11' %}GTO{% endif %}
-                        {% if item.estado == '13' %}HGO{% endif %}
-                        {% if item.estado == '14' %}JAL{% endif %}
-                        {% if item.estado == '16' %}MICH{% endif %}
-                        {% if item.estado == '17' %}MOR{% endif %}
-                        {% if item.estado == '18' %}NAY{% endif %}
-                        {% if item.estado == '19' %}NL{% endif %}
-                        {% if item.estado == '20' %}OAX{% endif %}
-                        {% if item.estado == '21' %}PUE{% endif %}
-                        {% if item.estado == '22' %}QRO{% endif %}
-                        {% if item.estado == '23' %}QROO{% endif %}
-                        {% if item.estado == '24' %}SLP{% endif %}
-                        {% if item.estado == '25' %}SIN{% endif %}
-                        {% if item.estado == '26' %}SON{% endif %}
-                        {% if item.estado == '27' %}TAB{% endif %}
-                        {% if item.estado == '28' %}TAMPS{% endif %}
-                        {% if item.estado == '29' %}TLAX{% endif %}
-                        {% if item.estado == '30' %}VER{% endif %}
-                        {% if item.estado == '31' %}YUC{% endif %}
-                        {% if item.estado == '32' %}ZAC{% endif %}
+                        <span class="or-completo">
+                            {% if item.estado == '1' %}AGUASCALIENTES
+                            {% elif item.estado == '2' %}BAJA CALIFORNIA
+                            {% elif item.estado == '3' %}BAJA CALIFORNIA SUR
+                            {% elif item.estado == '4' %}CAMPECHE
+                            {% elif item.estado == '5' %}COAHUILA
+                            {% elif item.estado == '6' %}COLIMA
+                            {% elif item.estado == '7' %}CHIAPAS
+                            {% elif item.estado == '8' %}CHIHUAHUA
+                            {% elif item.estado == '9' %}CDMX
+                            {% elif item.estado == '10' %}DURANGO
+                            {% elif item.estado == '11' %}GUANAJUATO
+                            {% elif item.estado == '12' %}GUERRERO
+                            {% elif item.estado == '13' %}HIDALGO
+                            {% elif item.estado == '14' %}JALISCO
+                            {% elif item.estado == '15' %}ESTADO DE MÉXICO
+                            {% elif item.estado == '16' %}MICHOACÁN
+                            {% elif item.estado == '17' %}MORELOS
+                            {% elif item.estado == '18' %}NAYARIT
+                            {% elif item.estado == '19' %}NUEVO LEÓN
+                            {% elif item.estado == '20' %}OAXACA
+                            {% elif item.estado == '21' %}PUEBLA
+                            {% elif item.estado == '22' %}QUERÉTARO
+                            {% elif item.estado == '23' %}QUINTANA ROO
+                            {% elif item.estado == '24' %}SAN LUIS POTOSÍ
+                            {% elif item.estado == '25' %}SINALOA
+                            {% elif item.estado == '26' %}SONORA
+                            {% elif item.estado == '27' %}TABASCO
+                            {% elif item.estado == '28' %}TAMAULIPAS
+                            {% elif item.estado == '29' %}TLAXCALA
+                            {% elif item.estado == '30' %}VERACRUZ
+                            {% elif item.estado == '31' %}YUCATÁN
+                            {% elif item.estado == '32' %}ZACATECAS
+                            {% endif %}
+                         </span>
+                         <span class="or-abreviado">
+                            {% if item.estado == '1' %}AGS{% endif %}
+                            {% if item.estado == '2' %}BC{% endif %}
+                            {% if item.estado == '3' %}BCS{% endif %}
+                            {% if item.estado == '4' %}CAMP{% endif %}
+                            {% if item.estado == '9' %}CDMX{% endif %}
+                            {% if item.estado == '7' %}CHIS{% endif %}
+                            {% if item.estado == '8' %}CHIH{% endif %}
+                            {% if item.estado == '5' %}COAH{% endif %}
+                            {% if item.estado == '6' %}COL{% endif %}
+                            {% if item.estado == '10' %}DGO{% endif %}
+                            {% if item.estado == '15' %}EDOMEX{% endif %}
+                            {% if item.estado == '12' %}GRO{% endif %}
+                            {% if item.estado == '11' %}GTO{% endif %}
+                            {% if item.estado == '13' %}HGO{% endif %}
+                            {% if item.estado == '14' %}JAL{% endif %}
+                            {% if item.estado == '16' %}MICH{% endif %}
+                            {% if item.estado == '17' %}MOR{% endif %}
+                            {% if item.estado == '18' %}NAY{% endif %}
+                            {% if item.estado == '19' %}NL{% endif %}
+                            {% if item.estado == '20' %}OAX{% endif %}
+                            {% if item.estado == '21' %}PUE{% endif %}
+                            {% if item.estado == '22' %}QRO{% endif %}
+                            {% if item.estado == '23' %}QROO{% endif %}
+                            {% if item.estado == '24' %}SLP{% endif %}
+                            {% if item.estado == '25' %}SIN{% endif %}
+                            {% if item.estado == '26' %}SON{% endif %}
+                            {% if item.estado == '27' %}TAB{% endif %}
+                            {% if item.estado == '28' %}TAMPS{% endif %}
+                            {% if item.estado == '29' %}TLAX{% endif %}
+                            {% if item.estado == '30' %}VER{% endif %}
+                            {% if item.estado == '31' %}YUC{% endif %}
+                            {% if item.estado == '32' %}ZAC{% endif %}
+                        </span>
                     </td>
                     <td>{{ item.nickname }}</td>
                     <td>{{ item.nombre }} {{ item.apellido }}</td>
@@ -762,6 +836,12 @@
                     cerrarConfirmacionUsuario();
                 }
              });
+        });
+        document.querySelector('#popup #cerrar').addEventListener('click', function(event) {
+            event.preventDefault();
+            if (window.location.hash === '#popup') {
+                window.history.back();
+            }
         });
     </script>
     {% endblock content %}

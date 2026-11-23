@@ -1308,40 +1308,241 @@ def generarExcelORs(request):
 @login_required
 @csrf_exempt
 def generarExcelEdoFuerza(request):
-    if(request.method == "POST"):
-
+    if request.method == "POST":
+        
         if request.user.is_superuser:
-                    valores = EstadoFuerza.objects.all().order_by('oficinaR')
-                    
-                    
-                    workbook = opxl.load_workbook('tmp/eF.xlsm', read_only=False, keep_vba=True)
-                    worksheet = workbook.active
-                        
-                    for valor in valores:
-                        worksheet.append([valor.oficinaR, 
-                                            valor.numPunto,
-                                            valor.nomPuntoRevision,
-                                            valor.tipoP,
-                                            valor.ubicacion,
-                                            valor.coordenadasTexto,
-                                            valor.latitud,
-                                            valor.longitud,
-                                            valor.personalINM,
-                                            valor.personalSEDENA,
-                                            valor.personalMarina,
-                                            valor.personalGuardiaN,
-                                            valor.personalOTROS,
-                                            valor.vehiculos,
-                                            valor.seccion
-                                            ])
-                
-                    response = HttpResponse(content = save_virtual_workbook(workbook), content_type='application/vnd.ms-excel.sheet.macroEnabled.12')
-                    response['Content-Disposition'] = 'attachment; filename=EdoFuerza.xlsm'
 
-                    return response
+            valores = EstadoFuerza.objects.all().order_by('oficinaR')
+            total_registros = valores.count()
+
+            # Crear libro de Excel
+            workbook = opxl.Workbook()
+            worksheet = workbook.active
+            worksheet.title = "Estado de Fuerza"
+
+            # Ocultar cuadrícula de Excel
+            worksheet.sheet_view.showGridLines = False
+
+            # Colores institucionales
+            vino = "741B35"
+            verde_militar = "10312B"
+            gris_claro = "E0E0E0"
+            beige = "D8C9A7"
+            blanco = "FFFFFF"
+
+            # Rellenos
+            encabezado_fill = opxl.styles.PatternFill(
+                fill_type="solid",
+                fgColor=vino
+            )
+
+            titulo_fill = opxl.styles.PatternFill(
+                fill_type="solid",
+                fgColor=verde_militar
+            )
+
+            fila_gris = opxl.styles.PatternFill(
+                fill_type="solid",
+                fgColor=gris_claro
+            )
+
+            fila_beige = opxl.styles.PatternFill(
+                fill_type="solid",
+                fgColor=beige
+            )
+
+            # Estilos de encabezados
+            encabezado_font = opxl.styles.Font(
+                name="Arial",
+                size=10,
+                bold=True,
+                color=blanco
+            )
+
+            # Estilo del título principal
+            titulo_font = opxl.styles.Font(
+                name="Arial",
+                size=14,
+                bold=True,
+                color=blanco
+            )
+
+            # Estilos de datos
+            datos_font = opxl.styles.Font(
+                name="Arial",
+                size=10,
+                color="000000"
+            )
+
+            # Bordes negros delgados
+            borde = opxl.styles.Border(
+                left=opxl.styles.Side(style="thin", color="000000"),
+                right=opxl.styles.Side(style="thin", color="000000"),
+                top=opxl.styles.Side(style="thin", color="000000"),
+                bottom=opxl.styles.Side(style="thin", color="000000")
+            )
+
+            # Título principal
+            worksheet.merge_cells("A1:O1")
+
+            titulo = worksheet["A1"]
+            titulo.value = "ESTADO DE FUERZA"
+            titulo.fill = titulo_fill
+            titulo.font = titulo_font
+            titulo.alignment = opxl.styles.Alignment(
+                horizontal="center",
+                vertical="center"
+            )
+
+            # Aplicar fondo verde a toda la franja
+            for fila_celdas in worksheet["A1:O1"]:
+                for celda in fila_celdas:
+                    celda.fill = titulo_fill
+
+            worksheet.row_dimensions[1].height = 32
+
+            # Encabezados de las 15 columnas
+            encabezados = [
+                "Oficina de Representación",
+                "Número de Punto",
+                "Nombre del Punto de Revisión",
+                "Tipo de Punto",
+                "Ubicación",
+                "Coordenadas",
+                "Latitud",
+                "Longitud",
+                "Personal INM",
+                "Personal SEDENA",
+                "Personal Marina",
+                "Personal Guardia Nacional",
+                "Personal Otros",
+                "Vehículos",
+                "Sección"
+            ]
+
+            # Colocar encabezados en la segunda fila
+            for numero, encabezado in enumerate(encabezados, start=1):
+                celda = worksheet.cell(row=2, column=numero)
+                celda.value = encabezado
+                celda.fill = encabezado_fill
+                celda.font = encabezado_font
+                celda.alignment = opxl.styles.Alignment(
+                    horizontal="center",
+                    vertical="center",
+                    wrap_text=True
+                )
+                celda.border = borde
+
+            worksheet.row_dimensions[2].height = 35
+
+            # Agregar registros
+            for valor in valores:
+                worksheet.append([
+                    valor.oficinaR,
+                    valor.numPunto,
+                    valor.nomPuntoRevision,
+                    valor.tipoP,
+                    valor.ubicacion,
+                    valor.coordenadasTexto,
+                    valor.latitud,
+                    valor.longitud,
+                    valor.personalINM,
+                    valor.personalSEDENA,
+                    valor.personalMarina,
+                    valor.personalGuardiaN,
+                    valor.personalOTROS,
+                    valor.vehiculos,
+                    valor.seccion
+                ])
+
+            # Aplicar formato a las filas
+            ultima_fila = worksheet.max_row
+
+            for fila in range(3, ultima_fila + 1):
+
+                for celda in worksheet[fila]:
+
+                    celda.font = datos_font
+                    celda.border = borde
+
+                    celda.alignment = opxl.styles.Alignment(
+                        horizontal="center",
+                        vertical="center",
+                        wrap_text=True
+                    )
+
+                    # Alternar colores entre gris y beige
+                    if fila % 2 == 1:
+                        celda.fill = fila_gris
+                    else:
+                        celda.fill = fila_beige
+
+                worksheet.row_dimensions[fila].height = 60
+
+            # Ancho de las 15 columnas
+            anchos = [
+                25, 14, 42, 22, 70,
+                28, 14, 14, 18, 18,
+                18, 23, 18, 14, 18
+            ]
+
+            for numero, ancho in enumerate(anchos, start=1):
+                letra = opxl.utils.get_column_letter(numero)
+                worksheet.column_dimensions[letra].width = ancho
+
+            # Filtros en los encabezados
+            worksheet.auto_filter.ref = f"A2:O{ultima_fila}"
+
+            # Mantener título y encabezados visibles
+            worksheet.freeze_panes = "A3"
+
+            # Recuadro de total a un costado de la tabla
+            celda_titulo = worksheet["Q1"]
+            celda_total = worksheet["Q2"]
+
+            celda_titulo.value = "TOTAL REGISTROS"
+            celda_total.value = total_registros
+
+            for celda in [celda_titulo, celda_total]:
+                celda.fill = encabezado_fill
+                celda.font = encabezado_font
+                celda.alignment = opxl.styles.Alignment(
+                    horizontal="center",
+                    vertical="center"
+                )
+                celda.border = borde
+
+            celda_total.font = opxl.styles.Font(
+                name="Arial",
+                size=16,
+                bold=True,
+                color=blanco
+            )
+
+            worksheet.column_dimensions["P"].width = 3
+            worksheet.row_dimensions[1].height = 32
+
+            # Preparar archivo para descarga
+            from io import BytesIO
+
+            archivo = BytesIO()
+            workbook.save(archivo)
+            archivo.seek(0)
+
+            response = HttpResponse(
+                archivo.getvalue(),
+                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+
+            response["Content-Disposition"] = (
+                "attachment; filename=EdoFuerza.xlsx"
+            )
+
+            return response
+
         else:
             return render(request, "base/error404.html")
-            
+
     else:
         return render(request, "base/error404.html")
 
@@ -1349,103 +1550,221 @@ def generarExcelEdoFuerza(request):
 @login_required
 @csrf_exempt
 def generarExcelUsuarios(request):
-    if(request.method == "POST"):
+    if request.method == "POST":
         if request.user.is_superuser:
+
             valores = Usuario.objects.all().order_by("estado")
-            workbook = opxl.load_workbook('tmp/us.xlsm', read_only=False, keep_vba=True)
+
+            # Crear libro de Excel
+            workbook = opxl.Workbook()
             worksheet = workbook.active
-            # print(valores)
+            worksheet.title = "Usuarios"
+            worksheet.sheet_view.showGridLines = False
+
+            # Colores
+            color_verde = "10312B"
+            color_vino = "741B35"
+            color_gris = "E0E0E0"
+            color_beige = "D8C9A7"
+            color_blanco = "FFFFFF"
+
+            # Estilos
+            titulo_font = opxl.styles.Font(
+                name="Arial", size=14, bold=True, color=color_blanco
+            )
+            encabezado_font = opxl.styles.Font(
+                name="Arial", size=10, bold=True, color=color_blanco
+            )
+            datos_font = opxl.styles.Font(
+                name="Arial", size=10, color="000000"
+            )
+
+            borde = opxl.styles.Border(
+                left=opxl.styles.Side(style="thin", color="000000"),
+                right=opxl.styles.Side(style="thin", color="000000"),
+                top=opxl.styles.Side(style="thin", color="000000"),
+                bottom=opxl.styles.Side(style="thin", color="000000")
+            )
+
+            fila_gris = opxl.styles.PatternFill(
+                fill_type="solid", fgColor=color_gris
+            )
+            fila_beige = opxl.styles.PatternFill(
+                fill_type="solid", fgColor=color_beige
+            )
+
+            relleno_verde = opxl.styles.PatternFill(
+                fill_type="solid", fgColor=color_verde
+            )
+            relleno_vino = opxl.styles.PatternFill(
+                fill_type="solid", fgColor=color_vino
+            )
+
+            # Título
+            worksheet.merge_cells("A1:D1")
+            worksheet["A1"] = "USUARIOS"
+            worksheet["A1"].fill = relleno_verde
+            worksheet["A1"].font = titulo_font
+            worksheet["A1"].alignment = opxl.styles.Alignment(
+                horizontal="center", vertical="center"
+            )
+            worksheet["A1"].border = borde
+            worksheet.row_dimensions[1].height = 32
+
+            # Encabezados
+            encabezados = [
+                "Estado",
+                "Nickname",
+                "Nombre completo",
+                "Tipo de Usuario"
+            ]
+
+            for columna, encabezado in enumerate(encabezados, start=1):
+                celda = worksheet.cell(row=2, column=columna)
+                celda.value = encabezado
+                celda.fill = relleno_vino
+                celda.font = encabezado_font
+                celda.border = borde
+                celda.alignment = opxl.styles.Alignment(
+                    horizontal="center",
+                    vertical="center",
+                    wrap_text=True
+                )
+
+            worksheet.row_dimensions[2].height = 35
+
+            # Catálogo de estados
+            estados = {
+                "1": "AGUASCALIENTES",
+                "2": "BAJA CALIFORNIA",
+                "3": "BAJA CALIFORNIA SUR",
+                "4": "CAMPECHE",
+                "5": "COAHUILA",
+                "6": "COLIMA",
+                "7": "CHIAPAS",
+                "8": "CHIHUAHUA",
+                "9": "CDMX",
+                "10": "DURANGO",
+                "11": "GUANAJUATO",
+                "12": "GUERRERO",
+                "13": "HIDALGO",
+                "14": "JALISCO",
+                "15": "ESTADO DE MÉXICO",
+                "16": "MICHOACÁN",
+                "17": "MORELOS",
+                "18": "NAYARIT",
+                "19": "NUEVO LEÓN",
+                "20": "OAXACA",
+                "21": "PUEBLA",
+                "22": "QUERÉTARO",
+                "23": "QUINTANA ROO",
+                "24": "SAN LUIS POTOSÍ",
+                "25": "SINALOA",
+                "26": "SONORA",
+                "27": "TABASCO",
+                "28": "TAMAULIPAS",
+                "29": "TLAXCALA",
+                "30": "VERACRUZ",
+                "31": "YUCATÁN",
+                "32": "ZACATECAS"
+            }
+
+            # Catálogo de tipos de usuario
+            tipos_usuario = {
+                "1": "Administrador",
+                "2": "Validador",
+                "3": "Capturador"
+            }
+
+            # Agregar registros
             for valor in valores:
-                estado = ""
-                if valor.estado == '1':
-                    estado = "AGUASCALIENTES"
-                elif valor.estado == '2':
-                    estado = "BAJA CALIFORNIA"
-                elif valor.estado == '3':
-                    estado = "BAJA CALIFORNIA SUR"
-                elif valor.estado == '4':
-                    estado = "CAMPECHE"
-                elif valor.estado == '5':
-                    estado = "COAHUILA"
-                elif valor.estado == '6':
-                    estado = "COLIMA"
-                elif valor.estado == '7':
-                    estado = "CHIAPAS"
-                elif valor.estado == '8':
-                    estado = "CHIHUAHUA"
-                elif valor.estado == '9':
-                    estado = "CDMX"
-                elif valor.estado == '10':
-                    estado = "DURANGO"
-                elif valor.estado == '11':
-                    estado = "GUANAJUATO"
-                elif valor.estado == '12':
-                    estado = "GUERRERO"
-                elif valor.estado == '13':
-                    estado = "HIDALGO"
-                elif valor.estado == '14':
-                    estado = "JALISCO"
-                elif valor.estado == '15':
-                    estado = "EDOMEX"
-                elif valor.estado == '16':
-                    estado = "MICHOACÁN"
-                elif valor.estado == '17':
-                    estado = "MORELOS"
-                elif valor.estado == '18':
-                    estado = "NAYARIT"
-                elif valor.estado == '19':
-                    estado = "NUEVO LEÓN"
-                elif valor.estado == '20':
-                    estado = "OAXACA"
-                elif valor.estado == '21':
-                    estado = "PUEBLA"
-                elif valor.estado == '22':
-                    estado = "QUERÉTARO"
-                elif valor.estado == '23':
-                    estado = "QUINTANA ROO"
-                elif valor.estado == '24':
-                    estado = "SAN LUIS POTOSÍ"
-                elif valor.estado == '25':
-                    estado = "SINALOA"
-                elif valor.estado == '26':
-                    estado = "SONORA"
-                elif valor.estado == '27':
-                    estado = "TABASCO"
-                elif valor.estado == '28':
-                    estado = "TAMAULIPAS"
-                elif valor.estado == '29':
-                    estado = "TLAXCALA"
-                elif valor.estado == '30':
-                    estado = "VERACRUZ"
-                elif valor.estado == '31':
-                    estado = "YUCATÁN"
-                elif valor.estado == '32':
-                    estado = "ZACATECAS"
-
-                disposi = ""
-
-                if valor.tipo_disp == '1':
-                    disposi = "ANDROID"
-                elif valor.tipo_disp == '2':
-                    disposi = "IPHONE"
-                else:
-                    disposi = "OTRO"
+                estado = estados.get(str(valor.estado), "")
+                tipo_usuario = tipos_usuario.get(str(valor.tipo), "")
 
                 worksheet.append([
                     estado,
                     valor.nickname,
-                    valor.nombre,
-                    valor.apellido,
-                    disposi,
+                    f"{valor.nombre} {valor.apellido}".strip(),
+                    tipo_usuario
                 ])
 
+            # Formato de filas
+            ultima_fila = worksheet.max_row
 
-            response = HttpResponse(content = save_virtual_workbook(workbook), content_type='application/vnd.ms-excel.sheet.macroEnabled.12')
-            response['Content-Disposition'] = 'attachment; filename=Usuarios.xlsm'
+            for fila in range(3, ultima_fila + 1):
+                for celda in worksheet[fila]:
+                    celda.font = datos_font
+                    celda.border = borde
+                    celda.alignment = opxl.styles.Alignment(
+                        horizontal="center",
+                        vertical="center",
+                        wrap_text=True
+                    )
+
+                    if fila % 2 == 1:
+                        celda.fill = fila_gris
+                    else:
+                        celda.fill = fila_beige
+
+                worksheet.row_dimensions[fila].height = 60
+
+            # Ancho de columnas
+            anchos = [30, 28, 45, 25]
+
+            for indice, ancho in enumerate(anchos, start=1):
+                worksheet.column_dimensions[
+                    opxl.utils.get_column_letter(indice)
+                ].width = ancho
+
+            # Filtro y encabezados inmovilizados
+            worksheet.auto_filter.ref = f"A2:D{ultima_fila}"
+            worksheet.freeze_panes = "A3"
+
+            # Total de registros
+            worksheet.column_dimensions["E"].width = 3
+            worksheet.column_dimensions["F"].width = 22
+
+            worksheet["F1"] = "TOTAL REGISTROS"
+            worksheet["F1"].fill = relleno_vino
+            worksheet["F1"].font = encabezado_font
+            worksheet["F1"].alignment = opxl.styles.Alignment(
+                horizontal="center", vertical="center"
+            )
+            worksheet["F1"].border = borde
+
+            worksheet["F2"] = valores.count()
+            worksheet["F2"].fill = relleno_vino
+            worksheet["F2"].font = opxl.styles.Font(
+                name="Arial", size=14, bold=True, color=color_blanco
+            )
+            worksheet["F2"].alignment = opxl.styles.Alignment(
+                horizontal="center", vertical="center"
+            )
+            worksheet["F2"].border = borde
+
+            # Separación entre tabla y total
+            worksheet.column_dimensions["D"].width = 25
+
+            # Preparar archivo Excel
+            from io import BytesIO
+
+            archivo = BytesIO()
+            workbook.save(archivo)
+            archivo.seek(0)
+
+            response = HttpResponse(
+                archivo.getvalue(),
+                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+            response["Content-Disposition"] = (
+                "attachment; filename=Usuarios.xlsx"
+            )
+
             return response
+
         else:
             return render(request, "base/error404.html")
-    
+
     else:
         return render(request, "base/error404.html")
 
@@ -1453,35 +1772,211 @@ def generarExcelUsuarios(request):
 @login_required
 @csrf_exempt
 def generarExcelPuntosI(request):
-    if(request.method == "POST"):
+    if request.method == "POST":
+
         if request.user.is_superuser:
+
             valores = PuntosInternacion.objects.all().order_by("estadoPunto")
-            workbook = opxl.load_workbook('tmp/pI.xlsm', read_only=False, keep_vba=True)
+            total_registros = valores.count()
+
+            # Crear libro de Excel
+            workbook = opxl.Workbook()
             worksheet = workbook.active
-            # print(valores)
+            worksheet.title = "Puntos de Internación"
+
+            # Ocultar cuadrícula
+            worksheet.sheet_view.showGridLines = False
+
+            # Colores institucionales
+            vino = "741B35"
+            verde_militar = "10312B"
+            gris_claro = "E0E0E0"
+            beige = "D8C9A7"
+            blanco = "FFFFFF"
+
+            # Rellenos
+            encabezado_fill = opxl.styles.PatternFill(
+                fill_type="solid",
+                fgColor=vino
+            )
+
+            titulo_fill = opxl.styles.PatternFill(
+                fill_type="solid",
+                fgColor=verde_militar
+            )
+
+            fila_gris = opxl.styles.PatternFill(
+                fill_type="solid",
+                fgColor=gris_claro
+            )
+
+            fila_beige = opxl.styles.PatternFill(
+                fill_type="solid",
+                fgColor=beige
+            )
+
+            # Fuentes
+            encabezado_font = opxl.styles.Font(
+                name="Arial",
+                size=10,
+                bold=True,
+                color=blanco
+            )
+
+            titulo_font = opxl.styles.Font(
+                name="Arial",
+                size=14,
+                bold=True,
+                color=blanco
+            )
+
+            datos_font = opxl.styles.Font(
+                name="Arial",
+                size=10,
+                color="000000"
+            )
+
+            # Bordes negros delgados
+            borde = opxl.styles.Border(
+                left=opxl.styles.Side(style="thin", color="000000"),
+                right=opxl.styles.Side(style="thin", color="000000"),
+                top=opxl.styles.Side(style="thin", color="000000"),
+                bottom=opxl.styles.Side(style="thin", color="000000")
+            )
+
+            # Título principal
+            worksheet.merge_cells("A1:C1")
+
+            titulo = worksheet["A1"]
+            titulo.value = "PUNTOS DE INTERNACIÓN"
+            titulo.fill = titulo_fill
+            titulo.font = titulo_font
+            titulo.alignment = opxl.styles.Alignment(
+                horizontal="center",
+                vertical="center"
+            )
+
+            for fila_celdas in worksheet["A1:C1"]:
+                for celda in fila_celdas:
+                    celda.fill = titulo_fill
+
+            worksheet.row_dimensions[1].height = 32
+
+            # Encabezados
+            encabezados = [
+                "OR",
+                "Nombre del Punto",
+                "Tipo de Punto"
+            ]
+
+            for numero, encabezado in enumerate(encabezados, start=1):
+                celda = worksheet.cell(row=2, column=numero)
+                celda.value = encabezado
+                celda.fill = encabezado_fill
+                celda.font = encabezado_font
+                celda.alignment = opxl.styles.Alignment(
+                    horizontal="center",
+                    vertical="center",
+                    wrap_text=True
+                )
+                celda.border = borde
+
+            worksheet.row_dimensions[2].height = 35
+
+            # Agregar registros
             for valor in valores:
                 worksheet.append([
                     valor.estadoPunto,
                     valor.nombrePunto,
-                    valor.tipoPunto,
+                    valor.tipoPunto
                 ])
 
+            # Aplicar formato a las filas
+            ultima_fila = worksheet.max_row
 
-            response = HttpResponse(content = save_virtual_workbook(workbook), content_type='application/vnd.ms-excel.sheet.macroEnabled.12')
-            response['Content-Disposition'] = 'attachment; filename=PuntosInternacion.xlsm'
+            for fila in range(3, ultima_fila + 1):
+
+                for celda in worksheet[fila]:
+
+                    celda.font = datos_font
+                    celda.border = borde
+
+                    celda.alignment = opxl.styles.Alignment(
+                        horizontal="center",
+                        vertical="center",
+                        wrap_text=True
+                    )
+
+                    # Alternar colores
+                    if fila % 2 == 1:
+                        celda.fill = fila_gris
+                    else:
+                        celda.fill = fila_beige
+
+                worksheet.row_dimensions[fila].height = 60
+
+            # Ancho de las 3 columnas
+            anchos = [30, 55, 30]
+
+            for numero, ancho in enumerate(anchos, start=1):
+                letra = opxl.utils.get_column_letter(numero)
+                worksheet.column_dimensions[letra].width = ancho
+
+            # Filtros
+            worksheet.auto_filter.ref = f"A2:C{ultima_fila}"
+
+            # Mantener título y encabezados visibles
+            worksheet.freeze_panes = "A3"
+
+            # Total de registros a un costado
+            celda_titulo = worksheet["E1"]
+            celda_total = worksheet["E2"]
+
+            celda_titulo.value = "TOTAL REGISTROS"
+            celda_total.value = total_registros
+
+            for celda in [celda_titulo, celda_total]:
+                celda.fill = encabezado_fill
+                celda.font = encabezado_font
+                celda.alignment = opxl.styles.Alignment(
+                    horizontal="center",
+                    vertical="center"
+                )
+                celda.border = borde
+
+            celda_total.font = opxl.styles.Font(
+                name="Arial",
+                size=16,
+                bold=True,
+                color=blanco
+            )
+
+            worksheet.column_dimensions["D"].width = 3
+            worksheet.column_dimensions["E"].width = 22
+
+            # Preparar archivo para descarga
+            from io import BytesIO
+
+            archivo = BytesIO()
+            workbook.save(archivo)
+            archivo.seek(0)
+
+            response = HttpResponse(
+                archivo.getvalue(),
+                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+
+            response["Content-Disposition"] = (
+                "attachment; filename=PuntosInternacion.xlsx"
+            )
+
             return response
+
         else:
             return render(request, "base/error404.html")
-    
+
     else:
         return render(request, "base/error404.html")
-
-
-
-
-
-
-
 
 
 @login_required

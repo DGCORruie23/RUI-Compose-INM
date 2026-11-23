@@ -251,6 +251,14 @@
             background-color: #d6c5a3;
         }
 
+        .or-completo {
+            display: inline;
+        }
+
+        .or-abreviado {
+            display: none;
+        }
+
         @media screen and (max-width: 800px) {
             .contIcons {
                 justify-content: stretch;
@@ -366,6 +374,14 @@
             #myTable td:nth-child(3) {
                 padding-left: 8px !important;
             }
+
+            .or-completo {
+                display: none;
+            }
+
+            .or-abreviado {
+                display: inline;
+            }
         }
 
         @media screen and (min-width: 600px) and (max-width: 800px) {
@@ -402,7 +418,7 @@
             }
 
             #myTable colgroup col:nth-child(1) {
-                width: 10% !important;
+                width: 20% !important;
             }
 
             #myTable colgroup col:nth-child(2) {
@@ -410,12 +426,12 @@
             }
 
             #myTable colgroup col:nth-child(3) {
-                width: 48% !important;
+                width: 42% !important;
             }
 
             #myTable colgroup col:nth-child(4),
             #myTable colgroup col:nth-child(5) {
-                width: 11% !important;
+                width: 9% !important;
             }
 
             #myTable .celda-accion a,
@@ -452,6 +468,21 @@
                 font-size: 14px;
                 line-height: 1;
                 white-space: nowrap;
+            }
+
+            #myTable th:nth-child(2) {
+                text-align: left !important;
+                padding-left: 16px;
+            }
+
+            #myTable td.celda-tipo-punto {
+                text-align: left !important;
+                padding-left: 16px !important;
+            }
+
+            #myTable td.celda-tipo-punto .contenido-tipo-punto {
+                justify-content: flex-start;
+                margin: 0;
             }
         }
 
@@ -597,9 +628,9 @@
     <div class="bdtable bg-inm-marron-100 mt-2">
         <table id="myTable">
             <colgroup>
-                <col style="width: 7%;">
+                <col style="width: 18%;">
                 <col style="width: 14%;">
-                <col style="width: 63%;">
+                <col style="width: 52%;">
                 <col style="width: 8%;">
                 <col style="width: 8%;">
             </colgroup>
@@ -613,40 +644,45 @@
             {% for item in puntosI %}
                 <tr>
                     <td>
-                        {% if item.estadoPunto == "AGUASCALIENTES" %}AGS
-                        {% elif item.estadoPunto == "BAJA CALIFORNIA" %}BC
-                        {% elif item.estadoPunto == "BAJA CALIFORNIA SUR" %}BCS
-                        {% elif item.estadoPunto == "CAMPECHE" %}CAMP
-                        {% elif item.estadoPunto == "CDMX" or item.estadoPunto == "CIUDAD DE MÉXICO" %}CDMX
-                        {% elif item.estadoPunto == "CHIAPAS" %}CHIS
-                        {% elif item.estadoPunto == "CHIHUAHUA" %}CHIH
-                        {% elif item.estadoPunto == "COAHUILA" %}COAH
-                        {% elif item.estadoPunto == "COLIMA" %}COL
-                        {% elif item.estadoPunto == "DURANGO" %}DGO
-                        {% elif item.estadoPunto == "EDOMEX" or item.estadoPunto == "ESTADO DE MÉXICO" %}EDOMEX
-                        {% elif item.estadoPunto == "GUANAJUATO" %}GTO
-                        {% elif item.estadoPunto == "GUERRERO" %}GRO
-                        {% elif item.estadoPunto == "HIDALGO" %}HGO
-                        {% elif item.estadoPunto == "JALISCO" %}JAL
-                        {% elif item.estadoPunto == "MICHOACÁN" %}MICH
-                        {% elif item.estadoPunto == "MORELOS" %}MOR
-                        {% elif item.estadoPunto == "NAYARIT" %}NAY
-                        {% elif item.estadoPunto == "NUEVO LEÓN" %}NL
-                        {% elif item.estadoPunto == "OAXACA" %}OAX
-                        {% elif item.estadoPunto == "PUEBLA" %}PUE
-                        {% elif item.estadoPunto == "QUERÉTARO" %}QRO
-                        {% elif item.estadoPunto == "QUINTANA ROO" %}QROO
-                        {% elif item.estadoPunto == "SAN LUIS POTOSÍ" %}SLP
-                        {% elif item.estadoPunto == "SINALOA" %}SIN
-                        {% elif item.estadoPunto == "SONORA" %}SON
-                        {% elif item.estadoPunto == "TABASCO" %}TAB
-                        {% elif item.estadoPunto == "TAMAULIPAS" %}TAMPS
-                        {% elif item.estadoPunto == "TLAXCALA" %}TLAX
-                        {% elif item.estadoPunto == "VERACRUZ" %}VER
-                        {% elif item.estadoPunto == "YUCATÁN" %}YUC
-                        {% elif item.estadoPunto == "ZACATECAS" %}ZAC
-                        {% else %}{{ item.estadoPunto }}
-                        {% endif %}
+                        <span class="or-completo">
+                            {{ item.estadoPunto }}
+                        </span>
+                        <span class="or-abreviado">
+                            {% if item.estadoPunto == "AGUASCALIENTES" %}AGS
+                            {% elif item.estadoPunto == "BAJA CALIFORNIA" %}BC
+                            {% elif item.estadoPunto == "BAJA CALIFORNIA SUR" %}BCS
+                            {% elif item.estadoPunto == "CAMPECHE" %}CAMP
+                            {% elif item.estadoPunto == "CDMX" or item.estadoPunto == "CIUDAD DE MÉXICO" %}CDMX
+                            {% elif item.estadoPunto == "CHIAPAS" %}CHIS
+                            {% elif item.estadoPunto == "CHIHUAHUA" %}CHIH
+                            {% elif item.estadoPunto == "COAHUILA" %}COAH
+                            {% elif item.estadoPunto == "COLIMA" %}COL
+                            {% elif item.estadoPunto == "DURANGO" %}DGO
+                            {% elif item.estadoPunto == "EDOMEX" or item.estadoPunto == "ESTADO DE MÉXICO" %}EDOMEX
+                            {% elif item.estadoPunto == "GUANAJUATO" %}GTO
+                            {% elif item.estadoPunto == "GUERRERO" %}GRO
+                            {% elif item.estadoPunto == "HIDALGO" %}HGO
+                            {% elif item.estadoPunto == "JALISCO" %}JAL
+                            {% elif item.estadoPunto == "MICHOACÁN" %}MICH
+                            {% elif item.estadoPunto == "MORELOS" %}MOR
+                            {% elif item.estadoPunto == "NAYARIT" %}NAY
+                            {% elif item.estadoPunto == "NUEVO LEÓN" %}NL
+                            {% elif item.estadoPunto == "OAXACA" %}OAX
+                            {% elif item.estadoPunto == "PUEBLA" %}PUE
+                            {% elif item.estadoPunto == "QUERÉTARO" %}QRO
+                            {% elif item.estadoPunto == "QUINTANA ROO" %}QROO
+                            {% elif item.estadoPunto == "SAN LUIS POTOSÍ" %}SLP
+                            {% elif item.estadoPunto == "SINALOA" %}SIN
+                            {% elif item.estadoPunto == "SONORA" %}SON
+                            {% elif item.estadoPunto == "TABASCO" %}TAB
+                            {% elif item.estadoPunto == "TAMAULIPAS" %}TAMPS
+                            {% elif item.estadoPunto == "TLAXCALA" %}TLAX
+                            {% elif item.estadoPunto == "VERACRUZ" %}VER
+                            {% elif item.estadoPunto == "YUCATÁN" %}YUC
+                            {% elif item.estadoPunto == "ZACATECAS" %}ZAC
+                            {% else %}{{ item.estadoPunto }}
+                            {% endif %}
+                         </span>
                     </td>
                     <td class="celda-tipo-punto">
                             {% if item.tipoPunto|upper == "AEREOS" %}
@@ -835,6 +871,12 @@
         document.addEventListener('keydown', function(event) {
             if (event.key === 'Escape') {
                 cerrarConfirmacionPuntoI();
+            }
+        });
+        document.querySelector('#popupPI #cerrar').addEventListener('click', function(event) {
+            event.preventDefault();
+            if (window.location.hash === '#popupPI') {
+                window.history.back();
             }
         });
 </script>
