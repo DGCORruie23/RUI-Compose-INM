@@ -243,6 +243,67 @@
             display: none;
         }
 
+        #myTable .celda-tipo-usuario {
+            text-align: center;
+            vertical-align: middle;
+            padding: 8px;
+        }
+
+        .tipo-usuario-icono {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: default;
+            outline: none;
+        }
+
+        .icono-tipo-usuario {
+            display: block;
+            width: 27px;
+            height: 27px;
+            color: #555555;
+        }
+
+        .tipo-usuario-icono::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: calc(100% + 9px);
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #10312B;
+            color: #ffffff;
+            padding: 7px 11px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            white-space: nowrap;
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            z-index: 100;
+            transition: opacity 0.2s ease;
+        }
+
+        .tipo-usuario-icono:hover::after,
+        .tipo-usuario-icono:focus-visible::after {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .tipo-usuario-icono:focus-visible {
+            outline: 2px solid #941b4c;
+            outline-offset: 4px;
+            border-radius: 3px;
+        }
+
+        #myTable th:nth-child(5),
+        #myTable td.celda-tipo-usuario {
+            text-align: center;
+            vertical-align: middle;
+            padding: 8px;
+        }
+
         @media screen and (max-width: 800px) {
             .contIcons {
                 justify-content: stretch;
@@ -570,11 +631,11 @@
             <colgroup>
                 <col class="col-id" style="width: 0%;">
                 <col style="width: 10%;">
-                <col style="width: 20%;">
+                <col style="width: 25%;">
+                <col style="width: 19%;">
                 <col style="width: 30%;">
-                <col style="width: 17%;">
-                <col style="width: 7%;">
-                <col style="width: 7%;">
+                <col style="width: 8%;">
+                <col style="width: 8%;">
             </colgroup>
             <tr class="header">
                 <th>ID</th>
@@ -660,10 +721,57 @@
                     </td>
                     <td>{{ item.nickname }}</td>
                     <td>{{ item.nombre }} {{ item.apellido }}</td>
-                    <td>
-                        {% if item.tipo == '1' %}Administrador{% endif %}
-                        {% if item.tipo == '2' %}Validador{% endif %}
-                        {% if item.tipo == '3' %}Capturador{% endif %}
+                    <td class="celda-tipo-usuario">
+                        {% if item.tipo == '1' %}
+                            <!-- Administrador: usuario con engranaje -->
+                            <span class="tipo-usuario-icono"
+                                data-tooltip="Administrador"
+                                tabindex="0"
+                                role="img"
+                                aria-label="Administrador">
+
+                                <svg class="icono-tipo-usuario" viewBox="0 0 24 24"
+                                    fill="none" stroke="currentColor" stroke-width="1.8"
+                                    stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="10" cy="7" r="4"/>
+                                    <path d="M3 21v-2a7 7 0 0 1 12-4.9"/>
+                                    <circle cx="18" cy="18" r="3"/>
+                                    <path d="M18 13.5v1M18 21.5v1M13.5 18h1M21.5 18h1"/>
+                                </svg>
+                            </span>
+                        {% elif item.tipo == '2' %}
+                            <!-- Validador: escudo con verificación -->
+                            <span class="tipo-usuario-icono"
+                                data-tooltip="Validador"
+                                tabindex="0"
+                                role="img"
+                                aria-label="Validador">
+
+                                <svg class="icono-tipo-usuario" viewBox="0 0 24 24"
+                                    fill="none" stroke="currentColor" stroke-width="1.8"
+                                    stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11z"/>
+                                    <path d="m9 12 2 2 4-4"/>
+                                </svg>
+                            </span>
+                        {% elif item.tipo == '3' %}
+                            <!-- Capturador: portapapeles con lápiz -->
+                            <span class="tipo-usuario-icono"
+                                data-tooltip="Capturador"
+                                tabindex="0"
+                                role="img"
+                                aria-label="Capturador">
+
+                                <svg class="icono-tipo-usuario" viewBox="0 0 24 24"
+                                    fill="none" stroke="currentColor" stroke-width="1.8"
+                                    stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="4" y="4" width="14" height="18" rx="2"/>
+                                    <path d="M9 4.5V3h4v1.5"/>
+                                    <path d="M8 9h6M8 13h4"/>
+                                    <path d="m14 17 4.5-4.5 2 2L16 19l-3 1z"/>
+                                </svg>
+                            </span>
+                        {% endif %}
                     </td>
                     <td class="celda-accion">
                         <a href="{% url 'editar_usuario' id_usuario=item.idUser %}" 

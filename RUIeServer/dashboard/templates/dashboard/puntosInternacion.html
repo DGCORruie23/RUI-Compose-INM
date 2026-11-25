@@ -514,6 +514,68 @@
             .contIcons > form > button {
                 width: 100%;
             }
+
+            .nombre-tipo-punto {
+                display: none;
+            }
+
+            .bdtable {
+                overflow-x: hidden;
+            }
+
+            #myTable {
+                width: 100%;
+                min-width: 0;
+                table-layout: fixed;
+            }
+
+            #myTable colgroup col:nth-child(1) {
+                width: 10% !important;
+            }
+
+            #myTable colgroup col:nth-child(2) {
+                width: 18% !important;
+            }
+
+            #myTable colgroup col:nth-child(3) {
+                width: 46% !important;
+            }
+
+            #myTable colgroup col:nth-child(4),
+            #myTable colgroup col:nth-child(5) {
+                width: 13% !important;
+            }
+
+            #myTable th,
+            #myTable td {
+                padding: 7px 4px;
+            }
+
+            #myTable th:first-child,
+            #myTable td:first-child {
+                padding-left: 6px;
+                padding-right: 4px;
+            }
+
+            #myTable th:nth-child(3),
+            #myTable td:nth-child(3) {
+                padding-left: 6px !important;
+            }
+
+            #myTable .celda-accion {
+                padding: 6px 2px;
+                text-align: center;
+                white-space: nowrap;
+            }
+
+            #myTable .celda-accion a,
+            #myTable .celda-accion button {
+                width: 78px;
+                min-height: 36px;
+                padding: 7px 4px;
+                margin: 0;
+                box-sizing: border-box;
+            }
         }
 
         @media screen and (min-width: 601px) {
